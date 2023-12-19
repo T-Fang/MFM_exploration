@@ -6,7 +6,7 @@ import pandas as pd
 import os
 import sys
 
-sys.path.insert(0, '/home/ftian/storage/MFM_exploration/')
+sys.path.insert(0, '/home/ftian/storage/projects/MFM_exploration')
 from src.scripts.Hybrid_CMA_ES_classes_rFIC import DLVersionCMAESValidator, DLVersionCMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
