@@ -6,17 +6,24 @@ import matplotlib.pyplot as plt
 import os
 from matplotlib.colors import ListedColormap
 import seaborn as sns
-import CBIG_func
+from src.utils import CBIG_func
 import optuna
 from optuna.trial import TrialState
 import pickle
 
 
-def tzeng_boxplot(lists, labels, save_fig_path=None, positions=None, fig_title='boxplot', xlabel='list', ylabel='y'):
+def tzeng_boxplot(lists,
+                  labels,
+                  save_fig_path=None,
+                  positions=None,
+                  fig_title='boxplot',
+                  xlabel='list',
+                  ylabel='y'):
     """Common used boxplot
 
     Args:
-        lists (ndarray or lists): Different from plt.boxplot, for my convenience (directly input a list of lists), the shape of ndarray should be [n_list, features], the transpose of plt.boxplot lists.
+        lists (ndarray or lists): Different from plt.boxplot, for my convenience (directly input a list of lists),
+                                  the shape of ndarray should be [n_list, features], the transpose of plt.boxplot lists.
         labels (_type_): A list of labels, must match len(lists)
         save_fig_path (_type_, optional): _description_. Defaults to None.
         positions (_type_, optional): _description_. Defaults to None.
@@ -32,18 +39,15 @@ def tzeng_boxplot(lists, labels, save_fig_path=None, positions=None, fig_title='
     """
 
     if save_fig_path is None:
-        raise Exception("If you need boxplot, please specify the figure save path.")
+        raise Exception(
+            "If you need boxplot, please specify the figure save path.")
     if positions is None:
         positions = range(len(lists))
     if isinstance(lists, np.ndarray):
         lists = lists.T
     print('Drawing box plot...')
     plt.figure()
-    plt.boxplot(lists,
-                labels=labels,
-                showfliers=False,
-                positions=positions
-                )
+    plt.boxplot(lists, labels=labels, showfliers=False, positions=positions)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(f'{fig_title}')
@@ -53,7 +57,10 @@ def tzeng_boxplot(lists, labels, save_fig_path=None, positions=None, fig_title='
     return 0
 
 
-def tzeng_check_logfile_empty(log_dir, log_nbr_list, logfile_prefix='', logfile_postfix='.log'):
+def tzeng_check_logfile_empty(log_dir,
+                              log_nbr_list,
+                              logfile_prefix='',
+                              logfile_postfix='.log'):
     """Check if error logs are empty. Output the error logs not empty in shell array format (to be easily copyied to shell scripts)
 
     Args:
@@ -61,7 +68,7 @@ def tzeng_check_logfile_empty(log_dir, log_nbr_list, logfile_prefix='', logfile_
         log_nbr_list (scalar or list or array-like): the log file nbrs list. If it's a scalar, will be np.arange(0, log_nbr_list, 1)
         logfile_prefix (str, optional): the log file name before the nbr. Defaults to ''.
         logfile_postfix (str, optional): the log file name after the nbr. Defaults to '.log'.
-    
+
     Examples:
         log_dir = '/home/tzeng/storage/Matlab/HCP_Dev/sh_logs/everysub'
         loglist = np.arange(51, 100)
@@ -72,7 +79,7 @@ def tzeng_check_logfile_empty(log_dir, log_nbr_list, logfile_prefix='', logfile_
         logfile_postfix = logfile_postfix + '.log'
     if np.isscalar(log_nbr_list):
         log_nbr_list = np.arange(log_nbr_list)
-    
+
     nonexist_list = []
     empty_list = []
     nonempty_list = []
@@ -87,7 +94,7 @@ def tzeng_check_logfile_empty(log_dir, log_nbr_list, logfile_prefix='', logfile_
             empty_list.append(i)
         else:
             nonempty_list.append(i)
-    
+
     return empty_list, nonempty_list, nonexist_list
 
 
@@ -127,7 +134,9 @@ def tzeng_fisher_average(corr_mat):
 
 
 def tzeng_group_SC_matrices(sc_mats):
-    """group SC matrices like that in matlab. Neglect 'nan' entries. Those entries with lower than half sc_mats > 0 will be set to 0. Scale the final SC by log function. Set the diagonal to be 0.
+    """group SC matrices like that in matlab. Neglect 'nan' entries.
+        Those entries with lower than half sc_mats > 0 will be set to 0.
+        Scale the final SC by log function. Set the diagonal to be 0.
 
     Args:
         sc_mats (np.array): [n_mats, n_roi, n_roi]
@@ -141,16 +150,16 @@ def tzeng_group_SC_matrices(sc_mats):
 
     for i in range(n_roi):
         for j in range(n_roi):
-            
-            if i == j:  #  if i == j, grouped_sc[i, j] = 0;
+
+            if i == j:  # if i == j, grouped_sc[i, j] = 0;
                 continue
-            
-            count_non_zero = 0  #  To count the number of non_zero
+
+            count_non_zero = 0  # To count the number of non_zero
             sum_temp = 0
             for mat_i in range(n_mats):  # For each SC matrix
                 if np.isnan(sc_mats[mat_i, i, j]):
                     continue
-                
+
                 if sc_mats[mat_i, i, j] != 0:
                     count_non_zero += 1
                     sum_temp += sc_mats[mat_i, i, j]
@@ -158,7 +167,7 @@ def tzeng_group_SC_matrices(sc_mats):
             # Only when there are over half of the SC[i, j] are not zero
             if count_non_zero >= 0.5 * n_mats:
                 grouped_sc[i, j] = np.log(sum_temp / count_non_zero)
-    
+
     return grouped_sc
 
 
@@ -176,7 +185,8 @@ def tzeng_list_difference(list_1, list_2, need_print=True, print_type=''):
     list_diff = np.setdiff1d(list_1, list_2)
     n_diff = len(list_diff)
     if need_print:
-        print("The number of different values (in list1 but not in list2): ", n_diff)
+        print("The number of different values (in list1 but not in list2): ",
+              n_diff)
         if print_type == 'sh':
             for i in range(n_diff):
                 print(list_diff[i], end=' ')
@@ -203,17 +213,19 @@ def tzeng_ln_Bessel(d, k, k0=None):
     """
     nu = d / 2 - 1
     if np.isscalar(k):
-        k = np.ones((1,)) * k
+        k = np.ones((1, )) * k
     out = np.log(sspec.iv(nu, k))
 
     if k0 is None:
         invalid_mask = np.isinf(out)
     else:
         invalid_mask = k > k0
-    
+
     if invalid_mask.any():
         if k0 is None:
-            raise Exception("Need an initial scalar k0, because some values are out of range.")
+            raise Exception(
+                "Need an initial scalar k0, because some values are out of range."
+            )
         ini_out = np.log(sspec.iv(nu, k0))
         if np.isinf(ini_out):
             raise Exception("Please use a smaller initial scalar k0.")
@@ -225,7 +237,7 @@ def tzeng_ln_Bessel(d, k, k0=None):
         u = (d - 1) / (2 * ks)
         adsum = np.sum(nu / ks + 1 / (u + np.sqrt(1 + u**2)), axis=1)
 
-        out[invalid_mask] =  ini_out + ofintv * adsum
+        out[invalid_mask] = ini_out + ofintv * adsum
 
     out = np.squeeze(out)
     return out
@@ -241,10 +253,10 @@ def tzeng_map_network_roi(network_dlabel, roi_dlabel):
     Returns:
         array: [roi_num, ] with 1 ~ network_num network assigning to each ROI
         dict: {f'network{i}': array([ROIs_belong_to_this_network])}
-    
+
     Example:
         network_dlabel: [4, 3, 0, 4, 4, ...]; roi_dlabel: [43, 55, 0, 33, 43, ... ]
-        
+
         network_dlabel = sio.loadmat('/home/tzeng/storage/Matlab/Utils/general_mats/Yeo7_fslr32.mat')
         network_dlabel = network_dlabel['dlabel']
         roi_dlabel = sio.loadmat('/home/tzeng/storage/Matlab/Utils/general_mats/Yan400_Yeo7_fslr32.mat')
@@ -253,14 +265,16 @@ def tzeng_map_network_roi(network_dlabel, roi_dlabel):
     """
     network_num = np.amax(network_dlabel)
     roi_num = np.amax(roi_dlabel)
-    
+
     overlap_mat = np.zeros((roi_num, network_num))
     for i in range(roi_num):
         for j in range(network_num):
-            overlap_mat[i, j] = np.sum(np.float64(roi_dlabel == i + 1) * np.float64(network_dlabel == j + 1))
+            overlap_mat[i, j] = np.sum(
+                np.float64(roi_dlabel == i + 1) *
+                np.float64(network_dlabel == j + 1))
 
     mapping_mat = np.argmax(overlap_mat, axis=1) + 1
-    
+
     mapping_dict = {}
     roi_list = np.arange(1, roi_num + 1, 1)
     for i in range(1, network_num + 1):
@@ -276,11 +290,13 @@ def tzeng_npy2mat(path, variable_name, target_dir, target_name=None):
         path (str): can be file or directory
         variable_name (str): The dictionary key for .mat file
         target_dir (str): The directory for saving .mat files
-        target_name (str or str list, optional): mat file name, if not specified it will keep the npy file(s)'s name. If list length is smaller than file number, then it will give name to first read-in files. Defaults to None.
+        target_name (str or str list, optional): mat file name, if not specified it will keep the npy file(s)'s name.
+                                                 If list length is smaller than file number,
+                                                 then it will give name to first read-in files. Defaults to None.
 
     Returns:
         0 or None: 0 - succeed, None - fail
-    
+
     Example:
         path = '/home/tzeng/storage/Python/Parcellation/Cluster/ClusterData/FC_group'
         target_dir = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/FC_group'
@@ -294,63 +310,79 @@ def tzeng_npy2mat(path, variable_name, target_dir, target_name=None):
 
     if os.path.isfile(path):
         filename = path.split('/')[-1]
-        
+
         if not filename.endswith('.npy'):
             print("The input file is not a numpy file.")
             return None
-        
+
         print(f'Start loading from {path}...')
         try:
             f = np.load(path)
             print(f'Successfully load in {filename}.')
-        except:
+        except Exception:
             print(f'Cannot load in {filename}.')
-            
+
         if target_name is None:
             target_name = filename[:-4] + '.mat'
-            
+
         try:
-            spio.savemat(os.path.join(target_dir, target_name), {variable_name:f})
+            spio.savemat(os.path.join(target_dir, target_name),
+                         {variable_name: f})
             print(f'Successfully saved to {target_name} in {target_dir}.')
-        except:
-            print("Cannot save mat file. Check your target directory and file name.")
-            
+        except Exception:
+            print(
+                "Cannot save mat file. Check your target directory and file name."
+            )
+
     elif os.path.isdir(path):
         print(f'Start loading from {path}...')
         file_list = os.listdir(path)
         npy_file_count = 0
-        
+
         for filename in file_list:
-            
+
             if filename.endswith('.npy'):
                 npy_file_count += 1
-                
+
                 try:
                     f = np.load(os.path.join(path, filename))
                     print(f'Successfully load in {filename}.')
-                except:
+                except Exception:
                     print(f'Cannot load in {filename}.')
-                
-                if target_name is not None and len(target_name) >= npy_file_count:
+
+                if target_name is not None and len(
+                        target_name) >= npy_file_count:
                     tmp_target_name = target_name[npy_file_count]
                 else:
                     tmp_target_name = filename[:-4] + '.mat'
-                
+
                 try:
-                    spio.savemat(os.path.join(target_dir, tmp_target_name), {variable_name:f})
-                    print(f'Successfully saved to {tmp_target_name} in {target_dir}.')
-                except:
+                    spio.savemat(os.path.join(target_dir, tmp_target_name),
+                                 {variable_name: f})
+                    print(
+                        f'Successfully saved to {tmp_target_name} in {target_dir}.'
+                    )
+                except Exception:
                     print("Cannot save mat file. Check your target directory.")
-                    
+
         print(f'Done for {path}. Totally transferred {npy_file_count} files.')
-    
+
     else:
         return None
-    
+
     return 0
 
 
-def tzeng_optuna_tune(from_sketch, study_name, store_dir, objective, direction, n_trials, timeout, ini_dict=None, n_startup_trials=5, n_warmup_steps=10):
+def tzeng_optuna_tune(from_sketch,
+                      study_name,
+                      store_dir,
+                      objective,
+                      direction,
+                      n_trials,
+                      timeout,
+                      ini_dict=None,
+                      n_startup_trials=5,
+                      n_warmup_steps=10):
     """optuna tune main function, TPESampler, MedianPruner
 
     Args:
@@ -372,17 +404,30 @@ def tzeng_optuna_tune(from_sketch, study_name, store_dir, objective, direction, 
     if from_sketch:
         seed = np.random.randint(0, 2**32 - 1)
         print('Seed: ', seed)
-        study = optuna.create_study(direction=direction, study_name=study_name, storage=storage_name, sampler=optuna.samplers.TPESampler(seed), pruner=optuna.pruners.MedianPruner(n_startup_trials=n_startup_trials, n_warmup_steps=n_warmup_steps))
+        study = optuna.create_study(direction=direction,
+                                    study_name=study_name,
+                                    storage=storage_name,
+                                    sampler=optuna.samplers.TPESampler(seed),
+                                    pruner=optuna.pruners.MedianPruner(
+                                        n_startup_trials=n_startup_trials,
+                                        n_warmup_steps=n_warmup_steps))
         if ini_dict is not None:
             study.enqueue_trial(ini_dict)
     else:
-        restored_sampler = pickle.load(open(os.path.join(store_dir, f"sampler_{study_name}.pkl"), "rb"))
-        study = optuna.create_study(direction="minimize", study_name=study_name, storage=storage_name, load_if_exists=True, sampler=restored_sampler)
+        restored_sampler = pickle.load(
+            open(os.path.join(store_dir, f"sampler_{study_name}.pkl"), "rb"))
+        study = optuna.create_study(direction="minimize",
+                                    study_name=study_name,
+                                    storage=storage_name,
+                                    load_if_exists=True,
+                                    sampler=restored_sampler)
 
     study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
-    pruned_trials = study.get_trials(deepcopy=False, states=[TrialState.PRUNED])
-    complete_trials = study.get_trials(deepcopy=False, states=[TrialState.COMPLETE])
+    pruned_trials = study.get_trials(deepcopy=False,
+                                     states=[TrialState.PRUNED])
+    complete_trials = study.get_trials(deepcopy=False,
+                                       states=[TrialState.COMPLETE])
 
     print("Study statistics: ")
     print("  Number of finished trials: ", len(study.trials))
@@ -398,14 +443,20 @@ def tzeng_optuna_tune(from_sketch, study_name, store_dir, objective, direction, 
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
 
-    with open(os.path.join(store_dir, f"sampler_{study_name}.pkl"), "wb") as fout:
+    with open(os.path.join(store_dir, f"sampler_{study_name}.pkl"),
+              "wb") as fout:
         pickle.dump(study.sampler, fout)
         print("Sampler saved.")
-    
+
     return
 
 
-def tzeng_scatter_with_regress_line(x_list, y_list, save_fig_path, figure_title='Scatter plot', xlabel='x', ylabel='y'):
+def tzeng_scatter_with_regress_line(x_list,
+                                    y_list,
+                                    save_fig_path,
+                                    figure_title='Scatter plot',
+                                    xlabel='x',
+                                    ylabel='y'):
     """Scatter plot with regress line and correlation shown beside figure title
 
     Args:
@@ -423,9 +474,14 @@ def tzeng_scatter_with_regress_line(x_list, y_list, save_fig_path, figure_title=
     x_list = np.array(x_list)
     y_list = np.array(y_list)
     # corr = np.corrcoef(y_list.reshape(1, -1), x_list.reshape(1, -1))[0, 1]
-    corr = CBIG_func.CBIG_corr(y_list.reshape((-1, 1)), x_list.astype(np.float64).reshape((-1, 1)))[0, 0]
+    corr = CBIG_func.CBIG_corr(y_list.reshape((-1, 1)),
+                               x_list.astype(np.float64).reshape((-1, 1)))[0,
+                                                                           0]
     plt.figure()
-    sns.regplot(x=x_list, y=y_list,  scatter_kws={'color': '#696969'}, line_kws={'color': 'red'})
+    sns.regplot(x=x_list,
+                y=y_list,
+                scatter_kws={'color': '#696969'},
+                line_kws={'color': 'red'})
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(f'{figure_title}, r={corr:.4f}')
@@ -445,7 +501,8 @@ def tzeng_visualize_FCD(fcd_mat, save_fig_path):
     Returns:
         _type_: _description_
     """
-    cmap = spio.loadmat('/home/shaoshi.z/storage/MFM/script/Rapaeh_color_table_FCD.mat')
+    cmap = spio.loadmat(
+        '/home/shaoshi.z/storage/MFM/script/Rapaeh_color_table_FCD.mat')
     cmap = np.array(cmap['c3'])
     cmap = np.hstack((cmap, np.ones((cmap.shape[0], 1))))  # [N, 4]
     cmap = ListedColormap(cmap)
@@ -461,7 +518,7 @@ def tzeng_KS_distance(s_cdf, t_cdf=None):
     Args:
         s_cdf (array): [s_labels, bins]
         t_cdf (array, optional): [t_labels, bins]. If None, will compute within s_cdf
-    
+
     Returns:
         array: distance matrix, [s_labels, t_labels]
     """
@@ -478,7 +535,15 @@ def tzeng_KS_distance(s_cdf, t_cdf=None):
     return distance_matrix
 
 
-def tzeng_2_sample_t_test_n_plot(list_1, list_2, need_boxplot, need_pvalue=True, labels=['list_1', 'list_2'], save_fig_path=None, fig_title='t_test', xlabel='list', ylabel='y'):
+def tzeng_2_sample_t_test_n_plot(list_1,
+                                 list_2,
+                                 need_boxplot,
+                                 need_pvalue=True,
+                                 labels=['list_1', 'list_2'],
+                                 save_fig_path=None,
+                                 fig_title='t_test',
+                                 xlabel='list',
+                                 ylabel='y'):
     """Perform 2 sample T-test and plot
 
     Args:
@@ -498,16 +563,14 @@ def tzeng_2_sample_t_test_n_plot(list_1, list_2, need_boxplot, need_pvalue=True,
         statistics, p_value = stats.ttest_ind(list_1, list_2)
         print('Average: ', np.mean(list_1), np.mean(list_2))
         print(f"T-test results: statistics: {statistics}; p-value: {p_value}")
-    
+
     if need_boxplot:
         if save_fig_path is None:
-            raise Exception("If you need boxplot, please specify the figure save path.")
+            raise Exception(
+                "If you need boxplot, please specify the figure save path.")
         print('Drawing box plot...')
         plt.figure()
-        plt.boxplot([list_1, list_2],
-                    labels=labels,
-                    showfliers=False
-                    )
+        plt.boxplot([list_1, list_2], labels=labels, showfliers=False)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
         if need_pvalue:
@@ -522,10 +585,12 @@ def tzeng_2_sample_t_test_n_plot(list_1, list_2, need_boxplot, need_pvalue=True,
 
 
 def test_main():
-    _, non_empty, non_exist = tzeng_check_logfile_empty('/home/tzeng/storage/Matlab/HCPS1200/logs/log_every_sub', np.arange(2, 1030), 's', '_error.log')
+    _, non_empty, non_exist = tzeng_check_logfile_empty(
+        '/home/tzeng/storage/Matlab/HCPS1200/logs/log_every_sub',
+        np.arange(2, 1030), 's', '_error.log')
     print(non_empty)
     print(non_exist)
-    
+
 
 if __name__ == "__main__":
     test_main()

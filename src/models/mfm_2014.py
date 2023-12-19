@@ -2,6 +2,8 @@ import math
 import torch
 import numpy as np
 import time
+import configparser
+import scipy.io as spio
 from scipy.optimize import fsolve
 from tqdm import tqdm
 
@@ -23,6 +25,7 @@ def torch_corr_3D(vec_3d):
 
 
 class MfmModel2014:
+
     def __init__(self, config, parameter, sc_euler, dt):
         """
         Deco 2014
@@ -53,9 +56,9 @@ class MfmModel2014:
         self.sc_euler = sc_euler
         self.dt = dt
         self.w_EE = parameter[0:self.N]
-        self.w_EI = parameter[self.N: 2 * self.N]
+        self.w_EI = parameter[self.N:2 * self.N]
         self.G = parameter[2 * self.N]
-        self.sigma = parameter[2 * self.N + 1: 3 * self.N + 1]
+        self.sigma = parameter[2 * self.N + 1:3 * self.N + 1]
 
         # Synaptic Dynamical Equations Constants
         synaptic_constants = config['Synaptic Dynamical Equations Constants']
@@ -75,7 +78,7 @@ class MfmModel2014:
         # self.r_E_min = float(synaptic_constants['r_E_min'])
         # self.r_E_max = float(synaptic_constants['r_E_max'])
         # self.S_E_ave = float(synaptic_constants['S_E_ave'])
-        
+
         # self.r_E = self.S_E_ave / (self.tau_E * self.gamma_kin * (1 - self.S_E_ave))
         self.r_E = 3
         print(f"Excitatory firing rate will be around {self.r_E}.")
@@ -84,33 +87,46 @@ class MfmModel2014:
 
         # Hemodynamic Model Constants
         hemodynamic_constants = config['Hemodynamic Model Constants']
-        self.V0 = float(hemodynamic_constants['V0'])  # resting blood volume fraction
-        self.kappa = float(hemodynamic_constants['kappa'])  # [s^-1] rate of signal decay
-        self.gamma_hemo = float(hemodynamic_constants['gamma_hemo'])  # [s^-1] rate of flow-dependent elimination
-        self.tau = float(hemodynamic_constants['tau'])  # [s] hemodynamic transit time
+        self.V0 = float(
+            hemodynamic_constants['V0'])  # resting blood volume fraction
+        self.kappa = float(
+            hemodynamic_constants['kappa'])  # [s^-1] rate of signal decay
+        self.gamma_hemo = float(hemodynamic_constants['gamma_hemo']
+                                )  # [s^-1] rate of flow-dependent elimination
+        self.tau = float(
+            hemodynamic_constants['tau'])  # [s] hemodynamic transit time
         self.alpha = float(hemodynamic_constants['alpha'])  # Grubb's exponent
-        self.rho = float(hemodynamic_constants['rho'])  # resting oxygen extraction fraction
-        self.B0 = float(hemodynamic_constants['B0'])  # magnetic field strength, T
+        self.rho = float(
+            hemodynamic_constants['rho'])  # resting oxygen extraction fraction
+        self.B0 = float(
+            hemodynamic_constants['B0'])  # magnetic field strength, T
         self.TE = float(hemodynamic_constants['TE'])  # TE echo time, s
-        self.r0 = float(hemodynamic_constants['r0'])  # the intravascular relaxation rate, Hz
-        self.epsilon_hemo = float(hemodynamic_constants['epsilon_hemo'])  # the ratio between intravascular and extravascular MR signal
+        self.r0 = float(hemodynamic_constants['r0']
+                        )  # the intravascular relaxation rate, Hz
+        self.epsilon_hemo = float(
+            hemodynamic_constants['epsilon_hemo']
+        )  # the ratio between intravascular and extravascular MR signal
         self.k1 = 4.3 * 28.265 * self.B0 * self.TE * self.rho
         self.k2 = self.epsilon_hemo * self.r0 * self.TE * self.rho
         self.k3 = 1 - self.epsilon_hemo
 
         # if self.is_w_IE_fixed:
-            # Calculating w_IE
-        
+        # Calculating w_IE
+
         # Calculate S_E average
         S_E_ini = 0.1641205151
-        self.S_E_ave, info_dict, ier, message= fsolve(self._solve_S_E_ave, S_E_ini, full_output=True)
+        self.S_E_ave, info_dict, ier, message = fsolve(self._solve_S_E_ave,
+                                                       S_E_ini,
+                                                       full_output=True)
         if ier == 0:
             print(message)
         self.S_E_ave = self.S_E_ave[0]  # convert 1 element array to float
 
         # Calculate I_E average
         I_E_ini = 0.3772259651
-        I_E_ave, info_dict, ier, message= fsolve(self._solve_I_E_ave, I_E_ini, full_output=True)
+        I_E_ave, info_dict, ier, message = fsolve(self._solve_I_E_ave,
+                                                  I_E_ini,
+                                                  full_output=True)
         if ier == 0:
             print(message)
         I_E_ave = I_E_ave[0]
@@ -120,20 +136,32 @@ class MfmModel2014:
         I_I_ave = np.ones_like(I_I_ini)
         for m in range(self.M):
             I_I_func_args = self.S_E_ave, self.w_EI[:, m]
-            I_I_ave[:, m], info_dict, ier, message = fsolve(self._solve_I_I, I_I_ini[:, m],
-                                                            args=I_I_func_args, full_output=True)
+            I_I_ave[:, m], info_dict, ier, message = fsolve(self._solve_I_I,
+                                                            I_I_ini[:, m],
+                                                            args=I_I_func_args,
+                                                            full_output=True)
             if ier == 0:
                 print(message)
-        
-        S_I_ave = self.tau_I * (self.a_I * I_I_ave - self.b_I) / (1 - np.exp(-self.d_I * (self.a_I * I_I_ave - self.b_I)))
+
+        S_I_ave = self.tau_I * (self.a_I * I_I_ave - self.b_I) / (
+            1 - np.exp(-self.d_I * (self.a_I * I_I_ave - self.b_I)))
         S_I_ave = torch.as_tensor(S_I_ave)
-        self.w_IE = (self.W_E * self.I_0 + self.w_EE * self.J_NMDA * self.S_E_ave +
-                        self.G * self.J_NMDA * torch.matmul(self.sc_euler, self.S_E_ave * torch.ones(self.N, self.M)) - I_E_ave) / S_I_ave
+        self.w_IE = (
+            self.W_E * self.I_0 + self.w_EE * self.J_NMDA * self.S_E_ave +
+            self.G * self.J_NMDA * torch.matmul(
+                self.sc_euler, self.S_E_ave * torch.ones(self.N, self.M)) -
+            I_E_ave) / S_I_ave
         # w_IE: [N, M]
 
         print("Successfully init MFM 2014 model!")
 
-    def CBIG_2014_mfm_simulation(self, simulate_time,  burn_in_time, TR, warm_up_t=5000, use_tqdm=False, need_EI=False):
+    def CBIG_2014_mfm_simulation(self,
+                                 simulate_time,
+                                 burn_in_time,
+                                 TR,
+                                 warm_up_t=5000,
+                                 use_tqdm=False,
+                                 need_EI=False):
         """
         For M sets of parameters. Do not store the whole process like S_E, S_I. Save memory.
         :param warm_up_t: The loop for warm up S_E and S_I
@@ -182,9 +210,12 @@ class MfmModel2014:
             main_loop = range(t_len)
 
         for t1 in warm_loop:
-            dSE_dt, dSI_dt, _ = self._synaptic_dynamical_equations_2014(S_E, S_I)
-            S_E = S_E + dSE_dt * dt + self.sigma * torch.randn(N, M) * math.sqrt(dt)
-            S_I = S_I + dSI_dt * dt + self.sigma * torch.randn(N, M) * math.sqrt(dt)
+            dSE_dt, dSI_dt, _ = self._synaptic_dynamical_equations_2014(
+                S_E, S_I)
+            S_E = S_E + dSE_dt * dt + self.sigma * torch.randn(
+                N, M) * math.sqrt(dt)
+            S_I = S_I + dSI_dt * dt + self.sigma * torch.randn(
+                N, M) * math.sqrt(dt)
         # warm_loop.close()
         # print("\nEnd warming up and start main body...")
 
@@ -194,11 +225,15 @@ class MfmModel2014:
 
         # Start calculating
         for t in main_loop:
-            dSE_dt, dSI_dt, r_E = self._synaptic_dynamical_equations_2014(S_E, S_I)
-            S_E = S_E + dSE_dt * dt + self.sigma * torch.randn(N, M) * math.sqrt(dt)
+            dSE_dt, dSI_dt, r_E = self._synaptic_dynamical_equations_2014(
+                S_E, S_I)
+            S_E = S_E + dSE_dt * dt + self.sigma * torch.randn(
+                N, M) * math.sqrt(dt)
             # here math.sqrt(dt) is to make noise equivalent under different time interval, see notes.
-            S_I = S_I + dSI_dt * dt + self.sigma * torch.randn(N, M) * math.sqrt(dt)
-            dz_dt, df_dt, dv_dt, dq_dt = self._hemodynamic_equations(S_E, z, f, v_volume, q)
+            S_I = S_I + dSI_dt * dt + self.sigma * torch.randn(
+                N, M) * math.sqrt(dt)
+            dz_dt, df_dt, dv_dt, dq_dt = self._hemodynamic_equations(
+                S_E, z, f, v_volume, q)
             z = z + dz_dt * dt
             f = f + df_dt * dt
             v_volume = v_volume + dv_dt * dt
@@ -209,18 +244,21 @@ class MfmModel2014:
             r_E_ave = r_E_ave + r_E
 
             if (t + 2) % t_inter == 0:
-                bold[:, :, count_bold] = 100 / self.rho * self.V0 * (self.k1 * (1 - q)
-                                                                     + self.k2 * (1 - q / v_volume)
-                                                                     + self.k3 * (1 - v_volume))
+                bold[:, :, count_bold] = 100 / self.rho * self.V0 * (
+                    self.k1 * (1 - q) + self.k2 *
+                    (1 - q / v_volume) + self.k3 * (1 - v_volume))
                 # here 100 / rho comes from Xiaolu's code, just a nonsense multiplication :.:
                 count_bold += 1
                 '''
                 if not use_tqdm:
                     print("Steps: [{}/{}]".format(t, t_len))
                 '''
-        bold[:, :, count_bold] = 100 / self.rho * self.V0 * (self.k1 * (1 - q)
-                                                             + self.k2 * (1 - q / v_volume)
-                                                             + self.k3 * (1 - v_volume))
+        bold[:, :,
+             count_bold] = 100 / self.rho * self.V0 * (self.k1 *
+                                                       (1 - q) + self.k2 *
+                                                       (1 - q / v_volume) +
+                                                       self.k3 *
+                                                       (1 - v_volume))
         # end for loop
         burn_in_bold = int(burn_in_t / TR)
 
@@ -233,7 +271,9 @@ class MfmModel2014:
             if torch.isnan(r_E_ave[:, i]).any():
                 print("r_E exploded!")
                 valid_M_mask[i] = False
-            elif (r_E_ave[:, i] < self.r_E_min).any() or (r_E_ave[:, i] > self.r_E_max).any():
+            elif (r_E_ave[:, i]
+                  < self.r_E_min).any() or (r_E_ave[:, i]
+                                            > self.r_E_max).any():
                 bold[:, i, :] = float('nan')
                 valid_M_mask[i] = False
             elif torch.isnan(bold[:, i, :]).any():
@@ -244,9 +284,10 @@ class MfmModel2014:
         print("BOLD shape with burn-in: ", bold.shape)
 
         if need_EI:
-            return bold[:, :, burn_in_bold+1:], valid_M_mask, S_E_ave, S_I_ave
+            return bold[:, :,
+                        burn_in_bold + 1:], valid_M_mask, S_E_ave, S_I_ave
         else:
-            return bold[:, :, burn_in_bold+1:], valid_M_mask
+            return bold[:, :, burn_in_bold + 1:], valid_M_mask
 
     @staticmethod
     def all_loss_calculate_from_fc_fcd(fc_sim, fcd_hist, fc_emp, emp_fcd_cum):
@@ -316,7 +357,8 @@ class MfmModel2014:
         vec_sim = fc_sim[:, mask]
 
         # L1 version 1: abs(mean)
-        L1_cost = torch.abs(torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        L1_cost = torch.abs(
+            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
         # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
@@ -371,7 +413,8 @@ class MfmModel2014:
         t_len = bold.shape[2]
         window_num = t_len - window_size + 1
         if t_len < window_size:
-            raise Exception("The length of bold signal is shorter than the window size!")
+            raise Exception(
+                "The length of bold signal is shorter than the window size!")
         fc_list = torch.zeros(M, window_num, N, N)
         for t in range(0, window_num):
             bold_single = bold[:, :, t:t + window_size]
@@ -399,7 +442,10 @@ class MfmModel2014:
         fcd_hist = torch.ones(bins, M)
 
         for hist_i in range(M):
-            fcd_hist[:, hist_i] = torch.histc(fcd_vec[hist_i], bins=bins, min=-1., max=1.)
+            fcd_hist[:, hist_i] = torch.histc(fcd_vec[hist_i],
+                                              bins=bins,
+                                              min=-1.,
+                                              max=1.)
 
         # Calculate whole FCD matrix
         # fcd_mat = fcd_mat + fcd_mat.transpose(1, 2) + torch.eye(window_num).expand(M, -1, -1)
@@ -438,10 +484,15 @@ class MfmModel2014:
         else:
             w_IE = 0
         '''
-        I_E_t = self.W_E * self.I_0 + self.w_EE * self.J_NMDA * S_E_t + self.G * self.J_NMDA * torch.matmul(self.sc_euler, S_E_t) - self.w_IE * S_I_t
+        I_E_t = self.W_E * self.I_0 + self.w_EE * self.J_NMDA * S_E_t + self.G * self.J_NMDA * torch.matmul(
+            self.sc_euler, S_E_t) - self.w_IE * S_I_t
         I_I_t = self.W_I * self.I_0 + self.w_EI * self.J_NMDA * S_E_t - S_I_t
-        r_E = (self.a_E * I_E_t - self.b_E) / (1 - torch.exp(-self.d_E * (self.a_E * I_E_t - self.b_E)))
-        r_I = (self.a_I * I_I_t - self.b_I) / (1 - torch.exp(-self.d_I * (self.a_I * I_I_t - self.b_I)))
+        r_E = (self.a_E * I_E_t -
+               self.b_E) / (1 - torch.exp(-self.d_E *
+                                          (self.a_E * I_E_t - self.b_E)))
+        r_I = (self.a_I * I_I_t -
+               self.b_I) / (1 - torch.exp(-self.d_I *
+                                          (self.a_I * I_I_t - self.b_I)))
         dSE_dt = -S_E_t / self.tau_E + (1 - S_E_t) * self.gamma_kin * r_E
         dSI_dt = -S_I_t / self.tau_I + r_I
         return dSE_dt, dSI_dt, r_E
@@ -449,45 +500,53 @@ class MfmModel2014:
     def _hemodynamic_equations(self, S_E_t, z_t, f_t, v_t, q_t):
         dz_dt = S_E_t - self.kappa * z_t - self.gamma_hemo * (f_t - 1)
         df_dt = z_t
-        dv_dt = (f_t - v_t ** (1 / self.alpha)) / self.tau
-        dq_dt = (f_t / self.rho * (1 - (1 - self.rho) ** (1 / f_t)) - q_t * v_t ** (1 / self.alpha - 1)) / self.tau
+        dv_dt = (f_t - v_t**(1 / self.alpha)) / self.tau
+        dq_dt = (f_t / self.rho * (1 - (1 - self.rho)**(1 / f_t)) -
+                 q_t * v_t**(1 / self.alpha - 1)) / self.tau
         return dz_dt, df_dt, dv_dt, dq_dt
 
     def _solve_I_I(self, I_I_ave, S_E_ave, w_EI_m):
         if torch.cuda.is_available():
             w_EI_m = w_EI_m.cpu().numpy()
-        phi_I_I_ave = (self.a_I * I_I_ave - self.b_I) / (1 - np.exp(-self.d_I * (self.a_I * I_I_ave - self.b_I)))
+        phi_I_I_ave = (self.a_I * I_I_ave - self.b_I) / (
+            1 - np.exp(-self.d_I * (self.a_I * I_I_ave - self.b_I)))
         res = self.W_I * self.I_0 + self.J_NMDA * w_EI_m * S_E_ave - phi_I_I_ave * self.tau_I - I_I_ave
         return res
-    
+
     def _solve_S_E_ave(self, S_E_ave):
-        res = S_E_ave / (self.tau_E * self.gamma_kin * (1 - S_E_ave)) - self.r_E
+        res = S_E_ave / (self.tau_E * self.gamma_kin *
+                         (1 - S_E_ave)) - self.r_E
         return res
-    
+
     def _solve_I_E_ave(self, I_E_ave):
         tmp = self.a_E * I_E_ave - self.b_E
         res = tmp / (1 - np.exp(-self.d_E * tmp)) - self.r_E
         return res
 
 
-def main_mfm_2014():
-    import configparser
-    import scipy.io as spio
+if __name__ == '__main__':
 
     config = configparser.ConfigParser()
     # config.read('/home/tzeng/storage/Python/MFMApplication/configs/perturbed_configs/PNC/trial1/config_pert4.ini')
-    config.read('/home/tzeng/storage/Python/MFMApplication/configs/general/config_pnc.ini')
+    config.read(
+        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_pnc.ini'
+    )
     parameter = torch.rand(205, 10)
     print("Parameter's shape: ", parameter.shape)
 
     # Get sc matrix
-    group_mats = spio.loadmat('/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat')
+    group_mats = spio.loadmat(
+        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat'
+    )
     sc_mat = torch.as_tensor(group_mats['sc_group_1029'])
-    sc_euler = sc_mat / torch.max(sc_mat) * 0.02  # [68, 68] for Euler integration
+    sc_euler = sc_mat / torch.max(
+        sc_mat) * 0.02  # [68, 68] for Euler integration
 
     # Start
     mfm_model = MfmModel2014(config, parameter, sc_euler, dt=0.006)
-    bold, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(simulate_time=0.1, burn_in_time=0.1, use_tqdm=True)
+    bold, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(simulate_time=0.1,
+                                                            burn_in_time=0.1,
+                                                            use_tqdm=True)
 
     print("bold shape: ", bold.shape)  # [N, M, t_len]
     print("valid M mask: ", valid_M_mask)
@@ -495,7 +554,3 @@ def main_mfm_2014():
         print("Good!")
     else:
         print("None!")
-
-
-if __name__ == '__main__':
-    main_mfm_2014()
