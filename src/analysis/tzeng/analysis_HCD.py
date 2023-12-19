@@ -1,15 +1,12 @@
 import torch
-import sys
 import scipy.io as sio
-import scipy.stats as stats
-import seaborn as sns
+# import scipy.stats as stats
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-sys.path.append('/home/tzeng/storage/Python/MFMDeepLearning')
-import analysis_functions
+from src.analysis import analysis_functions
 
 
 def plot_pred_loss(nbr=None):
@@ -21,12 +18,19 @@ def plot_pred_loss(nbr=None):
     split_nbr = 1
     trial_nbr = 22
     epochs = 50
-    param_save_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/{target}/train/trial{trial_nbr}/split{split_nbr}/{prefix}{nbr}'
-    figure_save_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/{target}/figures/pred_loss/trial{trial_nbr}'
+    param_save_dir = (
+        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/'
+        f'{target}/train/trial{trial_nbr}/split{split_nbr}/{prefix}{nbr}')
+    figure_save_dir = (
+        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/'
+        f'{target}/figures/pred_loss/trial{trial_nbr}')
     if not os.path.exists(figure_save_dir):
         os.makedirs(figure_save_dir)
-    figure_save_path = os.path.join(figure_save_dir, f'split{split_nbr}_{prefix}{nbr}.png')
-    analysis_functions.plot_pred_loss(epochs=epochs, param_save_dir=param_save_dir, figure_path=figure_save_path)
+    figure_save_path = os.path.join(figure_save_dir,
+                                    f'split{split_nbr}_{prefix}{nbr}.png')
+    analysis_functions.plot_pred_loss(epochs=epochs,
+                                      param_save_dir=param_save_dir,
+                                      figure_path=figure_save_path)
     return
 
 
@@ -34,12 +38,23 @@ def check_dl_epochs():
     trial_nbr = 1
     nbr = 1
     parent_dir = '/home/tzeng/storage/Python/MFMApplication/HCDParams/group'
-    train_results_dir = os.path.join(parent_dir, f'train/trial{trial_nbr}/group{nbr}')
-    val_results_dir = os.path.join(parent_dir, f'val_train_param/trial{trial_nbr}/group{nbr}')
+    train_results_dir = os.path.join(parent_dir,
+                                     f'train/trial{trial_nbr}/group{nbr}')
+    val_results_dir = os.path.join(
+        parent_dir, f'val_train_param/trial{trial_nbr}/group{nbr}')
     save_dir = os.path.join(parent_dir, 'figures')
     epochs = 67
     distinct_name = f'trial{trial_nbr}_{nbr}'
-    analysis_functions.check_dl_version_test_results_epochs(train_results_dir, val_results_dir, save_dir, epochs, distinct_name, need_plot_overlay_dl_euler=True, need_save_record=True, need_plot_ground_euler=False, ground_dir=None)
+    analysis_functions.check_dl_version_test_results_epochs(
+        train_results_dir,
+        val_results_dir,
+        save_dir,
+        epochs,
+        distinct_name,
+        need_plot_overlay_dl_euler=True,
+        need_save_record=True,
+        need_plot_ground_euler=False,
+        ground_dir=None)
     return 0
 
 
@@ -56,13 +71,19 @@ def age_distribution():
     plt.title('HCP-D age distribution')
     plt.xlabel('Age/year')
     plt.ylabel('number')
-    plt.savefig('/home/tzeng/storage/Python/MFMApplication/figures/HCD/age/HCD_age_dist.png')
+    plt.savefig(
+        '/home/ftian/storage/projects/MFM_exploration/reports/figures/HCD/age/HCD_age_dist.png'
+    )
     plt.close()
     print("Done.")
 
 
 def site_age_distribution():
-    ndar_info = pd.read_csv('/mnt/nas/CSC7/Yeolab/Data/HCP/HCP_Development/HCPDevelopmentRec/ndar_subject01.txt', sep='\t', header=0, index_col=False)
+    ndar_info = pd.read_csv(
+        '/mnt/nas/CSC7/Yeolab/Data/HCP/HCP_Development/HCPDevelopmentRec/ndar_subject01.txt',
+        sep='\t',
+        header=0,
+        index_col=False)
     n_sub = 652
     site_list = ['Harvard', 'UMinn', 'UCLA', 'WashU']
     count = 0
@@ -77,14 +98,16 @@ def site_age_distribution():
             age_list.append(int(age) / 12)
         print("Subject number: ", len(age_list))
         age_list = np.array(age_list)
-        min_age = np.amin(age_list)
+        min_age = np.amin(age_list)  # noqa
         max_age = np.amax(age_list)
-        
+
         plt.hist(age_list, bins=np.arange(8, int(max_age) + 1, 1))
         plt.title(f'Age distribution - {site_name}, {len(age_list)} subjects')
         plt.xlabel('Age/year')
         plt.ylabel('number')
-        plt.savefig(f'/home/tzeng/storage/Python/MFMApplication/figures/HCD/age/{site_name}_age_dist.png')
+        plt.savefig(
+            f'/home/ftian/storage/projects/MFM_exploration/reports/figures/HCD/age/{site_name}_age_dist.png'
+        )
         plt.close()
         print(f'{site_name} mean: ', np.mean(age_list))
         print(f'{site_name} std: ', np.std(age_list))
@@ -95,12 +118,13 @@ def plot_EI_ratio_group():
     split_nbr = 1
     trial_nbr = 7
     # trial_nbr_2 = 3
-    EI_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
-    # EI_dir_2 = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/group/EI_ratio/trial{trial_nbr_2}/split{split_nbr}'
-    save_fig_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/group/figures/EI/trial{trial_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
+    # EI_dir_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr_2}/split{split_nbr}'
+    save_fig_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/figures/EI/trial{trial_nbr}'
     if not os.path.exists(save_fig_dir):
         os.makedirs(save_fig_dir)
-    save_fig_path = os.path.join(save_fig_dir, f'split{split_nbr}_mean_development_fit.png')
+    save_fig_path = os.path.join(save_fig_dir,
+                                 f'split{split_nbr}_mean_development_fit.png')
 
     EI_ave_list = []
     age_list = []
@@ -123,7 +147,7 @@ def plot_EI_ratio_group():
 def regional_EI():
     split_nbr = 1
     trial_nbr = 19
-    EI_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
     save_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/EI_ratio/group_regional_age_trial{trial_nbr}.mat'
 
     EI_regional_list = []
@@ -139,7 +163,7 @@ def regional_EI():
         ei_tmp = torch.load(EI_path)
         EI_regional_list.append(ei_tmp['ei_ratio'].squeeze().numpy())
         age_list.append(np.mean(age))
-    
+
     EI_regional_list = np.array(EI_regional_list)
     age_list = np.array(age_list)
     reg = LinearRegression()

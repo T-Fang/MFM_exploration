@@ -6,6 +6,7 @@ import scipy.io as sio
 import scipy.stats as stats
 import matplotlib.pyplot as plt
 import sys
+
 sys.path.append('/home/tzeng/storage/Python/UtilsTzeng')
 import CBIG_func
 from tzeng_func_torch import tzeng_KS_distance, parameterize_myelin_rsfc
@@ -13,9 +14,13 @@ import tzeng_func
 
 
 def generate_sublist():
-    save_param_dir = '/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/EI_ratio'
+    save_param_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio'
 
-    subjects_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    subjects_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     subjects_age = np.array(subjects_age)
 
     subject_id_list = []
@@ -26,7 +31,11 @@ def generate_sublist():
         subject_id_list.append(subjects_age[sub_nbr, 0])
     print("Valid subject number: ", len(subject_id_list))
     subject_id_file = pd.DataFrame(subject_id_list, columns=['subject_id'])
-    subject_id_file.to_csv('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_list.txt', sep='\t', header=False, index=False)
+    subject_id_file.to_csv(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_list.txt',
+        sep='\t',
+        header=False,
+        index=False)
     print("Saved.")
 
 
@@ -36,7 +45,7 @@ def EI_separate():
     sub_list_above = []
     sub_list_below = []
     for sub_nbr in range(0, 885):
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         d = torch.load(EI_path)
@@ -48,7 +57,7 @@ def EI_separate():
     print("Below sub num: ", len(sub_list_below))
     sub_list_above = np.array(sub_list_above)
     sub_list_below = np.array(sub_list_below)
-    
+
     # np.save(f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_above_{threshold}.npy', sub_list_above)
     # np.save(f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_below_{threshold}.npy', sub_list_below)
     print(sub_list_above)
@@ -59,8 +68,8 @@ def EI_comparison_normal_hybrid():
     ei_1_list = []
     ei_2_list = []
     for sub_nbr in range(0, 885):
-        EI_path_1 = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
-        EI_path_2 = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual/EI_ratio/sub{sub_nbr}.pth'
+        EI_path_1 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path_1) or not os.path.exists(EI_path_2):
             continue
         d_1 = torch.load(EI_path_1)
@@ -74,15 +83,23 @@ def EI_comparison_normal_hybrid():
     plt.scatter(ei_1_list, ei_2_list, s=10)
     plt.xlabel('normal EI')
     plt.ylabel('hybrid EI')
-    plt.savefig('/home/tzeng/storage/Python/MFMApplication/analysis/whole/compare_normal_hybrid_ei.png')
+    plt.savefig(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/compare_normal_hybrid_ei.png'
+    )
     plt.close()
     print("Saved.")
 
 
 def EI_inves():
 
-    sub_list = np.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy')
-    subjects_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    sub_list = np.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy'
+    )
+    subjects_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     subjects_age = np.array(subjects_age)
 
     sub_num = len(sub_list)
@@ -96,32 +113,47 @@ def EI_inves():
         sub_nbr = sub_list[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
-        fc_emp = pd.read_csv(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv', header=None, index_col=False)
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
+        fc_emp = pd.read_csv(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
+            header=None,
+            index_col=False)
         fc_emp = torch.as_tensor(np.array(fc_emp))
-        emp_fcd_cum = sio.loadmat(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat')
-        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(np.float64)).T
+        emp_fcd_cum = sio.loadmat(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
+        )
+        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(
+            np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
         fc_emp_list[i] = fc_emp[fc_mask]
         emp_fcd_list[i] = torch.squeeze(emp_fcd_cum)
-    
+
     # Corr and KS
     '''fc_corr = CBIG_corr(fc_emp_list.T)
     torch.save(fc_corr, '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fc_corr_above210.pth')'''
 
     fcd_ks = tzeng_KS_distance(emp_fcd_list)
     print("KS: ", fcd_ks.shape)
-    torch.save(fcd_ks, '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_below210.pth')
+    torch.save(
+        fcd_ks,
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_below210.pth'
+    )
     print("Saved.")
 
 
 def EI_inves_2():
 
-    subjects_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    subjects_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     subjects_age = np.array(subjects_age)
 
-    sub_list_1 = np.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_above_210.npy')
+    sub_list_1 = np.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_above_210.npy'
+    )
     sub_num = len(sub_list_1)
     print("Subject number: ", sub_num)
     fc_mask = torch.triu(torch.ones(68, 68, dtype=torch.bool), 1)
@@ -131,17 +163,24 @@ def EI_inves_2():
         sub_nbr = sub_list_1[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        fc_emp = pd.read_csv(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv', header=None, index_col=False)
+        fc_emp = pd.read_csv(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
+            header=None,
+            index_col=False)
         fc_emp = torch.as_tensor(np.array(fc_emp))
-        emp_fcd_cum = sio.loadmat(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat')
-        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(np.float64)).T
+        emp_fcd_cum = sio.loadmat(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
+        )
+        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(
+            np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
         fc_emp_list_1[i] = fc_emp[fc_mask]
         emp_fcd_list_1[i] = torch.squeeze(emp_fcd_cum)
-    
 
-    sub_list_2 = np.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy')
+    sub_list_2 = np.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy'
+    )
     sub_num = len(sub_list_2)
     print("Subject number: ", sub_num)
     fc_mask = torch.triu(torch.ones(68, 68, dtype=torch.bool), 1)
@@ -151,15 +190,21 @@ def EI_inves_2():
         sub_nbr = sub_list_2[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        fc_emp = pd.read_csv(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv', header=None, index_col=False)
+        fc_emp = pd.read_csv(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
+            header=None,
+            index_col=False)
         fc_emp = torch.as_tensor(np.array(fc_emp))
-        emp_fcd_cum = sio.loadmat(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat')
-        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(np.float64)).T
+        emp_fcd_cum = sio.loadmat(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
+        )
+        emp_fcd_cum = torch.as_tensor(emp_fcd_cum['FCD_CDF'].astype(
+            np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
         fc_emp_list_2[i] = fc_emp[fc_mask]
         emp_fcd_list_2[i] = torch.squeeze(emp_fcd_cum)
-    
+
     # Corr and KS
     '''fc_corr = CBIG_corr(fc_emp_list_1.T, fc_emp_list_2.T)
     print("FC Corr: ", fc_corr)
@@ -168,14 +213,23 @@ def EI_inves_2():
 
     fcd_ks = tzeng_KS_distance(emp_fcd_list_1, emp_fcd_list_2)
     print("FCD KS: ", fcd_ks)
-    torch.save(fcd_ks, '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above_vs_below.pth')
+    torch.save(
+        fcd_ks,
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above_vs_below.pth'
+    )
     print("Saved.")
 
 
 def EI_inves_3():
-    metric_above = torch.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above210.pth')
-    metric_below = torch.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_below210.pth')
-    metric_above_below = torch.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above_vs_below.pth')
+    metric_above = torch.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above210.pth'
+    )
+    metric_below = torch.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_below210.pth'
+    )
+    metric_above_below = torch.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/fcd_ks_above_vs_below.pth'
+    )
 
     above_mask = torch.eye(metric_above.shape[0], dtype=torch.bool)
     metric_above[above_mask] = float('nan')
@@ -186,25 +240,39 @@ def EI_inves_3():
     ave_below = torch.nanmean(metric_below, dim=1)
     ave_above_below = torch.mean(metric_above_below, dim=1)
     ave_below_above = torch.mean(metric_above_below.T, dim=1)
-    statistics, p_value = stats.ttest_ind(torch.cat((ave_above, ave_below)), torch.cat((ave_above_below, ave_below_above)))
+    statistics, p_value = stats.ttest_ind(
+        torch.cat((ave_above, ave_below)),
+        torch.cat((ave_above_below, ave_below_above)))
     print(f"T-test results: statistics: {statistics}; p-value: {p_value}")
-    print("Average: ", torch.mean(ave_above).item(), torch.mean(ave_below).item(), torch.mean(ave_above_below).item())
+    print("Average: ",
+          torch.mean(ave_above).item(),
+          torch.mean(ave_below).item(),
+          torch.mean(ave_above_below).item())
 
 
 def ei_cognitive_age():
-    pnc_demo = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
+    pnc_demo = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
     scan_ids_demo = np.array(pnc_demo['scanid'])
     re_ids = np.array(pnc_demo['reid'])
 
-    cognitive_file = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv')
+    cognitive_file = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv'
+    )
     scan_ids_cog = np.array(cognitive_file['scanid'])
     overall_accuracy = np.array(cognitive_file['Overall_Accuracy'])
 
-    id_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    id_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     id_age = np.array(id_age)
 
     threshold = 220
-    sub_list_1 = np.load(f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_above_{threshold}.npy')
+    sub_list_1 = np.load(
+        f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_above_{threshold}.npy'
+    )
     subjects_id_1 = id_age[sub_list_1, 0]
     overall_accuracy_1 = np.zeros((len(sub_list_1), ))
     for i in range(len(sub_list_1)):
@@ -216,7 +284,9 @@ def ei_cognitive_age():
     overall_accuracy_1 = overall_accuracy_1[~nan_mask]
     print("Len(1): ", len(overall_accuracy_1))
 
-    sub_list_2 = np.load(f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_below_{threshold}.npy')
+    sub_list_2 = np.load(
+        f'/home/tzeng/storage/Python/MFMApplication/analysis/first_third/sub_below_{threshold}.npy'
+    )
     subjects_id_2 = id_age[sub_list_2, 0]
     overall_accuracy_2 = np.zeros((len(sub_list_2), ))
     for i in range(len(sub_list_2)):
@@ -230,22 +300,29 @@ def ei_cognitive_age():
 
     print("Ages: ", np.amax(ages_1), np.amax(ages_2))
     age_statistics, age_p_value = stats.ttest_ind(ages_1, ages_2)
-    print(f"Age T-test results: statistics: {age_statistics}; p-value: {age_p_value}")
-    cog_statistics, cog_p_value = stats.ttest_ind(overall_accuracy_1, overall_accuracy_2)
-    print(f"Cognitive T-test results: statistics: {cog_statistics}; p-value: {cog_p_value}")
-    
+    print(
+        f"Age T-test results: statistics: {age_statistics}; p-value: {age_p_value}"
+    )
+    cog_statistics, cog_p_value = stats.ttest_ind(overall_accuracy_1,
+                                                  overall_accuracy_2)
+    print(
+        f"Cognitive T-test results: statistics: {cog_statistics}; p-value: {cog_p_value}"
+    )
+
     need_boxplot = False
     if need_boxplot:
         print('Drawing box plot...')
         plt.figure()
         plt.boxplot([ages_1, ages_2],
                     labels=[f'EI_above_{threshold}', f'EI_below_{threshold}'],
-                    showfliers=False
-                    )
+                    showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('Ages / month')
         plt.title(f'Compare_Ages, p={age_p_value}')
-        plt.savefig(os.path.join('/home/tzeng/storage/Python/MFMApplication/figures/EI', f'Compare_Ages_{threshold}.png'))
+        plt.savefig(
+            os.path.join(
+                '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
+                f'Compare_Ages_{threshold}.png'))
         plt.close()
         print("Age figure saved.")
 
@@ -253,23 +330,28 @@ def ei_cognitive_age():
         plt.figure()
         plt.boxplot([overall_accuracy_1, overall_accuracy_2],
                     labels=[f'EI_above_{threshold}', f'EI_below_{threshold}'],
-                    showfliers=False
-                    )
+                    showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('Overall accuracy')
         plt.title(f'Compare_Overall_accuracy, p={cog_p_value}')
-        plt.savefig(os.path.join('/home/tzeng/storage/Python/MFMApplication/figures/EI', f'Compare_Overall_accuracy_{threshold}.png'))
+        plt.savefig(
+            os.path.join(
+                '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
+                f'Compare_Overall_accuracy_{threshold}.png'))
         plt.close()
         print("Cog figure saved.")
 
 
 def EI_ratio_individual():
-    parent_dir = '/home/tzeng/storage/Python/MFMApplication/PNCParams/Individual'
-    group_mats = sio.loadmat('/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat')
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual'
+    group_mats = sio.loadmat(
+        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat'
+    )
     myelin = torch.as_tensor(group_mats['myelin_group_1029'])
     rsfc_gradient = torch.as_tensor(group_mats['rsfc_group_1029'])
     sc_mat = torch.as_tensor(group_mats['sc_group_1029'])
-    sc_euler = sc_mat / torch.max(sc_mat) * 0.02  # [68, 68] for Euler integration
+    sc_euler = sc_mat / torch.max(
+        sc_mat) * 0.02  # [68, 68] for Euler integration
     euler_range = range(67, 100)
     euler_epochs = len(euler_range)
 
@@ -280,12 +362,13 @@ def EI_ratio_individual():
         if not os.path.exists(os.path.join(save_param_dir, 'final_state.pth')):
             print("This subject does not have final state file.")
             continue
-        
+
         param_dim = 10
         param_10_sets = torch.zeros(param_dim, euler_epochs)  # [10, 33]
         loss_sets = torch.ones(euler_epochs) * 3
         for epoch in euler_range:
-            param_10_path = os.path.join(save_param_dir, f'param_save_epoch{epoch}.pth')
+            param_10_path = os.path.join(save_param_dir,
+                                         f'param_save_epoch{epoch}.pth')
             d = torch.load(param_10_path)
 
             valid_param_list_pre = d['valid_param_list']
@@ -302,10 +385,11 @@ def EI_ratio_individual():
         # print("Best train loss: ", loss_sets[best_sets_ind])
         best_param_10 = param_10_sets[:, best_sets_ind].unsqueeze(1)
 
-        best_parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, best_param_10)
+        best_parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient,
+                                                  best_param_10)
         wei = best_parameter[68:136]
         wei_average.append(torch.mean(wei).item())
-    
+
     wei_average = np.array(wei_average)
     print(wei_average)
     print(np.sum(wei_average > 4.5))
@@ -313,21 +397,28 @@ def EI_ratio_individual():
 
 
 def age_match():
-    pnc_demo = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
+    pnc_demo = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
     scan_ids_demo = np.array(pnc_demo['scanid'])
     re_ids = np.array(pnc_demo['reid'])
 
-    cognitive_file = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv')
+    cognitive_file = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv'
+    )
     scan_ids_cog = np.array(cognitive_file['scanid'])
     overall_accuracy = np.array(cognitive_file['Overall_Accuracy'])
 
-    id_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    id_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     id_age = np.array(id_age)
 
     valid_sub_list = []
     ei_ratio_list = []
     for sub_nbr in range(0, 885):
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         valid_sub_list.append(sub_nbr)
@@ -382,11 +473,18 @@ def age_match():
 
     age_statistics, age_p_value = stats.ttest_ind(age_1_list, age_2_list)
     print('Age average: ', np.mean(age_1_list), np.mean(age_2_list))
-    print(f"Age T-test results: statistics: {age_statistics}; p-value: {age_p_value}")
-    cog_statistics, cog_p_value = stats.ttest_ind(overall_1_list, overall_2_list)
-    print(f"Cognition T-test results: statistics: {cog_statistics}; p-value: {cog_p_value}")
+    print(
+        f"Age T-test results: statistics: {age_statistics}; p-value: {age_p_value}"
+    )
+    cog_statistics, cog_p_value = stats.ttest_ind(overall_1_list,
+                                                  overall_2_list)
+    print(
+        f"Cognition T-test results: statistics: {cog_statistics}; p-value: {cog_p_value}"
+    )
     ei_statistics, ei_p_value = stats.ttest_ind(ei_1_list, ei_2_list)
-    print(f"EI T-test results: statistics: {ei_statistics}; p-value: {ei_p_value}")
+    print(
+        f"EI T-test results: statistics: {ei_statistics}; p-value: {ei_p_value}"
+    )
     print('EI average: ', np.mean(ei_1_list), np.mean(ei_2_list))
 
     need_boxplot = False
@@ -395,12 +493,14 @@ def age_match():
         plt.figure()
         plt.boxplot([age_1_list, age_2_list],
                     labels=[f'high performance', f'low performance'],
-                    showfliers=False
-                    )
+                    showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('Ages / month')
         plt.title(f'Compare_Ages, p={age_p_value:.4f}')
-        plt.savefig(os.path.join('/home/tzeng/storage/Python/MFMApplication/figures/EI', f'Age_match_Compare_Ages.png'))
+        plt.savefig(
+            os.path.join(
+                '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
+                f'Age_match_Compare_Ages.png'))
         plt.close()
         print("Age figure saved.")
 
@@ -408,12 +508,14 @@ def age_match():
         plt.figure()
         plt.boxplot([overall_1_list, overall_2_list],
                     labels=[f'high performance', f'low performance'],
-                    showfliers=False
-                    )
+                    showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('Overall accuracy')
         plt.title(f'Compare_Overall_accuracy, p={1.24e-43}')
-        plt.savefig(os.path.join('/home/tzeng/storage/Python/MFMApplication/figures/EI', f'Age_match_Compare_Overall_accuracy.png'))
+        plt.savefig(
+            os.path.join(
+                '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
+                f'Age_match_Compare_Overall_accuracy.png'))
         plt.close()
         print("Cog figure saved.")
 
@@ -421,36 +523,47 @@ def age_match():
         plt.figure()
         plt.boxplot([ei_1_list, ei_2_list],
                     labels=[f'high performance', f'low performance'],
-                    showfliers=False
-                    )
+                    showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('EI ratio')
         plt.title(f'Compare_EI_ratio, p={ei_p_value:.4f}')
-        plt.savefig(os.path.join('/home/tzeng/storage/Python/MFMApplication/figures/EI', f'Age_match_Compare_EI.png'))
+        plt.savefig(
+            os.path.join(
+                '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
+                f'Age_match_Compare_EI.png'))
         plt.close()
         print("EI figure saved.")
 
 
 def cognitive_scan_id_to_subject_id():
-    pnc_demo = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
+    pnc_demo = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/pnc_demographics.csv')
     scan_ids_demo = np.array(pnc_demo['scanid'])
     re_ids = np.array(pnc_demo['reid'])
 
-    behavior_file = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv')
+    behavior_file = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/PNC_behav/n1601_cnb_factor_scores_tymoore_20151006.csv'
+    )
     scan_ids_cog = np.array(behavior_file['scanid'])
-    
+
     subject_id_cog = []
     for i in range(len(scan_ids_cog)):
         for j in range(len(scan_ids_demo)):
             if scan_ids_cog[i] == scan_ids_demo[j]:
                 subject_id_cog.append(re_ids[j])
     behavior_file.insert(0, 'subject_id', subject_id_cog)
-    behavior_file.to_csv('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/behavior.csv', index=False)
+    behavior_file.to_csv(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/behavior.csv',
+        index=False)
     print("Saved.")
 
 
 def motion_extract():
-    subjects_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    subjects_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     subjects_age = np.array(subjects_age)
 
     sub_num = len(subjects_age)
@@ -478,22 +591,34 @@ def motion_extract():
             motion_file = pd.read_table(motion_path_1)
         sub_list.append(subject_id)
         ave_dvars.append(np.nanmean(motion_file['dvars']))
-        ave_framewise_displacement.append(np.nanmean(motion_file['framewise_displacement']))
+        ave_framewise_displacement.append(
+            np.nanmean(motion_file['framewise_displacement']))
     save_file = pd.DataFrame(sub_list, columns=['subject_id'])
     save_file['ave_dvars'] = ave_dvars
     save_file['ave_framewise_displacement'] = ave_framewise_displacement
-    save_file.to_csv('/home/tzeng/storage/Python/MFMApplication/analysis/whole/motion.csv', index=False)
+    save_file.to_csv(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/motion.csv',
+        index=False)
     print("Saved.")
 
 
 def motion_check():
-    subjects_age = pd.read_csv('/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv', sep=',', header=None, index_col=False)
+    subjects_age = pd.read_csv(
+        '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
+        sep=',',
+        header=None,
+        index_col=False)
     subjects_age = np.array(subjects_age)
 
-    sub_list_above = np.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_above_210.npy')
-    sub_list_below = np.load('/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy')
+    sub_list_above = np.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_above_210.npy'
+    )
+    sub_list_below = np.load(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/sub_below_210.npy'
+    )
 
-    motion_file = pd.read_csv('/home/tzeng/storage/Python/MFMApplication/analysis/whole/motion.csv')
+    motion_file = pd.read_csv(
+        '/home/tzeng/storage/Python/MFMApplication/analysis/whole/motion.csv')
 
     sub_num_above = len(sub_list_above)
     dvars_above = []
@@ -511,12 +636,18 @@ def motion_check():
         dvars_below.append(motion_file.loc[sub_nbr, 'ave_dvars'])
         fd_below.append(motion_file.loc[sub_nbr, 'ave_framewise_displacement'])
 
-    tzeng_func.tzeng_2_sample_t_test_n_plot(dvars_above, dvars_below, need_boxplot=False)
-    tzeng_func.tzeng_2_sample_t_test_n_plot(fd_above, fd_below, need_boxplot=False)
+    tzeng_func.tzeng_2_sample_t_test_n_plot(dvars_above,
+                                            dvars_below,
+                                            need_boxplot=False)
+    tzeng_func.tzeng_2_sample_t_test_n_plot(fd_above,
+                                            fd_below,
+                                            need_boxplot=False)
 
 
 def generate_parameter_mat():
-    group_mats = sio.loadmat('/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat')
+    group_mats = sio.loadmat(
+        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat'
+    )
     myelin = torch.as_tensor(group_mats['myelin_group_1029'])
     rsfc_gradient = torch.as_tensor(group_mats['rsfc_group_1029'])
     sc_mat = torch.as_tensor(group_mats['sc_group_1029'])
@@ -526,7 +657,7 @@ def generate_parameter_mat():
     for sub_nbr in range(0, 885):
         if sub_nbr == 135:  # This subject doesn't have behavior scores
             continue
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         d = torch.load(EI_path)
@@ -537,13 +668,23 @@ def generate_parameter_mat():
     parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, param_10_array)
     print(parameter.shape)
     parameter = parameter.numpy()
-    save_dict = {'parameter': parameter, 'wee': parameter[0:68], 'wei': parameter[68:136], 'sigma': parameter[137:]}
-    sio.savemat('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_parameters.mat', save_dict)
+    save_dict = {
+        'parameter': parameter,
+        'wee': parameter[0:68],
+        'wei': parameter[68:136],
+        'sigma': parameter[137:]
+    }
+    sio.savemat(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_parameters.mat',
+        save_dict)
     print("Saved.")
 
 
 def generate_emp_fc_mat():
-    id_list = pd.read_csv('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_list.txt', header=None, index_col=False)
+    id_list = pd.read_csv(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/subject_list.txt',
+        header=None,
+        index_col=False)
     id_list = np.squeeze(np.array(id_list))
 
     fc_mask = np.triu(np.ones((68, 68), dtype=bool), 1)
@@ -551,10 +692,15 @@ def generate_emp_fc_mat():
 
     for i in range(len(id_list)):
         subject_id = id_list[i]
-        fc_emp = pd.read_csv(f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv', header=None, index_col=False)
+        fc_emp = pd.read_csv(
+            f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
+            header=None,
+            index_col=False)
         fc_emp = np.array(fc_emp)
         fc_emps[:, i] = fc_emp[fc_mask]
-    sio.savemat('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/fc_emp.mat', {'empfc': fc_emps})
+    sio.savemat(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/fc_emp.mat',
+        {'empfc': fc_emps})
     print("Saved.")
 
 
@@ -565,8 +711,8 @@ def generate_sim_fc_mat():
 
     valid_count = 0
     for i in range(0, 885):
-        sim_fc_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/sim_fc/sub{i}.pth'
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/PNCParams/individual_shaoshi/EI_ratio/sub{i}.pth'
+        sim_fc_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/sim_fc/sub{i}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{i}.pth'
         if not os.path.exists(sim_fc_path):
             continue
         d = torch.load(sim_fc_path)
@@ -574,23 +720,36 @@ def generate_sim_fc_mat():
         fc_sims[:, valid_count] = fc_sim[fc_mask]
         valid_count += 1
     print("Valid count: ", valid_count)
-    sio.savemat('/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/fc_sim.mat', {'fc': fc_sims})
+    sio.savemat(
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/fc_sim.mat',
+        {'fc': fc_sims})
     print("Saved.")
 
 
 def EI_group_check(group_nbr):
-    parent_dir = '/home/tzeng/storage/Python/MFMApplication/PNCParams/group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group'
     group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}'
 
-    myelin = np.array(pd.read_csv(os.path.join(group_mats_path, 'myelin.csv'), header=None, index_col=False))
+    myelin = np.array(
+        pd.read_csv(os.path.join(group_mats_path, 'myelin.csv'),
+                    header=None,
+                    index_col=False))
     myelin = torch.as_tensor(myelin)
-    rsfc_gradient = np.array(pd.read_csv(os.path.join(group_mats_path, 'rsfc_gradient.csv'), header=None, index_col=False))
+    rsfc_gradient = np.array(
+        pd.read_csv(os.path.join(group_mats_path, 'rsfc_gradient.csv'),
+                    header=None,
+                    index_col=False))
     rsfc_gradient = torch.as_tensor(rsfc_gradient)
-    sc_mat = np.array(pd.read_csv(os.path.join(group_mats_path, f'SC_validation.csv'), header=None, index_col=False))
+    sc_mat = np.array(
+        pd.read_csv(os.path.join(group_mats_path, f'SC_validation.csv'),
+                    header=None,
+                    index_col=False))
     sc_mat = torch.as_tensor(sc_mat)
-    sc_euler = sc_mat / torch.max(sc_mat) * 0.02  # [68, 68] for Euler integration
+    sc_euler = sc_mat / torch.max(
+        sc_mat) * 0.02  # [68, 68] for Euler integration
 
-    EI_save_path = os.path.join(parent_dir, f'EI_ratio_before/group{group_nbr}.pth')
+    EI_save_path = os.path.join(parent_dir,
+                                f'EI_ratio_before/group{group_nbr}.pth')
     d = torch.load(EI_save_path)
     param_10 = d['param_10']
     parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, param_10)
@@ -603,13 +762,14 @@ def EI_group_check(group_nbr):
 
 def param_vs_age():
     trial_nbr = 1
-    test_dir = f'/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/group/test/trial{trial_nbr}'
+    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group/test/trial{trial_nbr}'
     wee_wei_ratio = []
     wee_list = []
     wei_list = []
     age_list = []
     for group_nbr in range(1, 30):
-        test_res_path = os.path.join(test_dir, f'group{group_nbr}', 'val_results.pth')
+        test_res_path = os.path.join(test_dir, f'group{group_nbr}',
+                                     'val_results.pth')
         if not os.path.exists(test_res_path):
             continue
         test_res = torch.load(test_res_path)
@@ -622,21 +782,34 @@ def param_vs_age():
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
         age = np.array(pd.read_csv(age_path, header=None, index_col=False))
         age_list.append(np.mean(age))
-    
+
     save_fig_path = f'/home/tzeng/storage/Python/MFMApplication/usage_files/figures2/PNC/wee_group_trial{trial_nbr}.png'
-    tzeng_func.tzeng_scatter_with_regress_line(age_list, wee_list, save_fig_path, figure_title='w_EE vs age', xlabel='Age', ylabel='w_EE')
+    tzeng_func.tzeng_scatter_with_regress_line(age_list,
+                                               wee_list,
+                                               save_fig_path,
+                                               figure_title='w_EE vs age',
+                                               xlabel='Age',
+                                               ylabel='w_EE')
 
     save_fig_path = f'/home/tzeng/storage/Python/MFMApplication/usage_files/figures2/PNC/wei_group_trial{trial_nbr}.png'
-    tzeng_func.tzeng_scatter_with_regress_line(age_list, wei_list, save_fig_path, figure_title='w_EI vs age', xlabel='Age', ylabel='w_EI')
+    tzeng_func.tzeng_scatter_with_regress_line(age_list,
+                                               wei_list,
+                                               save_fig_path,
+                                               figure_title='w_EI vs age',
+                                               xlabel='Age',
+                                               ylabel='w_EI')
 
 
 def mean_fc_profile_vs_age():
     fc_list = np.zeros((29, 68))
-    age_list = np.zeros((29,))
+    age_list = np.zeros((29, ))
     valid_count = 0
     for group_nbr in range(1, 30):
         group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}'
-        fc_emp = np.array(pd.read_csv(os.path.join(group_mats_path, f'FC_train.csv'), header=None, index_col=False))
+        fc_emp = np.array(
+            pd.read_csv(os.path.join(group_mats_path, f'FC_train.csv'),
+                        header=None,
+                        index_col=False))
         fc_list[valid_count] = np.mean(fc_emp, axis=1)
 
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
@@ -644,18 +817,24 @@ def mean_fc_profile_vs_age():
         age_list[valid_count] = np.mean(age)
 
         valid_count += 1
-    
-    corr = CBIG_func.CBIG_corr(fc_list, age_list.astype(np.float64).reshape((-1, 1)))
+
+    corr = CBIG_func.CBIG_corr(fc_list,
+                               age_list.astype(np.float64).reshape((-1, 1)))
     corr = pd.DataFrame(corr)
-    corr.to_csv('/home/tzeng/storage/Python/MFMApplication/usage_files/files/PNC/mean_fc_profiles_group.txt', sep='\t', header=False, index=False)
+    corr.to_csv(
+        '/home/tzeng/storage/Python/MFMApplication/usage_files/files/PNC/mean_fc_profiles_group.txt',
+        sep='\t',
+        header=False,
+        index=False)
 
 
 def final_state_check(trial_nbr):
-    parent_path = f'/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/perturbation/overall_acc_group/high/train/trial{trial_nbr}/seed1'
+    parent_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/perturbation/overall_acc_group/high/train/trial{trial_nbr}/seed1'
     nbr_range = np.arange(1, 15)
     flag = 0
     for i in nbr_range:
-        final_state_path = os.path.join(parent_path, f'group{i}', 'param_save_epoch49.pth')
+        final_state_path = os.path.join(parent_path, f'group{i}',
+                                        'param_save_epoch49.pth')
         if not os.path.exists(final_state_path):
             print(f'nbr: {i}, trial nbr: {trial_nbr}')
             flag = 1
@@ -665,15 +844,17 @@ def final_state_check(trial_nbr):
 
 
 def residual_1():
-    parent_path = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/train/trial1/seed1'
-    parent_path_2 = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/train/trial1/seed1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
     nbr_range = np.arange(0, 885)
     prefix = 'sub'
 
     count = 0
     for nbr in nbr_range:
-        sub_path = os.path.join(parent_path, f'{prefix}{nbr}', 'final_state_pFIC.pth')
-        sub_path_2 = os.path.join(parent_path_2, f'{prefix}{nbr}', 'final_state.pth')
+        sub_path = os.path.join(parent_path, f'{prefix}{nbr}',
+                                'final_state_pFIC.pth')
+        sub_path_2 = os.path.join(parent_path_2, f'{prefix}{nbr}',
+                                  'final_state.pth')
         if os.path.exists(sub_path) and not os.path.exists(sub_path_2):
             print(nbr, end=' ')
             count += 1
@@ -681,14 +862,15 @@ def residual_1():
 
 
 def residual_2():
-    parent_path = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/train/trial1/seed1'
-    parent_path_2 = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/EI_ratio_rFIC/trial1/seed1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio_rFIC/trial1/seed1'
     nbr_range = np.arange(0, 885)
     prefix = 'sub'
-    
+
     count = 0
     for nbr in nbr_range:
-        sub_path = os.path.join(parent_path, f'{prefix}{nbr}', 'final_state.pth')
+        sub_path = os.path.join(parent_path, f'{prefix}{nbr}',
+                                'final_state.pth')
         sub_path_2 = os.path.join(parent_path_2, f'{prefix}{nbr}.pth')
         if os.path.exists(sub_path) and not os.path.exists(sub_path_2):
             print(nbr, end=' ')
@@ -699,7 +881,7 @@ def residual_2():
 def get_subjects_low_EI_cluster():
     bad_ei_sub_list = []
     for sub_nbr in range(401, 885):
-        EI_path = f'/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/EI_ratio/trial2/seed1/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio/trial2/seed1/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         EI_ratio = torch.load(EI_path)
@@ -711,25 +893,30 @@ def get_subjects_low_EI_cluster():
 
 
 def check_wEI_n_range_individual():
-    parent_dir = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual'
     trial_nbr = 4
     seed_nbr = 1
-    save_fig_path = f'/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/individual/figures/trial{trial_nbr}/wei_range_check.png'
+    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/figures/trial{trial_nbr}/wei_range_check.png'
 
     wei_min_list = []
     wei_max_list = []
     wee_list = []
     wei_list = []
     for sub_nbr in range(0, 885):
-        train_final = os.path.join(parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}/sub{sub_nbr}/final_state.pth')
+        train_final = os.path.join(
+            parent_dir,
+            f'train/trial{trial_nbr}/seed{seed_nbr}/sub{sub_nbr}/final_state.pth'
+        )
         if not os.path.exists(train_final):
             continue
         train_final = torch.load(train_final)
         wei_range = train_final['wEI_search_range']
         wei_range_min = torch.mean(wei_range[:, 0])
         wei_range_max = torch.mean(wei_range[:, 1])
-        
-        ei_ratio = os.path.join(parent_dir, f'EI_ratio/trial{trial_nbr}/seed{seed_nbr}/sub{sub_nbr}.pth')
+
+        ei_ratio = os.path.join(
+            parent_dir,
+            f'EI_ratio/trial{trial_nbr}/seed{seed_nbr}/sub{sub_nbr}.pth')
         if not os.path.exists(ei_ratio):
             print(sub_nbr)
             continue
@@ -741,7 +928,7 @@ def check_wEI_n_range_individual():
         wei_max_list.append(wei_range_max)
         wei_list.append(wei)
         wee_list.append(wee)
-    
+
     x = np.arange(len(wei_list))
     plt.figure()
     plt.scatter(x, wee_list, c='y')

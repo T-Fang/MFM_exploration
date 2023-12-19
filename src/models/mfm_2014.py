@@ -527,9 +527,8 @@ class MfmModel2014:
 if __name__ == '__main__':
 
     config = configparser.ConfigParser()
-    # config.read('/home/tzeng/storage/Python/MFMApplication/configs/perturbed_configs/PNC/trial1/config_pert4.ini')
     config.read(
-        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_pnc.ini'
+        '/home/ftian/storage/projects/MFM_exploration/configs/model/config_pnc.ini'
     )
     parameter = torch.rand(205, 10)
     print("Parameter's shape: ", parameter.shape)

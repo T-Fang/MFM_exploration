@@ -61,7 +61,7 @@ if [ ${target} = 'only1_group' ]; then # No group_nbr need
             mkdir -p ${logdir}
 
             for seed_nbr in "${seed_list[@]}"; do
-                # final_state=/home/tzeng/storage/Python/MFMApplication/Params/HCPYAParams/group_340/train/trial${trial_nbr}/seed${seed_nbr}/final_state.pth
+                # final_state=/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/train/trial${trial_nbr}/seed${seed_nbr}/final_state.pth
                 # if [ ! -f "${final_state}" ]; then
                 #     echo "t${trial_nbr} se${seed_nbr} no final state."
                 #     continue
@@ -241,7 +241,7 @@ elif [ ${target} = 'individual' ]; then
             mkdir -p ${logdir}
 
             for trial_nbr in "${trial_list[@]}"; do
-                final_state=/home/tzeng/storage/Python/MFMApplication/Params/${dataset_name}Params/individual/train/trial${trial_nbr}/seed/sub${sub_nbr}/final_state.pth
+                final_state=/home/ftian/storage/projects/MFM_exploration/logs/params/${dataset_name}Params/individual/train/trial${trial_nbr}/seed/sub${sub_nbr}/final_state.pth
                 if [ ! -f "${final_state}" ]; then
                     echo "subject${sub_nbr} t${trial_nbr} no final state."
                     continue

@@ -125,9 +125,8 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
 
 def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
     config = configparser.ConfigParser()
-    # config.read(f'/home/tzeng/storage/Python/MFMApplication/configs/perturbed_configs/PNC/trial1/config_pert{trial_nbr}.ini')
     config.read(
-        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_pnc.ini'
+        '/home/ftian/storage/projects/MFM_exploration/configs/model/config_pnc.ini'
     )
 
     group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest_from_surface/age_results/input/{group_nbr}'
@@ -250,9 +249,8 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
 
 def apply_overall_acc_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
     config = configparser.ConfigParser()
-    # config.read(f'/home/tzeng/storage/Python/MFMApplication/configs/perturbed_configs/PNC/trial1/config_pert{trial_nbr}.ini')
     config.read(
-        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_pnc.ini'
+        '/home/ftian/storage/projects/MFM_exploration/configs/model/config_pnc.ini'
     )
 
     performance_group = 'low'

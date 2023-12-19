@@ -22,7 +22,7 @@ def tzeng_KS_distance(s_cdf, t_cdf=None):
     Args:
         s_cdf (tensor): [s_labels, bins]
         t_cdf (tensor, optional): [t_labels, bins]. If None, will compute within s_cdf
-    
+
     Returns:
         tensor: distance matrix, [s_labels, t_labels]
     """
@@ -46,7 +46,7 @@ def test_main():
     t_cdf = torch.cumsum(t, dim=1)
     distance_mat = tzeng_KS_distance(s_cdf, t_cdf)
     print(distance_mat)
-    
-    
+
+
 if __name__ == "__main__":
     test_main()
