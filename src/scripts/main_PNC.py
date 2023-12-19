@@ -5,8 +5,10 @@ import numpy as np
 import os
 import pandas as pd
 import sys
+
+sys.path.insert(0, '/home/ftian/storage/MFM_exploration/')
 from src.scripts.Hybrid_CMA_ES_classes_rFIC import DLVersionCMAESValidator, DLVersionCMAESTester, \
-     get_EI_ratio, train_help_function
+    get_EI_ratio, train_help_function
 
 
 def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
