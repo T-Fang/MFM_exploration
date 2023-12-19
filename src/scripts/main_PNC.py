@@ -177,8 +177,8 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
                                     emp_fcd_cum=emp_fcd_cum,
                                     save_param_dir=save_param_dir,
                                     epochs=epochs,
-                                    dl_pfic_range=np.arange(0, 45),
-                                    euler_pfic_range=np.arange(45, 50),
+                                    dl_pfic_range=[],
+                                    euler_pfic_range=np.arange(0, 50),
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='PNC',
@@ -247,13 +247,16 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
     return 0
 
 
-def apply_overall_acc_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
+def apply_overall_acc_group(mode,
+                            group_nbr,
+                            trial_nbr,
+                            seed_nbr,
+                            performance_group,
+                            epoch=None):
     config = configparser.ConfigParser()
     config.read(
         '/home/ftian/storage/projects/MFM_exploration/configs/model/config_pnc.ini'
     )
-
-    performance_group = 'low'
 
     group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest_from_surface/behavior_results/input_overall_acc/{performance_group}/{group_nbr}'
 
@@ -304,8 +307,8 @@ def apply_overall_acc_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
                                     emp_fcd_cum=emp_fcd_cum,
                                     save_param_dir=save_param_dir,
                                     epochs=epochs,
-                                    dl_pfic_range=np.arange(0, 40),
-                                    euler_pfic_range=np.arange(40, 50),
+                                    dl_pfic_range=[],
+                                    euler_pfic_range=np.arange(0, 50),
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='PNC',
@@ -682,7 +685,8 @@ if __name__ == "__main__":
         apply_overall_acc_group(mode='train',
                                 group_nbr=g_nbr,
                                 trial_nbr=t_nbr,
-                                seed_nbr=se_nbr)
+                                seed_nbr=se_nbr,
+                                performance_group=perform_group_name)
         if os.path.exists(
                 f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/'
                 f'{perform_group_name}/train/trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'
@@ -690,15 +694,18 @@ if __name__ == "__main__":
             apply_overall_acc_group(mode='validation',
                                     group_nbr=g_nbr,
                                     trial_nbr=t_nbr,
-                                    seed_nbr=se_nbr)
+                                    seed_nbr=se_nbr,
+                                    performance_group=perform_group_name)
             apply_overall_acc_group(mode='test',
                                     group_nbr=g_nbr,
                                     trial_nbr=t_nbr,
-                                    seed_nbr=se_nbr)
+                                    seed_nbr=se_nbr,
+                                    performance_group=perform_group_name)
             apply_overall_acc_group(mode='EI',
                                     group_nbr=g_nbr,
                                     trial_nbr=t_nbr,
-                                    seed_nbr=se_nbr)
+                                    seed_nbr=se_nbr,
+                                    performance_group=perform_group_name)
     else:
         raise Exception("Unrecognized target name!")
 

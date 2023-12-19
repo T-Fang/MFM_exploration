@@ -303,6 +303,7 @@ class MfmModel2014:
         corr_loss = 1 - corr
         ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
         total_loss = corr_loss + L1_loss + ks_loss
+        # TODO: Try without FCD KS loss
         # total_loss = corr_loss + L1_loss
         return total_loss, corr_loss, L1_loss, ks_loss
 
@@ -356,17 +357,19 @@ class MfmModel2014:
         vec_emp = vec_emp.unsqueeze(0).expand(M, -1)  # [M, len]
         vec_sim = fc_sim[:, mask]
 
+        # TODO: experiment with different L1 cost
+
         # L1 version 1: abs(mean)
-        L1_cost = torch.abs(
-            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        # L1_cost = torch.abs(
+        #     torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
-        # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
+        L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
-        # L2
+        # L2 or MSE
         # L1_cost = torch.mean(torch.square(vec_emp - vec_sim), dim=1)
 
-        # sqrt(L2)
+        # sqrt(L2) or RMSE
         # L1_cost = torch.sqrt(torch.mean(torch.square(vec_emp - vec_sim), dim=1))
 
         vec_3d = torch.zeros(M, 2, vec_emp.shape[1])
