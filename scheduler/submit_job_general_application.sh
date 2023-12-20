@@ -111,12 +111,14 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
         group_list=($(seq 0 1 63))
     fi
 
+    trial_list=(2)
+    seed_list=(1)
     if [ ${mode} = 'train' ]; then
 
         # group_list=(1)
         # trial_list=($(seq 51 1 100))
-        trial_list=(1)
-        seed_list=(1)
+        # trial_list=(1)
+        # seed_list=(1)
 
         # Make up log directories for different trials
         for trial_nbr in "${trial_list[@]}"; do
@@ -142,8 +144,8 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
         # whole group range ($(seq 1 1 29)); epoch range (0, 49); trial (1, 1)
         # group_list=(1)
         # trial_list=($(seq 4 1 14))
-        trial_list=(1)
-        seed_list=(1)
+        # trial_list=(1)
+        # seed_list=(1)
 
         for group_nbr in "${group_list[@]}"; do
 
@@ -168,8 +170,8 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
 
     elif [ ${mode} = 'test' ]; then
         # group_list=(1)
-        trial_list=(1)
-        seed_list=(1)
+        # trial_list=(1)
+        # seed_list=(1)
         for trial_nbr in "${trial_list[@]}"; do
 
             logdir="${logpath}/trial${trial_nbr}"
@@ -188,8 +190,8 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
     elif [ ${mode} = 'EI' ]; then
         # group_list=(1)
         # trial_list=($(seq 8 1 14))
-        trial_list=(1)
-        seed_list=(1)
+        # trial_list=(1)
+        # seed_list=(1)
         for trial_nbr in "${trial_list[@]}"; do
 
             logdir="${logpath}/trial${trial_nbr}"
