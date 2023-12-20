@@ -13,13 +13,13 @@ conda_env=MFM_tzeng
 dataset_name=PNC # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
 
-# target='age_group'
-target='overall_acc_group_high'
+target='age_group'
+# target='overall_acc_group_high'
 # target='overall_acc_group_low'
 # ['only1_group', 'age_group', 'overall_acc_group_high', 'overall_acc_group_low', 'group_dl_dataset', 'individual']
 mode='train'
 # ['train', 'validation', 'test', 'simulate_fc_fcd', 'EI', 'val_train_param', 'simulate_fc']
-need_gpu=1
+need_gpu=0
 
 logpath="${proj_dir}/logs/${dataset_name}/${target}/${mode}"
 
@@ -132,7 +132,7 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
                         $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 10:00:00 -mem 4G -ngpus 1 -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $target $group_nbr $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 30:00:00 -mem 4G -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -mem 4G -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     fi
                 done
             done

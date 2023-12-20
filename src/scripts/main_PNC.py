@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import sys
 
-sys.path.insert(0, '/home/ftian/storage/projects/MFM_exploration')
+sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.scripts.Hybrid_CMA_ES_classes_rFIC import DLVersionCMAESValidator, DLVersionCMAESTester, \
     get_EI_ratio, train_help_function
 
