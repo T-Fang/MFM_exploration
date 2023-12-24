@@ -360,11 +360,11 @@ class MfmModel2014:
         # TODO: experiment with different L1 cost
 
         # L1 version 1: abs(mean)
-        # L1_cost = torch.abs(
-        #     torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        L1_cost = torch.abs(
+            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
-        L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
+        # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
         # L2 or MSE
         # L1_cost = torch.mean(torch.square(vec_emp - vec_sim), dim=1)

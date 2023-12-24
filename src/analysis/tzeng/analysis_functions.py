@@ -503,9 +503,16 @@ def plot_EI_ratio(EI_list,
                   save_fig_path,
                   xlabel='age',
                   ylabel='mean cortical E/I ratio'):
-    EI_list = np.array(EI_list)
-    age_list = np.array(age_list) / 12
-    corr = np.corrcoef(EI_list.reshape(1, -1), age_list.reshape(1, -1))[0, 1]
+    EI_list = np.array(EI_list).reshape(1, -1)[0]
+    age_list = (np.array(age_list) / 12).reshape(1, -1)[0]
+    # corr = np.corrcoef(EI_list.reshape(1, -1), age_list.reshape(1, -1))[0, 1]
+
+    # Perform linear regression
+    slope, intercept, rvalue, pvalue, stderr = stats.linregress(
+        age_list, EI_list)
+    # Create parent directory if it does not exist
+    os.makedirs(os.path.dirname(save_fig_path), exist_ok=True)
+
     plt.figure()
     sns.regplot(x=age_list,
                 y=EI_list,
@@ -514,7 +521,9 @@ def plot_EI_ratio(EI_list,
                 order=1)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.title(f'{ylabel} vs {xlabel} curve, r={corr:.4f}')
+    plt.title(f'{ylabel} vs {xlabel} curve, r={rvalue:.4f}, p={pvalue:.4f}'
+              )  # Include p-value in the title
+
     plt.savefig(save_fig_path)
     plt.close()
     print("Figure saved.")

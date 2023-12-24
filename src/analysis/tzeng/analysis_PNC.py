@@ -5,8 +5,10 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import sys
 
-from src.analysis import analysis_functions
+sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
+from src.analysis.tzeng import analysis_functions
 from src.utils import tzeng_func
 
 
@@ -200,8 +202,9 @@ def regional_EI_age_individual():
 
 
 def plot_EI_ratio_age_group():
-    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial4/seed1'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial4_development_fit.png'
+    EI_dir = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/age_group/EI_ratio/trial4/seed1'
+    # EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial1/seed1'
+    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial1_development_fit.png'
 
     EI_ave_list = []
     age_list = []
@@ -262,8 +265,9 @@ def generate_EI_ratio_ave_across_trials():
 
 
 def regional_EI_age_group():
-    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial3/seed1'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial3_regional.mat'
+    EI_dir = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/age_group/EI_ratio/trial4/seed1'
+    # EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial1/seed1'
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial1_regional.mat'
     nbr_list = np.arange(1, 30, 1)
     n_roi = 68
     nbr_num = len(nbr_list)
@@ -584,4 +588,5 @@ if __name__ == "__main__":
     # plot_pred_loss()
     # plot_EI_overall_acc_group()
     # overall_acc_group_effect_size()
-    regional_EI_age_group()
+    plot_EI_ratio_age_group()
+    # regional_EI_age_group()

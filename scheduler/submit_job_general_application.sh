@@ -13,9 +13,9 @@ conda_env=MFM_tzeng
 dataset_name=PNC # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
 
-target='age_group'
+# target='age_group'
 # target='overall_acc_group_high'
-# target='overall_acc_group_low'
+target='overall_acc_group_low'
 # ['only1_group', 'age_group', 'overall_acc_group_high', 'overall_acc_group_low', 'group_dl_dataset', 'individual']
 mode='train'
 # ['train', 'validation', 'test', 'simulate_fc_fcd', 'EI', 'val_train_param', 'simulate_fc']
@@ -26,6 +26,10 @@ logpath="${proj_dir}/logs/${dataset_name}/${target}/${mode}"
 mkdir -p ${logpath}
 
 echo $dataset_name $target $mode
+
+# ! Need to modify on every run
+trial_list=(2)
+seed_list=(2)
 
 # For group
 if [ ${target} = 'only1_group' ]; then # No group_nbr need
@@ -103,6 +107,9 @@ if [ ${target} = 'only1_group' ]; then # No group_nbr need
     fi
 
 elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${target} = 'overall_acc_group_low' || ${target} = 'group_dl_dataset' ]]; then # Need to check final state manually.
+
+    # * Mostly used part
+
     if [[ ${target} = 'age_group' ]]; then
         group_list=($(seq 1 1 29))
     elif [[ ${target} = 'overall_acc_group_high' || ${target} = 'overall_acc_group_low' ]]; then
@@ -111,8 +118,8 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
         group_list=($(seq 0 1 63))
     fi
 
-    trial_list=(2)
-    seed_list=(1)
+    # trial_list=(1)
+    # seed_list=(2)
     if [ ${mode} = 'train' ]; then
 
         # group_list=(1)
@@ -134,7 +141,7 @@ elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${tar
                         $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 10:00:00 -mem 4G -ngpus 1 -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $target $group_nbr $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -mem 4G -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 30:00:00 -mem 4G -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     fi
                 done
             done
