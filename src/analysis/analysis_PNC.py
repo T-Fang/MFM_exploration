@@ -10,7 +10,7 @@ import sys
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import get_run_path, get_fig_file_path, visualize_param
+from src.utils.analysis_utils import get_run_path, get_fig_file_path, visualize_param, ttest_1samp_n_plot
 
 
 def plot_pred_loss():
@@ -382,63 +382,64 @@ def statistics_EI_age_group_perturbation():
     print("Saved successfully.")
 
 
-def plot_EI_overall_acc_group():
-    high_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/EI_ratio/trial3/seed3'
-    low_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio/trial3/seed3'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/' \
-                    'trial3_seed3_overall_comparison.png'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/' \
-                    'trial3_seed3_overall_comparison.png'
+def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
+    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
+                               trial_idx, seed_idx)
+    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+                              trial_idx, seed_idx)
+    save_fig_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'mean_EI_diff_t_test.png')
     high_list = []
     low_list = []
-    for nbr in range(1, 15):
-        high_ei = os.path.join(high_ei_dir, f'group{nbr}.pth')
-        low_ei = os.path.join(low_ei_dir, f'group{nbr}.pth')
-        high_ei = torch.load(high_ei)
-        low_ei = torch.load(low_ei)
+    for group_idx in range(1, 15):
+        high_ei_path = os.path.join(high_ei_dir, f'group{group_idx}.pth')
+        low_ei_path = os.path.join(low_ei_dir, f'group{group_idx}.pth')
+        high_ei = torch.load(high_ei_path, map_location='cpu')
+        low_ei = torch.load(low_ei_path, map_location='cpu')
         high_list.append(torch.mean(high_ei['ei_ratio']).item())
         low_list.append(torch.mean(low_ei['ei_ratio']).item())
-    print(len(high_list))
     print(high_list)
     print(low_list)
-    pvalue = stats.ttest_1samp(np.array(high_list) - np.array(low_list), 0)
-    print(pvalue)
-    tzeng_func.tzeng_2_sample_t_test_n_plot(
+    ttest_1samp_n_plot(
         high_list,
         low_list,
         need_boxplot=True,
-        need_pvalue=False,
-        labels=['high acc', 'low acc'],
+        need_pvalue=True,
+        labels=['high-performance', 'low-performance'],
         save_fig_path=save_fig_path,
-        fig_title='high_acc_vs_low_acc_EI_ratio',
+        fig_title='t-test on mean cortical E/I ratio difference',
         xlabel='performance group',
         ylabel='mean cortical E/I ratio')
     return
 
 
-def overall_acc_group_effect_size():
-    EI_dir_high_trial = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/EI_ratio/trial3/seed3'
-    EI_dir_low_trial = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio/trial3/seed3'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/trial3_seed3_EI.mat'
+def overall_acc_group_effect_size(trial_idx, seed_idx):
+    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
+                               trial_idx, seed_idx)
+    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+                              trial_idx, seed_idx)
+    save_mat_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'EI_ratio_diff_effect_size.mat')
 
     nbr_list = np.arange(1, 15, 1)
-    n_roi = 68
-    nbr_num = len(nbr_list)
+    num_roi = 68
+    num_groups = len(nbr_list)
 
-    EI_high_list = np.zeros((nbr_num, n_roi))
-    EI_low_list = np.zeros((nbr_num, n_roi))
-    for i in range(nbr_num):
+    EI_high_list = np.zeros((num_groups, num_roi))
+    EI_low_list = np.zeros((num_groups, num_roi))
+    for i in range(num_groups):
         group_nbr = nbr_list[i]
-        EI_high = torch.load(
-            os.path.join(EI_dir_high_trial, f'group{group_nbr}.pth'))
+        EI_high = torch.load(os.path.join(high_ei_dir,
+                                          f'group{group_nbr}.pth'))
         EI_high = torch.squeeze(EI_high['ei_ratio']).numpy()
-        EI_low = torch.load(
-            os.path.join(EI_dir_low_trial, f'group{group_nbr}.pth'))
+        EI_low = torch.load(os.path.join(low_ei_dir, f'group{group_nbr}.pth'))
         EI_low = torch.squeeze(EI_low['ei_ratio']).numpy()
         EI_high_list[i] = EI_high
         EI_low_list[i] = EI_low
 
-    sio.savemat(save_path, {
+    sio.savemat(save_mat_path, {
         'EI_high_list': EI_high_list,
         'EI_low_list': EI_low_list
     })
@@ -601,7 +602,7 @@ def compare_test_results_many_dirs_plot():
 
 if __name__ == "__main__":
     # plot_pred_loss()
-    # plot_EI_overall_acc_group()
-    # overall_acc_group_effect_size()
+    # plot_mean_EI_diff_t_test(1, 1)
+    overall_acc_group_effect_size(1, 1)
     # corr_mean_EI_vs_age(1, 1)
-    visualize_regional_EI_vs_age_slope(1, 1)
+    # visualize_regional_EI_vs_age_slope(1, 1)
