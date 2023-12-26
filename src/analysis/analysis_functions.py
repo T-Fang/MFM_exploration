@@ -529,26 +529,6 @@ def plot_EI_ratio(EI_list,
     print("Figure saved.")
 
 
-def EI_age_slope_regional(n_roi, age_list, EI_regional_list):
-    # EI_regional_list = np.zeros((nbr_num, n_roi))    # age_list = np.zeros((nbr_num))
-
-    slope_arr = np.zeros((n_roi))
-    pvalue_arr = np.zeros((n_roi))
-    for i in range(n_roi):
-        # slope, intercept, rvalue, pvalue, stderr, intercept_stderr = stats.linregress(EI_regional_list[:, i], age_list, alternative='two-sided')
-        # print(slope, pvalue)
-        res = stats.linregress(age_list,
-                               EI_regional_list[:, i],
-                               alternative='two-sided')
-        slope_arr[i] = res.slope
-        pvalue_arr[i] = res.pvalue
-    pvalue_fdr = stats.false_discovery_control(pvalue_arr)
-    significant_num = np.sum(pvalue_fdr < 0.05)
-    print(pvalue_arr, pvalue_fdr)
-    print(f'Significant regions after FDR: {significant_num} / {n_roi}')
-    return slope_arr, pvalue_arr, pvalue_fdr
-
-
 def compare_test_results_two_lists(test_dir_1, test_dir_2,
                                    best_val_or_test_mean, prefix, nbr_range):
     """Return test results from two trials

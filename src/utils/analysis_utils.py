@@ -114,3 +114,42 @@ def ttest_1samp_n_plot(list_1,
         plt.close()
         print("Boxplot figure saved.")
     return 0
+
+
+############################################################
+# EI related analysis
+############################################################
+
+
+def regional_EI_age_slope(n_roi, ages, regional_EIs):
+    # regional_EIs = np.zeros((nbr_num, n_roi))    # ages = np.zeros((nbr_num))
+
+    slope_arr = np.zeros((n_roi))
+    pvalue_arr = np.zeros((n_roi))
+    for i in range(n_roi):
+        res = stats.linregress(ages,
+                               regional_EIs[:, i],
+                               alternative='two-sided')
+        slope_arr[i] = res.slope
+        pvalue_arr[i] = res.pvalue
+    pvalue_fdr = stats.false_discovery_control(pvalue_arr)
+    significant_num = np.sum(pvalue_fdr < 0.05)
+    print(pvalue_arr, pvalue_fdr)
+    print(f'Significant regions after FDR: {significant_num} / {n_roi}')
+    return slope_arr, pvalue_arr, pvalue_fdr
+
+
+def regional_EI_diff_cohen_d(EI_matrix_high, EI_matrix_low):
+    """
+    Compute the effect size (cohen's d) of E/I ratio difference, specifically:
+    For each ROI, compute Cohen's d for the E/I ratio difference between the two groups (low/high-performance)
+    Cohen's d's formula for 1-sample is (mean of the sample)/(sample standard deviation of the sample)
+    """
+    EI_ratio_diff = EI_matrix_low - EI_matrix_high
+    EI_ratio_diff_mean = np.mean(EI_ratio_diff, axis=0)
+    EI_ratio_diff_std = np.std(
+        EI_ratio_diff, axis=0, ddof=1
+    )  # * ddof=1 for sample std (after Bessel's correction), equivalent to MATLAB's default std
+    cohen_ds = EI_ratio_diff_mean / EI_ratio_diff_std
+    cohen_ds = np.reshape(cohen_ds, (cohen_ds.shape[0], 1))  # Reshape to 68x1
+    return cohen_ds

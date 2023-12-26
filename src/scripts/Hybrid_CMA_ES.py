@@ -762,7 +762,7 @@ class DLVersionCMAESForward:
                                        init_parameters[0:N]).squeeze()
         start_point_wEI = torch.matmul(self.pinv_concat_mat,
                                        init_parameters[N:2 * N]).squeeze()
-        start_point_sigma = torch.matmul(
+        start_point_sigma = torch.matmul(  # noqa
             self.pinv_concat_mat, init_parameters[2 * N + 1:]).squeeze()
 
         # Init m_0 for CMA-ES, just by the experience of my seniors
@@ -772,7 +772,9 @@ class DLVersionCMAESForward:
         m_0[3:6] = start_point_wEI
         # m_0[4] = start_point_wEI[1] / 2
         m_0[6] = init_parameters[2 * N]  # G
+        # TODO: Try without parameterizing sigma
         m_0[7:] = start_point_sigma
+        # m_0[7:] = 0
 
         sigma_0 = 0.2
         p_sigma_0 = torch.zeros(self.param_dim, 1)

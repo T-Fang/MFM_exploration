@@ -10,7 +10,11 @@ import sys
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import get_run_path, get_fig_file_path, visualize_param, ttest_1samp_n_plot
+from src.utils.analysis_utils import (get_run_path, get_fig_file_path,
+                                      visualize_param, ttest_1samp_n_plot,
+                                      regional_EI_age_slope,
+                                      regional_EI_diff_cohen_d)
+from src.basic.constants import NUM_GROUP_PNC_AGE, NUM_GROUP_PNC_COGNITION, NUM_ROI
 
 
 def plot_pred_loss():
@@ -31,8 +35,8 @@ def compare_train_loss(nbr):
     path_2 = os.path.join(dir_2, f'param_save_epoch{epoch_nbr_2}.pth')
     if not os.path.exists(path_1) or not os.path.exists(path_2):
         raise Exception("Check path first.")
-    d_1 = torch.load(path_1)
-    d_2 = torch.load(path_2)
+    d_1 = torch.load(path_1, map_location='cpu')
+    d_2 = torch.load(path_2, map_location='cpu')
     '''print("Corr loss: ", torch.mean(d_1['corr_loss']), torch.mean(d_2['corr_loss']))
     print("L1 loss: ", torch.mean(d_1['L1_loss']), torch.mean(d_2['L1_loss']))
     print("KS loss: ", torch.mean(d_1['ks_loss']), torch.mean(d_2['ks_loss']))'''
@@ -51,7 +55,7 @@ def compare_val_loss():
     count = 0
     my_list = []
     shaoshi_list = []
-    for group_nbr in range(1, 30):
+    for group_nbr in range(1, NUM_GROUP_PNC_AGE + 1):
         shaoshi = np.squeeze(
             np.array(
                 pd.read_csv(
@@ -68,8 +72,8 @@ def compare_val_loss():
         shaoshi_list.append(shaoshi_loss)
 
         me = torch.load(
-            f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test_before/group{group_nbr}/val_results.pth'
-        )
+            f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test_before/group{group_nbr}/val_results.pth',
+            map_location='cpu')
         my_loss = me['corr_loss'][0].item() + me['l1_loss'][0].item(
         ) + me['ks_loss'][0].item()
         my_list.append(my_loss)
@@ -99,10 +103,10 @@ def compare_val_loss():
 
 
 def parameter_surface_map(param_10_path, myelin, rsfc_gradient, save_map_path):
-    d = torch.load(param_10_path)
+    d = torch.load(param_10_path, map_location='cpu')
     param_10 = d['param_10']
     w_EE = param_10[0] + param_10[1] * myelin + param_10[
-        2] * rsfc_gradient  # [68, param_sets (100)]
+        2] * rsfc_gradient  # [NUM_ROI, param_sets (100)]
     w_EI = param_10[3] + param_10[4] * myelin + param_10[5] * rsfc_gradient
     G = param_10[6]  # noqa
     sigma = param_10[7] + param_10[8] * myelin + param_10[9] * rsfc_gradient
@@ -137,7 +141,7 @@ def plot_EI_ratio_individual():
         EI_path = os.path.join(EI_dir, f'sub{sub_nbr}.pth')
         if os.path.exists(EI_path):
             valid_count += 1
-            d = torch.load(EI_path)
+            d = torch.load(EI_path, map_location='cpu')
             ei_tmp = torch.mean(d['ei_ratio'].squeeze()).item()
             # if ei_tmp < 2.25:
             valid_sub_list.append(sub_nbr)
@@ -155,7 +159,7 @@ def regional_EI_age_individual():
     EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio_rFIC/trial1/seed1'
     save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/figures/trial1/rFIC_EI_regional.mat'
     nbr_list = np.arange(0, 885, 1)
-    n_roi = 68
+    n_roi = NUM_ROI
     nbr_num = len(nbr_list)
     EI_regional_list = np.zeros((nbr_num, n_roi))
     age_list = np.zeros((nbr_num))
@@ -175,7 +179,7 @@ def regional_EI_age_individual():
         if not os.path.exists(EI_path):
             continue
 
-        ei_tmp = torch.load(EI_path)
+        ei_tmp = torch.load(EI_path, map_location='cpu')
         EI_regional_list[count] = ei_tmp['ei_ratio'].squeeze().numpy()
         # age_list[i] = np.mean(age)
         age_list[count] = age_all[nbr]
@@ -203,33 +207,11 @@ def regional_EI_age_individual():
     return slope_arr, pvalue_arr
 
 
-def corr_mean_EI_vs_age(trial_idx, seed_idx):
-    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
-    save_fig_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'corr_mean_EI_vs_age.png')
-    EI_ave_list = []
-    age_list = []
-    for group_nbr in range(1, 30):
-        # age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
-        age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest_from_surface/age_results/input/{group_nbr}/validation_subject_age.txt'
-        EI_path = os.path.join(EI_dir, f'group{group_nbr}.pth')
-        if not os.path.exists(EI_path):
-            continue
-        age = np.array(pd.read_csv(age_path, header=None, index_col=False))
-        ei_tmp = torch.load(EI_path)
-        EI_ave_list.append(torch.mean(ei_tmp['ei_ratio']).item())
-        age_list.append(np.mean(age))
-    print(EI_ave_list)
-
-    analysis_functions.plot_EI_ratio(EI_ave_list, age_list, save_fig_path)
-
-
 def generate_EI_ratio_ave_across_trials():
     EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
-    group_range = np.arange(1, 30)
+    group_range = np.arange(1, NUM_GROUP_PNC_AGE + 1)
     trials_range = np.arange(1, 101)
-    EI_ratio_tensors = torch.zeros(68, len(group_range))
+    EI_ratio_tensors = torch.zeros(NUM_ROI, len(group_range))
 
     # Find valid trials
     valid_trial_list = []
@@ -252,7 +234,7 @@ def generate_EI_ratio_ave_across_trials():
         for i in range(len(group_range)):
             group_nbr = group_range[i]
             EI_path = os.path.join(EI_dir_1_trial, f'group{group_nbr}.pth')
-            EI_file = torch.load(EI_path)
+            EI_file = torch.load(EI_path, map_location='cpu')
             EI_ratio_tensors[:, i] += torch.squeeze(EI_file['ei_ratio'])
     EI_ratio_tensors /= len(valid_trial_list)
     print("Averaged.")
@@ -266,61 +248,6 @@ def generate_EI_ratio_ave_across_trials():
     return
 
 
-def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
-    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
-    if save_mat_path is None:
-        save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                          trial_idx, seed_idx,
-                                          'regional_EI_vs_age_slope.mat')
-    nbr_list = np.arange(1, 30, 1)
-    n_roi = 68
-    nbr_num = len(nbr_list)
-    EI_regional_list = np.zeros((nbr_num, n_roi))
-    age_list = np.zeros((nbr_num))
-    count = 0
-    for i in range(nbr_num):
-        nbr = nbr_list[i]
-        age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{nbr}/validation_subject_age.txt'
-        age = np.array(pd.read_csv(age_path, header=None, index_col=False))
-
-        EI_path = os.path.join(EI_dir, f'group{nbr}.pth')
-        if not os.path.exists(EI_path):
-            continue
-
-        ei_tmp = torch.load(EI_path)
-        EI_regional_list[count] = ei_tmp['ei_ratio'].squeeze().numpy()
-        age_list[i] = np.mean(age)
-        count += 1
-
-    EI_regional_list = EI_regional_list[:count]
-    age_list = age_list[:count]
-    print("Valid count: ", count)
-    slope_arr, pvalue_arr, pvalue_fdr = analysis_functions.EI_age_slope_regional(
-        n_roi, age_list, EI_regional_list)
-    sio.savemat(
-        save_mat_path, {
-            'regional_EI_vs_age_slope': slope_arr[:, np.newaxis],
-            'pvalue': pvalue_arr[:, np.newaxis],
-            'pvalue_fdr': pvalue_fdr[:, np.newaxis]
-        })
-    # reg = LinearRegression()
-    # reg.fit(age_list[:, np.newaxis], EI_regional_list)
-    # sio.savemat(save_path, {'regional_EI_vs_age_slope': reg.coef_})
-    print("Saved regional_EI_vs_age_slope.")
-    return slope_arr, pvalue_arr, pvalue_fdr
-
-
-def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
-    save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'regional_EI_vs_age_slope.mat')
-    # export_regional_EI_vs_age_slope(trial_idx,
-    #                                 seed_idx,
-    #                                 save_mat_path=save_mat_path)
-    visualize_param(save_mat_path, 'regional_EI_vs_age_slope',
-                    save_mat_path.replace('.mat', '.png'))
-
-
 def statistics_EI_age_group_perturbation():
     # Compute correlation and slope for each trial and statistic
     trial_list = [
@@ -331,8 +258,8 @@ def statistics_EI_age_group_perturbation():
     EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
     save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/figures/EI_ratio/statistics_50trials.mat'
 
-    nbr_list = np.arange(1, 30, 1)
-    n_roi = 68
+    nbr_list = np.arange(1, NUM_GROUP_PNC_AGE + 1, 1)
+    n_roi = NUM_ROI
     nbr_num = len(nbr_list)
 
     # Get age list
@@ -356,7 +283,7 @@ def statistics_EI_age_group_perturbation():
         for j in range(nbr_num):
             group_nbr = nbr_list[j]
             EI_path = os.path.join(EI_dir_1_trial, f'group{group_nbr}.pth')
-            EI_file = torch.load(EI_path)
+            EI_file = torch.load(EI_path, map_location='cpu')
             EI_ratio = torch.squeeze(EI_file['ei_ratio']).numpy()
             EI_list[i, j] = EI_ratio
 
@@ -382,70 +309,6 @@ def statistics_EI_age_group_perturbation():
     print("Saved successfully.")
 
 
-def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
-    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
-                               trial_idx, seed_idx)
-    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
-                              trial_idx, seed_idx)
-    save_fig_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'mean_EI_diff_t_test.png')
-    high_list = []
-    low_list = []
-    for group_idx in range(1, 15):
-        high_ei_path = os.path.join(high_ei_dir, f'group{group_idx}.pth')
-        low_ei_path = os.path.join(low_ei_dir, f'group{group_idx}.pth')
-        high_ei = torch.load(high_ei_path, map_location='cpu')
-        low_ei = torch.load(low_ei_path, map_location='cpu')
-        high_list.append(torch.mean(high_ei['ei_ratio']).item())
-        low_list.append(torch.mean(low_ei['ei_ratio']).item())
-    print(high_list)
-    print(low_list)
-    ttest_1samp_n_plot(
-        high_list,
-        low_list,
-        need_boxplot=True,
-        need_pvalue=True,
-        labels=['high-performance', 'low-performance'],
-        save_fig_path=save_fig_path,
-        fig_title='t-test on mean cortical E/I ratio difference',
-        xlabel='performance group',
-        ylabel='mean cortical E/I ratio')
-    return
-
-
-def overall_acc_group_effect_size(trial_idx, seed_idx):
-    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
-                               trial_idx, seed_idx)
-    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
-                              trial_idx, seed_idx)
-    save_mat_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'EI_ratio_diff_effect_size.mat')
-
-    nbr_list = np.arange(1, 15, 1)
-    num_roi = 68
-    num_groups = len(nbr_list)
-
-    EI_high_list = np.zeros((num_groups, num_roi))
-    EI_low_list = np.zeros((num_groups, num_roi))
-    for i in range(num_groups):
-        group_nbr = nbr_list[i]
-        EI_high = torch.load(os.path.join(high_ei_dir,
-                                          f'group{group_nbr}.pth'))
-        EI_high = torch.squeeze(EI_high['ei_ratio']).numpy()
-        EI_low = torch.load(os.path.join(low_ei_dir, f'group{group_nbr}.pth'))
-        EI_low = torch.squeeze(EI_low['ei_ratio']).numpy()
-        EI_high_list[i] = EI_high
-        EI_low_list[i] = EI_low
-
-    sio.savemat(save_mat_path, {
-        'EI_high_list': EI_high_list,
-        'EI_low_list': EI_low_list
-    })
-    print("Saved successfully.")
-
-
 def statistics_EI_overall_acc_group_perturbation():
     # Compute correlation and slope for each trial and statistic
     # trial_list = [1, 3, 10, 13, 14, 15, 18, 22, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 38, 40, 41, 42, 44, 46, 48, 54, 55, 59, 60, 63, 64, 67, 74, 76, 78, 79, 83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 98, 99]  # Must be valid # noqa
@@ -454,8 +317,8 @@ def statistics_EI_overall_acc_group_perturbation():
     EI_dir_low_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio'
     save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/trial2_statistics.mat'
 
-    nbr_list = np.arange(1, 15, 1)
-    n_roi = 68
+    nbr_list = np.arange(1, NUM_GROUP_PNC_COGNITION + 1, 1)
+    n_roi = NUM_ROI
     nbr_num = len(nbr_list)
 
     # Get EI ratio
@@ -471,11 +334,13 @@ def statistics_EI_overall_acc_group_perturbation():
                                         'seed1')
         for j in range(nbr_num):
             group_nbr = nbr_list[j]
-            EI_high = torch.load(
-                os.path.join(EI_dir_high_trial, f'group{group_nbr}.pth'))
+            EI_high = torch.load(os.path.join(EI_dir_high_trial,
+                                              f'group{group_nbr}.pth'),
+                                 map_location='cpu')
             EI_high = torch.squeeze(EI_high['ei_ratio']).numpy()
-            EI_low = torch.load(
-                os.path.join(EI_dir_low_trial, f'group{group_nbr}.pth'))
+            EI_low = torch.load(os.path.join(EI_dir_low_trial,
+                                             f'group{group_nbr}.pth'),
+                                map_location='cpu')
             EI_low = torch.squeeze(EI_low['ei_ratio']).numpy()
             EI_high_list[i, j] = EI_high
             EI_low_list[i, j] = EI_low
@@ -600,9 +465,183 @@ def compare_test_results_many_dirs_plot():
     '''
 
 
+############################################################
+# Actively Used
+############################################################
+
+
+def corr_mean_EI_vs_age(trial_idx, seed_idx):
+    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    save_fig_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'corr_mean_EI_vs_age.png')
+    EI_ave_list = []
+    age_list = []
+    for group_nbr in range(1, NUM_GROUP_PNC_AGE + 1):
+        # age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
+        age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest_from_surface/age_results/input/{group_nbr}/validation_subject_age.txt'
+        EI_path = os.path.join(EI_dir, f'group{group_nbr}.pth')
+        if not os.path.exists(EI_path):
+            continue
+        age = np.array(pd.read_csv(age_path, header=None, index_col=False))
+        ei_tmp = torch.load(EI_path, map_location='cpu')
+        EI_ave_list.append(torch.mean(ei_tmp['ei_ratio']).item())
+        age_list.append(np.mean(age))
+    print(EI_ave_list)
+
+    analysis_functions.plot_EI_ratio(EI_ave_list, age_list, save_fig_path)
+
+
+def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
+    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    if save_mat_path is None:
+        save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                          trial_idx, seed_idx,
+                                          'regional_EI_vs_age_slope.mat')
+    regional_EIs = np.zeros((NUM_GROUP_PNC_AGE, NUM_ROI))
+    ages = np.zeros(NUM_GROUP_PNC_AGE)
+    count = 0
+    for i in range(NUM_GROUP_PNC_AGE):
+        group_idx = i + 1
+        age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_idx}/validation_subject_age.txt'
+        age = np.array(pd.read_csv(age_path, header=None, index_col=False))
+
+        EI_path = os.path.join(EI_dir, f'group{group_idx}.pth')
+        if not os.path.exists(EI_path):
+            continue
+
+        ei_tmp = torch.load(EI_path, map_location='cpu')
+        regional_EIs[count] = ei_tmp['ei_ratio'].squeeze().numpy()
+        ages[i] = np.mean(age)
+        count += 1
+
+    regional_EIs = regional_EIs[:count]
+    ages = ages[:count]
+    print("Valid count: ", count)
+    slope_arr, pvalue_arr, pvalue_fdr = regional_EI_age_slope(
+        NUM_ROI, ages, regional_EIs)
+    sio.savemat(
+        save_mat_path, {
+            'regional_EI_vs_age_slope': slope_arr[:, np.newaxis],
+            'pvalue': pvalue_arr[:, np.newaxis],
+            'pvalue_fdr': pvalue_fdr[:, np.newaxis]
+        })
+    # reg = LinearRegression()
+    # reg.fit(age_list[:, np.newaxis], EI_regional_list)
+    # sio.savemat(save_path, {'regional_EI_vs_age_slope': reg.coef_})
+    print("Saved regional_EI_vs_age_slope.")
+    return slope_arr, pvalue_arr, pvalue_fdr
+
+
+def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
+    save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'regional_EI_vs_age_slope.mat')
+    export_regional_EI_vs_age_slope(trial_idx,
+                                    seed_idx,
+                                    save_mat_path=save_mat_path)
+    visualize_param(save_mat_path, 'regional_EI_vs_age_slope',
+                    save_mat_path.replace('.mat', '.png'))
+
+
+def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
+    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
+                               trial_idx, seed_idx)
+    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+                              trial_idx, seed_idx)
+    save_fig_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'mean_EI_diff_t_test.png')
+    high_list = []
+    low_list = []
+    for group_idx in range(1, NUM_GROUP_PNC_COGNITION + 1):
+        high_ei_path = os.path.join(high_ei_dir, f'group{group_idx}.pth')
+        low_ei_path = os.path.join(low_ei_dir, f'group{group_idx}.pth')
+        high_ei = torch.load(high_ei_path, map_location='cpu')
+        low_ei = torch.load(low_ei_path, map_location='cpu')
+        high_list.append(torch.mean(high_ei['ei_ratio']).item())
+        low_list.append(torch.mean(low_ei['ei_ratio']).item())
+    print(high_list)
+    print(low_list)
+    ttest_1samp_n_plot(
+        high_list,
+        low_list,
+        need_boxplot=True,
+        need_pvalue=True,
+        labels=['high-performance', 'low-performance'],
+        save_fig_path=save_fig_path,
+        fig_title='t-test on mean cortical E/I ratio difference',
+        xlabel='performance group',
+        ylabel='mean cortical E/I ratio')
+    return
+
+
+def export_EI_ratio_diff_effect_size(trial_idx, seed_idx, save_mat_path=None):
+    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
+                               trial_idx, seed_idx)
+    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+                              trial_idx, seed_idx)
+    if save_mat_path is None:
+        save_mat_path = get_fig_file_path('PNC', 'overall_acc_group',
+                                          'EI_ratio', trial_idx, seed_idx,
+                                          'EI_ratio_diff_effect_size.mat')
+
+    EI_matrix_high = np.zeros((NUM_GROUP_PNC_COGNITION, NUM_ROI))
+    EI_matrix_low = np.zeros((NUM_GROUP_PNC_COGNITION, NUM_ROI))
+    for i in range(NUM_GROUP_PNC_COGNITION):
+        group_idx = i + 1
+        EI_high = torch.load(os.path.join(high_ei_dir,
+                                          f'group{group_idx}.pth'),
+                             map_location='cpu')
+        EI_high = torch.squeeze(EI_high['ei_ratio']).numpy()
+        EI_low = torch.load(os.path.join(low_ei_dir, f'group{group_idx}.pth'),
+                            map_location='cpu')
+        EI_low = torch.squeeze(EI_low['ei_ratio']).numpy()
+        EI_matrix_high[i] = EI_high
+        EI_matrix_low[i] = EI_low
+
+    EI_ratio_diff_effect_size = regional_EI_diff_cohen_d(
+        EI_matrix_high, EI_matrix_low)
+    sio.savemat(save_mat_path,
+                {'EI_ratio_diff_effect_size': EI_ratio_diff_effect_size})
+    print("Saved successfully.")
+
+
+def visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx):
+    save_mat_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'EI_ratio_diff_effect_size.mat')
+    export_EI_ratio_diff_effect_size(trial_idx,
+                                     seed_idx,
+                                     save_mat_path=save_mat_path)
+    visualize_param(save_mat_path, 'EI_ratio_diff_effect_size',
+                    save_mat_path.replace('.mat', '.png'))
+
+
+def EI_analysis_age_group(trial_idx, seed_idx):
+    corr_mean_EI_vs_age(trial_idx, seed_idx)
+    visualize_regional_EI_vs_age_slope(trial_idx, seed_idx)
+
+
+def EI_analysis_overall_acc_group(trial_idx, seed_idx):
+    plot_mean_EI_diff_t_test(trial_idx, seed_idx)
+    visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx)
+
+
+def EI_analysis(trial_idx, seed_idx):
+    EI_analysis_age_group(trial_idx, seed_idx)
+    EI_analysis_overall_acc_group(trial_idx, seed_idx)
+
+
 if __name__ == "__main__":
+    for trial_idx in range(3, 4):
+        for seed_idx in range(1, 3):
+            EI_analysis(trial_idx, seed_idx)
+
     # plot_pred_loss()
-    # plot_mean_EI_diff_t_test(1, 1)
-    overall_acc_group_effect_size(1, 1)
     # corr_mean_EI_vs_age(1, 1)
     # visualize_regional_EI_vs_age_slope(1, 1)
+    # plot_mean_EI_diff_t_test(1, 1)
+    # visualize_EI_ratio_diff_effect_size(1, 1)
+
+    # EI_analysis(1, 1)
