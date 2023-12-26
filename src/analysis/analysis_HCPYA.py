@@ -23,8 +23,8 @@ sub_109 = [
 
 
 def plot_pred_loss():
-    param_save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029/train/trial1/seed1'
-    figure_save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029/figures/pred_loss/trial1_seed1.png'
+    param_save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029/train/trial1/seed1'
+    figure_save_path = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029/figures/pred_loss/trial1_seed1.png'
     analysis_functions.plot_pred_loss(epochs=100,
                                       param_save_dir=param_save_dir,
                                       figure_path=figure_save_path)
@@ -34,7 +34,7 @@ def plot_pred_loss():
 def check_dl_epochs():
     trial_nbr = 1
     nbr = 1
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/age_group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/age_group'
     train_results_dir = os.path.join(parent_dir,
                                      f'train/trial{trial_nbr}/group{nbr}')
     val_results_dir = os.path.join(
@@ -77,8 +77,8 @@ def age_distribution():
 
 def plot_EI_ratio_group():
     trial_nbr = 1
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/age_group/EI_ratio/trial{trial_nbr}'
-    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/age_group/figures/EI/trial{trial_nbr}_development_fit.png'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/age_group/EI_ratio/trial{trial_nbr}'
+    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/age_group/figures/EI/trial{trial_nbr}_development_fit.png'
 
     EI_ave_list = []
     age_list = []
@@ -98,7 +98,7 @@ def plot_EI_ratio_group():
 
 def regional_EI():
     trial_nbr = 1
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/age_group/EI_ratio/trial{trial_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/age_group/EI_ratio/trial{trial_nbr}'
     save_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/NeuralMass/pMFM/EI_ratio/EI_group_regional_age.mat'
 
     EI_regional_list = []
@@ -141,7 +141,7 @@ def regional_EI():
 
 
 def compare_test_results_individual(trial_1, trial_2):
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/test'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/test'
     all_loss_list_1 = []
     all_loss_list_2 = []
     corr_loss_list1 = []
@@ -187,15 +187,15 @@ def compare_test_results_individual(trial_1, trial_2):
 
 
 def compare_test_results_plot():
-    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/test/trial24/split1'
-    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/test/trial26/split1'
+    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/test/trial24/split1'
+    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/test/trial26/split1'
     best_val_or_test_mean = 'best_val'
     prefix = 'sub'
     nbr_range = np.arange(860, 1029)
     loss_lists = analysis_functions.compare_test_results_two_lists(
         test_dir_1, test_dir_2, best_val_or_test_mean, prefix, nbr_range)
 
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/figures/compare_L1_MAE'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/figures/compare_L1_MAE'
     fig_name = f'L1_vs_MAE_{best_val_or_test_mean}'
     labels = ['L1', 'MAE']
     need_plot = False
@@ -247,15 +247,15 @@ def compare_group_params_apply_to_individual():
     ks_loss_group = []
     ks_loss_individual = []
     group_losses = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/trial3/seed1/loss_group_to_subj_2RLtest_MAE.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial3/seed1/loss_group_to_subj_2RLtest_MAE.pth'
     )
     total_loss = torch.sum(group_losses, dim=2)
 
     for i in range(len(group_losses)):
-        sub_nbr = sub_109[i] # noqa
+        sub_nbr = sub_109[i]  # noqa
 
         path_sub = (
-            '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/'
+            '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/'
             'individual/test/trial26/split1/sub{sub_nbr}/test_results.pth')
         if not os.path.exists(path_sub):
             continue
@@ -282,7 +282,7 @@ def compare_group_params_apply_to_individual():
 
     print("Valid subjects: ", len(all_loss_individual))
 
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/figures/group_apply_to_subj'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/figures/group_apply_to_subj'
     fig_name = 'mean_group_params_apply_to_subj_2RLtest_MAE_1seed'
     labels = ['Group', 'Individual']
     tzeng_func.tzeng_2_sample_t_test_n_plot(
@@ -325,15 +325,15 @@ def compare_group_params_apply_to_individual():
 
 def compare_group_test_results():
     res_1 = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029/test/trial2/seed1/test_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029/test/trial2/seed1/test_results.pth'
     )
     res1_total_loss = res_1['corr_loss'] + res_1['l1_loss'] + res_1['ks_loss']
     res_2 = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029/test/trial1/seed5/test_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029/test/trial1/seed5/test_results.pth'
     )
     res2_total_loss = res_2['corr_loss'] + res_2['l1_loss'] + res_2['ks_loss']
 
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029/figures'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029/figures'
     fig_name = 'Hybrid_vs_Normal'
     labels = ['Hybrid 1', 'Normal 1']
     print("Res 1 min loss: ", torch.min(res1_total_loss))

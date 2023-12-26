@@ -21,7 +21,7 @@ def EI_ratio_group_parameter(group_nbr, trial_nbr):
 
     group_nbr = int(group_nbr)
 
-    parent_dir = '/home/tzeng/storage/Python/MFMApplication/HCDParams/group'
+    parent_dir = '/home/tzeng/storage/Python/MFMApplication/HCD/group'
     param_path = os.path.join(
         parent_dir, f'test/trial{trial_nbr}/group{group_nbr}/val_results.pth')
     if not os.path.exists(param_path):
@@ -602,7 +602,7 @@ def compare_pipeline():
 def param_vs_age():
     split_nbr = 1
     trial_nbr = 21
-    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/test/trial{trial_nbr}/split{split_nbr}'
+    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/test/trial{trial_nbr}/split{split_nbr}'
     age_list = []
     wee_list = []
     wei_list = []
@@ -642,8 +642,8 @@ def param_vs_age():
 def param_distribution():
     split_nbr = 1
     trial_nbr = 21
-    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/train/trial{trial_nbr}/split{split_nbr}'
-    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/test/trial{trial_nbr}/split{split_nbr}'
+    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/train/trial{trial_nbr}/split{split_nbr}'
+    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/test/trial{trial_nbr}/split{split_nbr}'
     for group_nbr in range(1, 22):
         train_final_state = os.path.join(train_dir, f'group{group_nbr}',
                                          'final_state.pth')
@@ -805,7 +805,7 @@ def sc_fc_corr():
     for group_nbr in range(1, n_group + 1):
         # fc_mat = sio.loadmat(f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/age_group_Harvard/{group_nbr}/fc_fcd_cdf_aCompCor.mat')
         fc_mat = torch.load(
-            f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/simulate/fc/trial7/split1/group{group_nbr}.pth'
+            f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/simulate/fc/trial7/split1/group{group_nbr}.pth'
         )
         fc_mat = fc_mat['fc'].numpy()
         fc_mats[:, group_nbr - 1] = fc_mat[mask_68]

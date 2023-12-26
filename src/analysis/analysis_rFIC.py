@@ -60,15 +60,15 @@ def plot_pred_loss(epochs, param_save_dir, figure_path):
 
 def compare_group_test_results_2lists():
     res_1 = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/test/trial6/test_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/test/trial6/test_results.pth'
     )
     res1_total_loss = res_1['corr_loss'] + res_1['l1_loss'] + res_1['ks_loss']
     res_2 = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/test/trial7/test_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/test/trial7/test_results.pth'
     )
     res2_total_loss = res_2['corr_loss'] + res_2['l1_loss'] + res_2['ks_loss']
 
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/figures/compare_hybrid_normal'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/figures/compare_hybrid_normal'
     fig_name = 'Shaoshi_1_vs_Shaoshi_5'
     labels = ['Shaoshi_1', 'Shaoshi_5']
     print("Res 1 min loss: ", torch.min(res1_total_loss))
@@ -119,14 +119,14 @@ def compare_group_test_results_many_lists():
     ks_lists = []
 
     path_lists = [
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial3/seed1/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial3/seed5/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial1/seed1/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial1/seed5/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial4/seed1/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/test/trial4/seed5/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/test/trial1/test_results.pth',
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/test/trial5/test_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial3/seed1/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial3/seed5/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial1/seed1/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial1/seed5/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial4/seed1/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/test/trial4/seed5/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/test/trial1/test_results.pth',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/test/trial5/test_results.pth'
     ]
     for path in path_lists:
         res = torch.load(path)
@@ -136,7 +136,7 @@ def compare_group_test_results_many_lists():
         l1_lists.append(res['l1_loss'])
         ks_lists.append(res['ks_loss'])
 
-    save_fig_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/figures/compare_50_50_5seeds'
+    save_fig_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/figures/compare_50_50_5seeds'
     if not os.path.exists(save_fig_dir):
         os.mkdir(save_fig_dir)
     labels = [
@@ -180,13 +180,13 @@ def compare_group_test_results_many_lists():
 
 
 def save_parameters_to_matfile():
-    pFIC_sample = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/validation/trial1/seed1/best_param49.pth'
+    pFIC_sample = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/validation/trial1/seed1/best_param49.pth'
     pFIC_sample = torch.load(pFIC_sample)
     spio.savemat(
         '/home/tzeng/storage/Matlab/HCPS1200/matfiles/NeuralMass/rFIC/group/pFIC49.mat',
         {'parameter': pFIC_sample['parameter'].numpy()})
     rFIC_sample = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/validation/trial1/seed1/best_param99.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/validation/trial1/seed1/best_param99.pth'
     )
     spio.savemat(
         '/home/tzeng/storage/Matlab/HCPS1200/matfiles/NeuralMass/rFIC/group/rFIC99.mat',
@@ -204,13 +204,13 @@ def corr_parameters():
     rsfc_gradient = torch.as_tensor(rsfc_gradient).unsqueeze(1).numpy()
 
     pFIC_sample = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/validation/trial1/seed1/best_param49.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/validation/trial1/seed1/best_param49.pth'
     )
     co = CBIG_func.CBIG_corr(pFIC_sample['parameter'].numpy()[137:],
                              rsfc_gradient)
     print(co)
     rFIC_sample = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/validation/trial1/seed1/best_param99.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/validation/trial1/seed1/best_param99.pth'
     )
     co = CBIG_func.CBIG_corr(rFIC_sample['parameter'].numpy()[137:],
                              rsfc_gradient)
@@ -219,8 +219,8 @@ def corr_parameters():
 
 def plot_main():
     trial_nbr = 4
-    param_save_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/train/trial{trial_nbr}'
-    figure_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/rFIC_group/figures/train_curve/trial{trial_nbr}.png'
+    param_save_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/train/trial{trial_nbr}'
+    figure_path = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/rFIC_group/figures/train_curve/trial{trial_nbr}.png'
     plot_pred_loss(epochs=100,
                    param_save_dir=param_save_dir,
                    figure_path=figure_path)

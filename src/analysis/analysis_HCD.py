@@ -19,11 +19,10 @@ def plot_pred_loss(nbr=None):
     trial_nbr = 22
     epochs = 50
     param_save_dir = (
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCD/'
         f'{target}/train/trial{trial_nbr}/split{split_nbr}/{prefix}{nbr}')
-    figure_save_dir = (
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/'
-        f'{target}/figures/pred_loss/trial{trial_nbr}')
+    figure_save_dir = ('/home/ftian/storage/projects/MFM_exploration/logs/HCD/'
+                       f'{target}/figures/pred_loss/trial{trial_nbr}')
     if not os.path.exists(figure_save_dir):
         os.makedirs(figure_save_dir)
     figure_save_path = os.path.join(figure_save_dir,
@@ -37,7 +36,7 @@ def plot_pred_loss(nbr=None):
 def check_dl_epochs():
     trial_nbr = 1
     nbr = 1
-    parent_dir = '/home/tzeng/storage/Python/MFMApplication/HCDParams/group'
+    parent_dir = '/home/tzeng/storage/Python/MFMApplication/HCD/group'
     train_results_dir = os.path.join(parent_dir,
                                      f'train/trial{trial_nbr}/group{nbr}')
     val_results_dir = os.path.join(
@@ -118,9 +117,9 @@ def plot_EI_ratio_group():
     split_nbr = 1
     trial_nbr = 7
     # trial_nbr_2 = 3
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
-    # EI_dir_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr_2}/split{split_nbr}'
-    save_fig_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/figures/EI/trial{trial_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
+    # EI_dir_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/EI_ratio/trial{trial_nbr_2}/split{split_nbr}'
+    save_fig_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/figures/EI/trial{trial_nbr}'
     if not os.path.exists(save_fig_dir):
         os.makedirs(save_fig_dir)
     save_fig_path = os.path.join(save_fig_dir,
@@ -147,7 +146,7 @@ def plot_EI_ratio_group():
 def regional_EI():
     split_nbr = 1
     trial_nbr = 19
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/EI_ratio/trial{trial_nbr}/split{split_nbr}'
     save_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/EI_ratio/group_regional_age_trial{trial_nbr}.mat'
 
     EI_regional_list = []

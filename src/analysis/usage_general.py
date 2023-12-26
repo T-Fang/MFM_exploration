@@ -208,9 +208,9 @@ def fc_mean_datasets():
 
 
 def test_results_compare():
-    # pnc_test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group/test/trial4'
+    # pnc_test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test/trial4'
 
-    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/test/trial13/split1'
+    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/test/trial13/split1'
     total_loss_1 = []
     corr_loss_1 = []
     l1_loss_1 = []
@@ -226,7 +226,7 @@ def test_results_compare():
         l1_loss_1.append(test_res['l1_loss'].item())
         ks_loss_1.append(test_res['ks_loss'].item())
 
-    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCDParams/group/test/trial14/split1'
+    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/HCD/group/test/trial14/split1'
     total_loss_2 = []
     corr_loss_2 = []
     l1_loss_2 = []

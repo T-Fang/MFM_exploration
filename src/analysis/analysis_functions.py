@@ -667,8 +667,8 @@ def get_test_results_from_many_dirs(test_dirs, best_val_or_test_mean, prefix,
 
 
 def test_main():
-    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/test/trial5'
-    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/test/trial6'
+    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/test/trial5'
+    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/test/trial6'
     best_val_or_test_mean = 'best_val'
     prefix = 'group'
     nbr_range = np.arange(1, 2)

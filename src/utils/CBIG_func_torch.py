@@ -21,8 +21,8 @@ def CBIG_corr(s_series, t_series=None):
         t_series = t_series - torch.mean(t_series, dim=0)
         t_series = t_series / torch.linalg.norm(t_series, dim=0)
         return torch.matmul(torch.transpose(s_series, 0, 1), t_series)
-    
-    
+
+
 def adj_matrix_to_tensor(adj_mat, normalize=True, add_self_loop=True):
     """ Input 2D symmetric adjacency matrix, return tensors for constructing DGL graphs.
     [IMPORTANT] The adjacency matrix's entries must be larger or equal to 0
@@ -62,7 +62,7 @@ def test_main():
     z = torch.corrcoef(x.T)
     print(y)
     print(z)
-    
-    
+
+
 if __name__ == "__main__":
     test_main()

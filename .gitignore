@@ -1,4 +1,4 @@
 logs/
 notebooks/
 tmp/
-reports/matlab_visual/shaoshi/*.annot
+*.annot

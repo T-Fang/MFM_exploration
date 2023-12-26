@@ -19,7 +19,7 @@ from mfm_model_2014_general import MfmModel2014
 
 
 def final_state_check():
-    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/DL_dataset/Yan100/train/trial1/seed1'
+    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/DL_dataset/Yan100/train/trial1/seed1'
     count = 0
     for nbr in range(0, 64):
         train_final_state = os.path.join(train_dir,
@@ -67,7 +67,7 @@ def check_within_between_fc():
 
 
 def remove_empty_dir():
-    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/individual/test'
+    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/individual/test'
     for sub_nbr in range(687, 901):
         sub_dir = os.path.join(test_dir, f'sub{sub_nbr}')
         if os.path.exists(sub_dir):
@@ -81,13 +81,13 @@ def compare_group_individual():
     group_list = []
     indi_list = []
     for sub_nbr in range(684, 901):
-        group_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/test_groupmats/trial1/sub{sub_nbr}/test_results.pth'
+        group_path = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/test_groupmats/trial1/sub{sub_nbr}/test_results.pth'
         if not os.path.exists(group_path):
             continue
         b = torch.load(group_path)
         if len(b['corr_loss']) > 0:
             a = torch.load(
-                f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/individual/test/sub{sub_nbr}/test_results.pth'
+                f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/individual/test/sub{sub_nbr}/test_results.pth'
             )
             indi_list.append(
                 torch.min(a['corr_loss'] + a['l1_loss'] +
@@ -98,7 +98,7 @@ def compare_group_individual():
     df['group'] = group_list
     df['individual'] = indi_list
     df.to_csv(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/files/compare.txt',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/files/compare.txt',
         sep='\t',
         header=True,
         index=False)
@@ -121,17 +121,17 @@ def compare_group_individual():
 def visualize_FCD():
     epoch = 99
     fcd_mat = torch.load(
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/sim_fc_fcd/fcd/val_epoch{epoch}.pth'
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/sim_fc_fcd/fcd/val_epoch{epoch}.pth'
     )
     fcd_mat = fcd_mat['fcd'].numpy()
     for i in range(3):
         tmp_fcd = fcd_mat[i]
-        save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/sim_fc_fcd/visualize_fcd/e{epoch}_{i}.png'
+        save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/sim_fc_fcd/visualize_fcd/e{epoch}_{i}.png'
         tzeng_func.tzeng_visualize_FCD(tmp_fcd, save_fig_path)
 
 
 def check_test_results_params():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/test/trial9/split1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/test/trial9/split1'
     count = 0
     rec = np.zeros((106, 10))
     for sub_nbr in range(860, 1029):
@@ -179,7 +179,7 @@ def read_train_logs(trial_nbr):
     record_file['sub_list'] = subnbr_list
     record_file['randseed_count'] = randseed_list
     record_file.to_csv(
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial{trial_nbr}_randseed_.txt',
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial{trial_nbr}_randseed_.txt',
         sep=' ',
         header=False,
         index=False)
@@ -212,13 +212,13 @@ def combine_train_logs(origin_txt_path, new_txt_path, save_path):
 
 def stat_random_seed(trial_nbr_list):
     trial_9 = pd.read_csv(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial9_randseed.txt',
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial9_randseed.txt',
         sep=' ',
         header=None,
         index_col=False)
     randseed_array = np.ones((len(trial_9), ))
     for trial_nbr in trial_nbr_list:
-        trial_randseed_file = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial{trial_nbr}_randseed.txt'
+        trial_randseed_file = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial{trial_nbr}_randseed.txt'
         trial_randseed_file = pd.read_csv(trial_randseed_file,
                                           sep=' ',
                                           header=None,
@@ -273,18 +273,18 @@ def select_best_from_validation():
         sc_mat) * 0.02  # [68, 68] for Euler integration
 
     val_dirs = [
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/val/trial1'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/val/trial1'
     ]
-    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/val/best_from_trial1'
+    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/val/best_from_trial1'
     tester = DLVersionCMAESTester(val_dirs, test_dir, 'HCP')
     tester.select_best_from_val(myelin, rsfc_gradient)
 
 
 def compare_train_logs_main(trial_nbr):
     combine_train_logs(
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial{trial_nbr}_randseed.txt',
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial{trial_nbr}_randseed_.txt',
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/record_files/trial{trial_nbr}_randseed.txt'
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial{trial_nbr}_randseed.txt',
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial{trial_nbr}_randseed_.txt',
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/record_files/trial{trial_nbr}_randseed.txt'
     )
 
 
@@ -335,7 +335,7 @@ def group_sim_fc_fcd_to_individual(sub_nbr, group_same_fc_fcd):
 
 def group_sim_fc_fcd_to_individual_main():
     group_same_fc_fcd = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/trial3/seed1/sim_results.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial3/seed1/sim_results.pth'
     )
     save_losses = torch.zeros((109, 10, 3))
     sub_109 = [
@@ -353,13 +353,13 @@ def group_sim_fc_fcd_to_individual_main():
             sub_109[s_nbr], group_same_fc_fcd)
     torch.save(
         save_losses,
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/trial3/seed1/loss_group_to_subj_2RLtest_MAE.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial3/seed1/loss_group_to_subj_2RLtest_MAE.pth'
     )
 
 
 def compute_KS_distance():
     fcd_mat = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/compare_group_individual/group/sim_fc_fcd/fcd/val_epoch99.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/compare_group_individual/group/sim_fc_fcd/fcd/val_epoch99.pth'
     )
     fcd_mat = fcd_mat['fcd']
     window_num = fcd_mat.shape[1]
@@ -387,12 +387,12 @@ def visualize_FC():
     # fc_emp = np.array(fc_1029[860:1029])
     # fc = tzeng_func.tzeng_fisher_average(fc_emp)
     fc = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/trial1/sim_results_5seeds.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial1/sim_results_5seeds.pth'
     )
     fc = fc['fc'][0].numpy()
     plt.imshow(fc)
     plt.savefig(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/figures/visualize_fc_fcd/fc_sim_trial1_5seeds.png'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/figures/visualize_fc_fcd/fc_sim_trial1_5seeds.png'
     )
     plt.close()
 
@@ -416,7 +416,7 @@ def simulate_results_loss_analysis():
     emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
 
     sim_res = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/trial3/seed1/sim_results_mats.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial3/seed1/sim_results_mats.pth'
     )
     print(sim_res['fcd_pdf'].shape)
     fc_sim = sim_res['fc']

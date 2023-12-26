@@ -396,7 +396,7 @@ class DLVersionCMAESForward:
         self.classify_model_pFIC.eval()
         self.predict_model_pFIC.eval()
         with torch.no_grad():
-            parameter = parameter.T  # [xxx, 3N+1] Pay attention !!!!!!!
+            parameter = parameter.T  # !!! [xxx, 3N+1] Pay attention
             sc_this = self.sc_dl.unsqueeze(0).expand(parameter.shape[0], -1)
             pred_nan = self.classify_model_pFIC(parameter, sc_this)
             # [IMPORTANT] the probability this parameter will be available.

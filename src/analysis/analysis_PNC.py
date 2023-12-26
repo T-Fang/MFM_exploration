@@ -8,21 +8,22 @@ import matplotlib.pyplot as plt
 import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.analysis.tzeng import analysis_functions
+from src.analysis import analysis_functions
 from src.utils import tzeng_func
+from src.utils.analysis_utils import get_run_path, get_fig_file_path, visualize_param
 
 
 def plot_pred_loss():
-    param_save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/high/train/trial3/seed1/group14'
-    figure_save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/figures/pred_loss/t3se1g14.png'
+    param_save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/train/trial3/seed1/group14'
+    figure_save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/pred_loss/t3se1g14.png'
     analysis_functions.plot_pred_loss(epochs=50,
                                       param_save_dir=param_save_dir,
                                       figure_path=figure_save_path)
 
 
 def compare_train_loss(nbr):
-    dir_1 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/FinetuneData/test/trial1/sub{nbr}'
-    dir_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/FinetuneData/test/trial1/sub{nbr}'
+    dir_1 = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/FinetuneData/test/trial1/sub{nbr}'
+    dir_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/FinetuneData/test/trial1/sub{nbr}'
     epoch_nbr_1 = 99
     epoch_nbr_2 = 119
 
@@ -60,14 +61,14 @@ def compare_val_loss():
         shaoshi_loss = shaoshi[9]
         '''
         shaoshi = torch.load(
-            f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group/test_shaoshi/group{group_nbr}/val_results.pth'
+            f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test_shaoshi/group{group_nbr}/val_results.pth'
         )
         shaoshi_loss = shaoshi['corr_loss'][0].item() + shaoshi['l1_loss'][0].item() + shaoshi['ks_loss'][0].item()
         '''
         shaoshi_list.append(shaoshi_loss)
 
         me = torch.load(
-            f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group/test_before/group{group_nbr}/val_results.pth'
+            f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test_before/group{group_nbr}/val_results.pth'
         )
         my_loss = me['corr_loss'][0].item() + me['l1_loss'][0].item(
         ) + me['ks_loss'][0].item()
@@ -118,8 +119,8 @@ def parameter_surface_map(param_10_path, myelin, rsfc_gradient, save_map_path):
 
 
 def plot_EI_ratio_individual():
-    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio/trial4/seed1'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/figures/trial4/seed1_pFIC_EI.png'
+    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio/trial4/seed1'
+    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/figures/trial4/seed1_pFIC_EI.png'
 
     age_all = pd.read_csv(
         '/mnt/isilon/CSC1/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
@@ -151,8 +152,8 @@ def plot_EI_ratio_individual():
 
 
 def regional_EI_age_individual():
-    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio_rFIC/trial1/seed1'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/figures/trial1/rFIC_EI_regional.mat'
+    EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio_rFIC/trial1/seed1'
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/figures/trial1/rFIC_EI_regional.mat'
     nbr_list = np.arange(0, 885, 1)
     n_roi = 68
     nbr_num = len(nbr_list)
@@ -193,19 +194,20 @@ def regional_EI_age_individual():
                                alternative='two-sided')
         slope_arr[i] = res.slope
         pvalue_arr[i] = res.pvalue
-    sio.savemat(save_path, {
-        'EI_ROI': slope_arr[:, np.newaxis],
-        'p_value': pvalue_arr[:, np.newaxis]
-    })
+    sio.savemat(
+        save_path, {
+            'regional_EI_vs_age_slope': slope_arr[:, np.newaxis],
+            'p_value': pvalue_arr[:, np.newaxis]
+        })
     print("Saved regional EI development.")
     return slope_arr, pvalue_arr
 
 
-def plot_EI_ratio_age_group():
-    EI_dir = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/age_group/EI_ratio/trial4/seed1'
-    # EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial1/seed1'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial1_development_fit.png'
-
+def corr_mean_EI_vs_age(trial_idx, seed_idx):
+    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    save_fig_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'corr_mean_EI_vs_age.png')
     EI_ave_list = []
     age_list = []
     for group_nbr in range(1, 30):
@@ -224,7 +226,7 @@ def plot_EI_ratio_age_group():
 
 
 def generate_EI_ratio_ave_across_trials():
-    EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/perturbation/age_group/EI_ratio'
+    EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
     group_range = np.arange(1, 30)
     trials_range = np.arange(1, 101)
     EI_ratio_tensors = torch.zeros(68, len(group_range))
@@ -264,10 +266,12 @@ def generate_EI_ratio_ave_across_trials():
     return
 
 
-def regional_EI_age_group():
-    EI_dir = '/home/tzeng/storage/Python/MFMApplication/Params/PNCParams/age_group/EI_ratio/trial4/seed1'
-    # EI_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/EI_ratio/trial1/seed1'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/figures/EI/trial1_regional.mat'
+def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
+    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    if save_mat_path is None:
+        save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                          trial_idx, seed_idx,
+                                          'regional_EI_vs_age_slope.mat')
     nbr_list = np.arange(1, 30, 1)
     n_roi = 68
     nbr_num = len(nbr_list)
@@ -294,16 +298,27 @@ def regional_EI_age_group():
     slope_arr, pvalue_arr, pvalue_fdr = analysis_functions.EI_age_slope_regional(
         n_roi, age_list, EI_regional_list)
     sio.savemat(
-        save_path, {
-            'EI_ROI': slope_arr[:, np.newaxis],
+        save_mat_path, {
+            'regional_EI_vs_age_slope': slope_arr[:, np.newaxis],
             'pvalue': pvalue_arr[:, np.newaxis],
             'pvalue_fdr': pvalue_fdr[:, np.newaxis]
         })
     # reg = LinearRegression()
     # reg.fit(age_list[:, np.newaxis], EI_regional_list)
-    # sio.savemat(save_path, {'EI_ROI': reg.coef_})
-    print("Saved regional EI development.")
+    # sio.savemat(save_path, {'regional_EI_vs_age_slope': reg.coef_})
+    print("Saved regional_EI_vs_age_slope.")
     return slope_arr, pvalue_arr, pvalue_fdr
+
+
+def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
+    save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
+                                      trial_idx, seed_idx,
+                                      'regional_EI_vs_age_slope.mat')
+    # export_regional_EI_vs_age_slope(trial_idx,
+    #                                 seed_idx,
+    #                                 save_mat_path=save_mat_path)
+    visualize_param(save_mat_path, 'regional_EI_vs_age_slope',
+                    save_mat_path.replace('.mat', '.png'))
 
 
 def statistics_EI_age_group_perturbation():
@@ -313,8 +328,8 @@ def statistics_EI_age_group_perturbation():
         40, 41, 42, 44, 46, 48, 54, 55, 59, 60, 63, 64, 67, 68, 74, 76, 78, 79,
         83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 98, 99, 100
     ]  # Must be valid
-    EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/perturbation/age_group/EI_ratio'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/perturbation/age_group/figures/EI_ratio/statistics_50trials.mat'
+    EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/figures/EI_ratio/statistics_50trials.mat'
 
     nbr_list = np.arange(1, 30, 1)
     n_roi = 68
@@ -368,11 +383,11 @@ def statistics_EI_age_group_perturbation():
 
 
 def plot_EI_overall_acc_group():
-    high_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/high/EI_ratio/trial3/seed3'
-    low_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/low/EI_ratio/trial3/seed3'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/figures/EI_ratio/' \
+    high_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/EI_ratio/trial3/seed3'
+    low_ei_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio/trial3/seed3'
+    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/' \
                     'trial3_seed3_overall_comparison.png'
-    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/figures/EI_ratio/' \
+    save_fig_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/' \
                     'trial3_seed3_overall_comparison.png'
     high_list = []
     low_list = []
@@ -402,9 +417,9 @@ def plot_EI_overall_acc_group():
 
 
 def overall_acc_group_effect_size():
-    EI_dir_high_trial = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/high/EI_ratio/trial3/seed3'
-    EI_dir_low_trial = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/low/EI_ratio/trial3/seed3'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/figures/EI_ratio/trial3_seed3_EI.mat'
+    EI_dir_high_trial = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/EI_ratio/trial3/seed3'
+    EI_dir_low_trial = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio/trial3/seed3'
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/trial3_seed3_EI.mat'
 
     nbr_list = np.arange(1, 15, 1)
     n_roi = 68
@@ -434,9 +449,9 @@ def statistics_EI_overall_acc_group_perturbation():
     # Compute correlation and slope for each trial and statistic
     # trial_list = [1, 3, 10, 13, 14, 15, 18, 22, 25, 26, 27, 28, 29, 30, 32, 33, 34, 35, 36, 38, 40, 41, 42, 44, 46, 48, 54, 55, 59, 60, 63, 64, 67, 74, 76, 78, 79, 83, 84, 86, 87, 88, 89, 91, 92, 93, 94, 96, 98, 99]  # Must be valid # noqa
     trial_list = [3]
-    EI_dir_high_trials = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/high/EI_ratio'
-    EI_dir_low_trials = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/low/EI_ratio'
-    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/figures/EI_ratio/trial2_statistics.mat'
+    EI_dir_high_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/EI_ratio'
+    EI_dir_low_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio'
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/trial2_statistics.mat'
 
     nbr_list = np.arange(1, 15, 1)
     n_roi = 68
@@ -479,14 +494,14 @@ def statistics_EI_overall_acc_group_perturbation():
 
 
 def compare_test_results_plot():
-    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/test/trial1'
-    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/test/trial5'
+    test_dir_1 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/test/trial1'
+    test_dir_2 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/test/trial5'
     best_val_or_test_mean = 'best_val'
     prefix = 'group'
     nbr_range = np.arange(1, 20)
     loss_lists = analysis_functions.compare_test_results_two_lists(
         test_dir_1, test_dir_2, best_val_or_test_mean, prefix, nbr_range)
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/figures/compare_shaoshi_1_5_seed'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/figures/compare_shaoshi_1_5_seed'
     fig_name = f'shaoshi_1seed_vs_shaoshi_5seed_{best_val_or_test_mean}'
     labels = ['1', '5']
     need_plot = True
@@ -531,7 +546,7 @@ def compare_test_results_plot():
 def compare_test_results_many_dirs_plot():
 
     test_dirs = [
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/test/trial{i}'
+        f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/test/trial{i}'
         for i in range(1, 6)
     ]
     best_val_or_test_mean = 'best_val'
@@ -543,7 +558,7 @@ def compare_test_results_many_dirs_plot():
     print(np.mean(loss_lists[:, :, 0], axis=1))
     '''
     labels = [f'{i} seed' for i in range(1, 6)]
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group_by_45/figures/compare_shaoshi_1_5_seed'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group_by_45/figures/compare_shaoshi_1_5_seed'
     fig_name = f'Shaoshi_1_5_seeds_{best_val_or_test_mean}'
 
         tzeng_func.tzeng_boxplot(
@@ -588,5 +603,5 @@ if __name__ == "__main__":
     # plot_pred_loss()
     # plot_EI_overall_acc_group()
     # overall_acc_group_effect_size()
-    plot_EI_ratio_age_group()
-    # regional_EI_age_group()
+    # corr_mean_EI_vs_age(1, 1)
+    visualize_regional_EI_vs_age_slope(1, 1)

@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.scripts.Hybrid_CMA_ES_classes_rFIC import DLVersionCMAESValidator, DLVersionCMAESTester, \
+from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
     get_EI_ratio, train_help_function
 
 
@@ -52,7 +52,7 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
     # Setting parent directory
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual'
     epochs = 50
 
     # Main part, if statement for mode
@@ -163,7 +163,7 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         np.float64))
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/age_group'
     epochs = 50
 
     if mode == 'train':
@@ -293,7 +293,7 @@ def apply_overall_acc_group(mode,
         np.float64))
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-    parent_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/{performance_group}'
+    parent_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/{performance_group}'
     epochs = 50
 
     if mode == 'train':
@@ -419,7 +419,7 @@ def apply_age_group_Yan100(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         np.float64))
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/age_group'
     epochs = 50
 
     if mode == 'train':
@@ -552,7 +552,7 @@ def apply_overall_acc_group_Yan100(mode,
         np.float64))
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-    parent_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/{performance_group}'
+    parent_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/{performance_group}'
     epochs = 50
 
     if mode == 'train':
@@ -661,7 +661,7 @@ if __name__ == "__main__":
                         trial_nbr=t_nbr,
                         seed_nbr=se_nbr)
         if os.path.exists(
-                '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/train/'
+                '/home/ftian/storage/projects/MFM_exploration/logs/PNC/age_group/train/'
                 f'trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'
         ):
             apply_age_group(mode='validation',
@@ -690,7 +690,7 @@ if __name__ == "__main__":
                                 seed_nbr=se_nbr,
                                 performance_group=perform_group_name)
         if os.path.exists(
-                f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/'
+                f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/'
                 f'{perform_group_name}/train/trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'
         ):
             apply_overall_acc_group(mode='validation',
@@ -720,7 +720,7 @@ if __name__ == "__main__":
     #                        trial_nbr=t_nbr,
     #                        seed_nbr=se_nbr)
     # if os.path.exists(
-    #         '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/age_group/train/'
+    #         '/home/ftian/storage/projects/MFM_exploration/logs/PNC/age_group/train/'
     #         f'trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'):
     #     apply_age_group_Yan100(mode='validation',
     #                            group_nbr=g_nbr,
@@ -747,7 +747,7 @@ if __name__ == "__main__":
     #                                seed_nbr=se_nbr,
     #                                performance_group=perform_group_name)
     # if os.path.exists(
-    #         f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/overall_acc_group/{perform_group_name}/train/trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'  # noqa
+    #         f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/{perform_group_name}/train/trial{t_nbr}/seed{se_nbr}/group{g_nbr}/param_save_epoch49.pth'  # noqa
     # ):
     #     apply_overall_acc_group_Yan100(mode='validation',
     #                                    group_nbr=g_nbr,

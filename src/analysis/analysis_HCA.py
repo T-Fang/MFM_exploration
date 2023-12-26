@@ -18,9 +18,9 @@ def plot_pred_loss(nbr=None):
     target = 'group'
     prefix = 'group' if target == 'group' else 'sub'
     trial_nbr = 5
-    param_save_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/{target}/train/trial{trial_nbr}/{prefix}{nbr}'
+    param_save_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/{target}/train/trial{trial_nbr}/{prefix}{nbr}'
     figure_save_path = (
-        f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/{target}/figures/'
+        f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/{target}/figures/'
         f'pred_loss/trial{trial_nbr}_{prefix}{nbr}.png')
     analysis_functions.plot_pred_loss(epochs=50,
                                       param_save_dir=param_save_dir,
@@ -31,7 +31,7 @@ def plot_pred_loss(nbr=None):
 def check_dl_epochs():
     trial_nbr = 1
     nbr = 1
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCA/group'
     train_results_dir = os.path.join(parent_dir,
                                      f'train/trial{trial_nbr}/group{nbr}')
     val_results_dir = os.path.join(
@@ -54,7 +54,7 @@ def check_dl_epochs():
 
 def find_fail_trial():
     trial_nbr = 4
-    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/train/trial{trial_nbr}'
+    train_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/train/trial{trial_nbr}'
     for nbr in range(1, 30):
         train_final_state = os.path.join(train_dir,
                                          f'group{nbr}/param_save_epoch0.pth')
@@ -85,8 +85,8 @@ def age_distribution():
 
 def plot_EI_ratio_group():
     trial_nbr = 5
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/EI_ratio/trial{trial_nbr}'
-    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/figures/EI/trial{trial_nbr}_development_fit.png'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/EI_ratio/trial{trial_nbr}'
+    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/figures/EI/trial{trial_nbr}_development_fit.png'
 
     EI_ave_list = []
     age_list = []
@@ -106,7 +106,7 @@ def plot_EI_ratio_group():
 
 def regional_EI():
     trial_nbr = 5
-    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/EI_ratio/trial{trial_nbr}'
+    EI_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/EI_ratio/trial{trial_nbr}'
     save_path = f'/home/tzeng/storage/Matlab/HCP_Aging/matfiles/pMFM/EI_ratio/group_regional_vs_age_trial{trial_nbr}.mat'
 
     EI_regional_list = []

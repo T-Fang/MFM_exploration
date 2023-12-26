@@ -23,9 +23,9 @@ end
 
 function all_desikan_label = desikan_label_subcortical_removal()
 % Subcortical will be set to 0.
-    lh_desikan_label = load('/home/ftian/storage/projects/MFM_exploration/reports/matlab_visual/tzeng/matfiles/lh_desikan_label.mat');
+    lh_desikan_label = load('/home/ftian/storage/projects/MFM_exploration/src/utils/matlab/lh_desikan_label.mat');
     lh_desikan_label = lh_desikan_label.lh_desikan_fslr_32k_label;
-    rh_desikan_label = load('/home/ftian/storage/projects/MFM_exploration/reports/matlab_visual/tzeng/matfiles/rh_desikan_label.mat');
+    rh_desikan_label = load('/home/ftian/storage/projects/MFM_exploration/src/utils/matlab/rh_desikan_label.mat');
     rh_desikan_label = rh_desikan_label.rh_desikan_fslr_32k_label;
     for i = 1:36
         if i == 1 || i == 5

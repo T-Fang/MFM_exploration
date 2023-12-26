@@ -13,8 +13,8 @@ import tzeng_func
 
 
 def residual_1():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/train/trial2/split1'
-    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/train/trial2/split1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/train/trial2/split1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/train/trial2/split1'
     nbr_range = np.arange(0, 45)
     prefix = 'sub'
 
@@ -30,8 +30,8 @@ def residual_1():
 
 
 def residual_2():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/train/trial23/split1'
-    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual/validation/trial23/split1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/train/trial23/split1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual/validation/trial23/split1'
     nbr_range = np.arange(860, 1029)
     prefix = 'sub'
 
@@ -47,8 +47,8 @@ def residual_2():
 
 
 def residual_3():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/validation/trial2/split1'
-    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/test/trial2/split1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/validation/trial2/split1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/test/trial2/split1'
     count = 0
     for sub_nbr in range(0, 45):
         sub_path = os.path.join(parent_path, f'sub{sub_nbr}')
@@ -112,7 +112,7 @@ def group_sim_fc_fcd_to_individual(subject_id):
     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
     group_same_fc_fcd = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/simulate/sim_results_1seed.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/sim_results_1seed.pth'
     )
 
     fc_sim = group_same_fc_fcd['fc']
@@ -142,7 +142,7 @@ def group_sim_fc_fcd_to_individual_main():
             save_losses[sub_nbr] = save_loss
     torch.save(
         save_losses,
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/loss_group340_to_subj_retest_1seed.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/loss_group340_to_subj_retest_1seed.pth'
     )
 
 
@@ -156,7 +156,7 @@ def compare_group_params_apply_to_individual():
     ks_loss_group = []
     ks_loss_individual = []
     group_losses = torch.load(
-        '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/loss_group340_to_subj_retest_1seed.pth'
+        '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/loss_group340_to_subj_retest_1seed.pth'
     )
     total_loss = torch.sum(group_losses, dim=2)
 
@@ -173,7 +173,7 @@ def compare_group_params_apply_to_individual():
         # ks_loss_group.append(torch.mean(group_losses[i, :, 2]).item())
         # all_loss_group.append(torch.mean(total_loss[i]).item())
 
-        path_sub = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/test/trial2/split1/sub{sub_nbr}/test_results.pth'
+        path_sub = f'/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/test/trial2/split1/sub{sub_nbr}/test_results.pth'
         if not os.path.exists(path_sub):
             continue
         res_sub = torch.load(path_sub)
@@ -189,7 +189,7 @@ def compare_group_params_apply_to_individual():
         # all_loss_individual.append(torch.mean(res_sub['corr_loss'] + res_sub['l1_loss'] + res_sub['ks_loss']).item())
 
     print("Valid count: ", len(all_loss_group))
-    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPretestParams/individual/figures/compare_group_apply_to_individual'
+    save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPretest/individual/figures/compare_group_apply_to_individual'
     fig_name = 'group_params_apply_to_subj_retest_best_val_1_seed'
     labels = ['Group', 'Individual']
     need_plot = True

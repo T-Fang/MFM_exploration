@@ -98,7 +98,7 @@ def roi_fc_vs_age():
 
 
 def param_distribution():
-    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/test/trial5'
+    test_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/test/trial5'
     x_list = []
     wee_list = []
     wei_list = []
@@ -141,7 +141,7 @@ def param_distribution():
 
 def param_vs_age():
     trial_nbr = 3
-    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/HCAParams/group/test/trial{trial_nbr}'
+    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/HCA/group/test/trial{trial_nbr}'
     age_list = []
     wee_list = []
     wei_list = []

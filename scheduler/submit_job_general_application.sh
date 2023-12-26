@@ -21,14 +21,14 @@ mode='train'
 # ['train', 'validation', 'test', 'simulate_fc_fcd', 'EI', 'val_train_param', 'simulate_fc']
 need_gpu=0
 
-logpath="${proj_dir}/logs/${dataset_name}/${target}/${mode}"
+logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
 
 mkdir -p ${logpath}
 
 echo $dataset_name $target $mode
 
 # ! Need to modify on every run
-trial_list=(2)
+trial_list=(3)
 seed_list=(2)
 
 # For group
@@ -67,7 +67,7 @@ if [ ${target} = 'only1_group' ]; then # No group_nbr need
             mkdir -p ${logdir}
 
             for seed_nbr in "${seed_list[@]}"; do
-                # final_state=/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_340/train/trial${trial_nbr}/seed${seed_nbr}/final_state.pth
+                # final_state=/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/train/trial${trial_nbr}/seed${seed_nbr}/final_state.pth
                 # if [ ! -f "${final_state}" ]; then
                 #     echo "t${trial_nbr} se${seed_nbr} no final state."
                 #     continue
@@ -252,7 +252,7 @@ elif [ ${target} = 'individual' ]; then
             mkdir -p ${logdir}
 
             for trial_nbr in "${trial_list[@]}"; do
-                final_state=/home/ftian/storage/projects/MFM_exploration/logs/params/${dataset_name}Params/individual/train/trial${trial_nbr}/seed/sub${sub_nbr}/final_state.pth
+                final_state=/home/ftian/storage/projects/MFM_exploration/logs/${dataset_name}/individual/train/trial${trial_nbr}/seed/sub${sub_nbr}/final_state.pth
                 if [ ! -f "${final_state}" ]; then
                     echo "subject${sub_nbr} t${trial_nbr} no final state."
                     continue

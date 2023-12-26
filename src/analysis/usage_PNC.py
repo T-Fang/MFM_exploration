@@ -14,7 +14,7 @@ import tzeng_func
 
 
 def generate_sublist():
-    save_param_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio'
+    save_param_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/EI_ratio'
 
     subjects_age = pd.read_csv(
         '/mnt/isilon/CSC2/Yeolab/Data/PNC/documentation/rest_subject_age.csv',
@@ -45,7 +45,7 @@ def EI_separate():
     sub_list_above = []
     sub_list_below = []
     for sub_nbr in range(0, 885):
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         d = torch.load(EI_path)
@@ -68,8 +68,8 @@ def EI_comparison_normal_hybrid():
     ei_1_list = []
     ei_2_list = []
     for sub_nbr in range(0, 885):
-        EI_path_1 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
-        EI_path_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio/sub{sub_nbr}.pth'
+        EI_path_1 = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path_2 = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path_1) or not os.path.exists(EI_path_2):
             continue
         d_1 = torch.load(EI_path_1)
@@ -113,7 +113,7 @@ def EI_inves():
         sub_nbr = sub_list[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/Individual/EI_ratio/sub{sub_nbr}.pth'
         fc_emp = pd.read_csv(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
             header=None,
@@ -343,7 +343,7 @@ def ei_cognitive_age():
 
 
 def EI_ratio_individual():
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/Individual'
     group_mats = sio.loadmat(
         '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/group_all.mat'
     )
@@ -418,7 +418,7 @@ def age_match():
     valid_sub_list = []
     ei_ratio_list = []
     for sub_nbr in range(0, 885):
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/Individual/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/Individual/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         valid_sub_list.append(sub_nbr)
@@ -657,7 +657,7 @@ def generate_parameter_mat():
     for sub_nbr in range(0, 885):
         if sub_nbr == 135:  # This subject doesn't have behavior scores
             continue
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/EI_ratio/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         d = torch.load(EI_path)
@@ -711,8 +711,8 @@ def generate_sim_fc_mat():
 
     valid_count = 0
     for i in range(0, 885):
-        sim_fc_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/sim_fc/sub{i}.pth'
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual_shaoshi/EI_ratio/sub{i}.pth'
+        sim_fc_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/sim_fc/sub{i}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual_shaoshi/EI_ratio/sub{i}.pth'
         if not os.path.exists(sim_fc_path):
             continue
         d = torch.load(sim_fc_path)
@@ -727,7 +727,7 @@ def generate_sim_fc_mat():
 
 
 def EI_group_check(group_nbr):
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/group'
     group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}'
 
     myelin = np.array(
@@ -762,7 +762,7 @@ def EI_group_check(group_nbr):
 
 def param_vs_age():
     trial_nbr = 1
-    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/group/test/trial{trial_nbr}'
+    test_dir = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/group/test/trial{trial_nbr}'
     wee_wei_ratio = []
     wee_list = []
     wei_list = []
@@ -829,7 +829,7 @@ def mean_fc_profile_vs_age():
 
 
 def final_state_check(trial_nbr):
-    parent_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/perturbation/overall_acc_group/high/train/trial{trial_nbr}/seed1'
+    parent_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/overall_acc_group/high/train/trial{trial_nbr}/seed1'
     nbr_range = np.arange(1, 15)
     flag = 0
     for i in nbr_range:
@@ -844,8 +844,8 @@ def final_state_check(trial_nbr):
 
 
 def residual_1():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
-    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/train/trial1/seed1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/train/trial1/seed1'
     nbr_range = np.arange(0, 885)
     prefix = 'sub'
 
@@ -862,8 +862,8 @@ def residual_1():
 
 
 def residual_2():
-    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/train/trial1/seed1'
-    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio_rFIC/trial1/seed1'
+    parent_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/train/trial1/seed1'
+    parent_path_2 = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio_rFIC/trial1/seed1'
     nbr_range = np.arange(0, 885)
     prefix = 'sub'
 
@@ -881,7 +881,7 @@ def residual_2():
 def get_subjects_low_EI_cluster():
     bad_ei_sub_list = []
     for sub_nbr in range(401, 885):
-        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/EI_ratio/trial2/seed1/sub{sub_nbr}.pth'
+        EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/EI_ratio/trial2/seed1/sub{sub_nbr}.pth'
         if not os.path.exists(EI_path):
             continue
         EI_ratio = torch.load(EI_path)
@@ -893,10 +893,10 @@ def get_subjects_low_EI_cluster():
 
 
 def check_wEI_n_range_individual():
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual'
     trial_nbr = 4
     seed_nbr = 1
-    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/params/PNCParams/individual/figures/trial{trial_nbr}/wei_range_check.png'
+    save_fig_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/individual/figures/trial{trial_nbr}/wei_range_check.png'
 
     wei_min_list = []
     wei_max_list = []

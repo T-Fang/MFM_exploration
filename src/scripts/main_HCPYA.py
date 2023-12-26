@@ -7,7 +7,7 @@ import os
 import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.scripts.Hybrid_CMA_ES_classes_rFIC import DLVersionCMAESValidator, DLVersionCMAESTester, \
+from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
 
@@ -32,7 +32,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         os.path.join(individual_mats_path, 'sc_roi_1029.mat'))
     sc_indi = sc_indi['sc_roi_1029']
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029'
     epochs = 100
 
     # Always using train set myelin and RSFC gradient
@@ -284,7 +284,7 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
     rsfc_gradient = torch.as_tensor(rsfc_gradient)
     # rsfc_gradient = torch.as_tensor(rsfc_indi[sub_nbr]).unsqueeze(1)
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/individual'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/individual'
     epochs = 100
 
     if mode == 'train':
@@ -413,7 +413,7 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[group_nbr])
     emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)  # [bins, 1]
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/DL_dataset/Yan100'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/DL_dataset/Yan100'
     epochs = 100
 
     save_param_dir = os.path.join(
@@ -467,7 +467,7 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
     )
     fcd_1029 = fcd_1029['fcd_cdf_Yan100']
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/params/HCPYAParams/group_860_1029'
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029'
     epochs = 100
 
     # Always using train set myelin and RSFC gradient
