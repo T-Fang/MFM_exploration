@@ -155,6 +155,7 @@ class MfmModel2014:
 
         print("Successfully init MFM 2014 model!")
 
+    # TODO: Check all occurence of CBIG_2014_mfm_simulation, if we want to remove r_E regularization loss
     def CBIG_2014_mfm_simulation(self,
                                  simulate_time,
                                  burn_in_time,
@@ -271,11 +272,13 @@ class MfmModel2014:
             if torch.isnan(r_E_ave[:, i]).any():
                 print("r_E exploded!")
                 valid_M_mask[i] = False
-            elif (r_E_ave[:, i]
-                  < self.r_E_min).any() or (r_E_ave[:, i]
-                                            > self.r_E_max).any():
-                bold[:, i, :] = float('nan')
-                valid_M_mask[i] = False
+            # TODO: Comment out the next 5 lines and regulate the r_E range
+            # elif (r_E_ave[:, i]
+            #       < self.r_E_min).any() or (r_E_ave[:, i]
+            #                                 > self.r_E_max).any():
+            #     bold[:, i, :] = float('nan')
+            #     valid_M_mask[i] = False
+            # TODO: regulate the r_E range
             elif torch.isnan(bold[:, i, :]).any():
                 valid_M_mask[i] = False
 
@@ -284,10 +287,10 @@ class MfmModel2014:
         print("BOLD shape with burn-in: ", bold.shape)
 
         if need_EI:
-            return bold[:, :,
-                        burn_in_bold + 1:], valid_M_mask, S_E_ave, S_I_ave
+            return bold[:, :, burn_in_bold +
+                        1:], valid_M_mask, S_E_ave, S_I_ave, r_E_ave
         else:
-            return bold[:, :, burn_in_bold + 1:], valid_M_mask
+            return bold[:, :, burn_in_bold + 1:], valid_M_mask, r_E_ave
 
     @staticmethod
     def all_loss_calculate_from_fc_fcd(fc_sim, fcd_hist, fc_emp, emp_fcd_cum):
@@ -548,9 +551,8 @@ if __name__ == '__main__':
 
     # Start
     mfm_model = MfmModel2014(config, parameter, sc_euler, dt=0.006)
-    bold, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(simulate_time=0.1,
-                                                            burn_in_time=0.1,
-                                                            use_tqdm=True)
+    bold, valid_M_mask, _ = mfm_model.CBIG_2014_mfm_simulation(
+        simulate_time=0.1, burn_in_time=0.1, use_tqdm=True)
 
     print("bold shape: ", bold.shape)  # [N, M, t_len]
     print("valid M mask: ", valid_M_mask)

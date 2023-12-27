@@ -57,6 +57,26 @@ def regularization_loss(parameter,
                          sigma_regularization_loss.unsqueeze(1)))
 
 
+def r_E_reg_loss(r_E, target_r_E, loss_type='L2'):
+    """
+    firing rate r_E regularization loss using the specified loss, the target firing rate comes from mfm_model.r_E
+    Args:
+        r_E: average firing rate from the simulation [N, param_sets]
+        target_r_E: target firing rate from the mfm_model.r_E (scalar)
+        loss_type: 'L2' or 'L1'
+
+    Returns:
+        r_E_loss: r_E regularization loss [param_sets, ]
+    """
+    if loss_type == 'L2':
+        r_E_loss = torch.mean(torch.square(r_E - target_r_E), dim=0)
+    elif loss_type == 'L1':
+        r_E_loss = torch.mean(torch.abs(r_E - target_r_E), dim=0)
+    else:
+        raise NotImplementedError
+    return r_E_loss
+
+
 def select_best_parameter_from_savedict(save_dict):
     if 'corr_loss' in save_dict:
         total_loss = save_dict['corr_loss'] + save_dict['L1_loss'] + save_dict[
@@ -464,11 +484,11 @@ class DLVersionCMAESForward:
                                  parameter_repeat,
                                  self.sc_euler,
                                  dt=self.dt)
-        bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
             TR=self.TR)
-        # bold_signal: [N, M=param_sets * param_dup, t_for_bold]; valid_M_mask: [param_sets * param_dup]
+        # bold_signal: [N, M=param_sets * param_dup, t_for_bold]; valid_M_mask: [param_sets * param_dup]; r_E_ave: [N, param_sets * param_dup]
         # bold_signal, valid_M_mask = CBIG_mfm_single_simulation_no_input_noise(parameter_repeat, sc_mat, self.t_epochlong)
 
         bold_signal = bold_signal.view(
@@ -480,6 +500,13 @@ class DLVersionCMAESForward:
         valid_param_list = []  # record valid param index
         fc_sim = torch.zeros(self.param_sets, self.N, self.N)
         fcd_hist = torch.zeros(self.fcd_hist_bins, self.param_sets)
+
+        # TODO: Regularize firing rate
+        r_E_ave = r_E_ave.view(self.N,
+                               self.param_dup, self.param_sets).transpose(
+                                   1, 2)  # [N, param_sets, param_dup]
+        r_E_for_valid_params = torch.zeros(self.N, self.param_sets)
+        # TODO: Regularize firing rate
         count_valid = 0
         for i in range(self.param_sets):
             # for each set of parameter
@@ -496,6 +523,12 @@ class DLVersionCMAESForward:
 
                 fc_sim[count_valid] = fc_this_param
                 fcd_hist[:, count_valid] = fcd_hist_this_param
+                # TODO: Regularize firing rate
+                r_E_ave_this_param = r_E_ave[:, i,
+                                             mask_this_param]  # [N, 1/2/3/param_dup]
+                r_E_for_valid_params[:, count_valid] = torch.mean(
+                    r_E_ave_this_param, dim=1)
+                # TODO: Regularize firing rate
                 count_valid += 1
 
         select_param_sets = self.select_param_sets
@@ -513,6 +546,9 @@ class DLVersionCMAESForward:
 
         fc_sim = fc_sim[:count_valid]
         fcd_hist = fcd_hist[:, :count_valid]
+        # TODO: Regularize firing rate
+        r_E_for_valid_params = r_E_for_valid_params[:, :count_valid]
+        # TODO: Regularize firing rate
         total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
             fc_sim, fcd_hist, self.fc_euler,
             self.fcd_cum_euler)  # [count_valid]
@@ -529,6 +565,15 @@ class DLVersionCMAESForward:
                 pinv_concat_mat=self.pinv_concat_mat)
             # [count_valid, 3]
             total_loss = total_loss + torch.sum(reg_loss, dim=1)
+
+        # TODO: Regularize firing rate
+        if mfm_model.r_E:
+            r_E_loss = r_E_reg_loss(r_E_for_valid_params,
+                                    mfm_model.r_E,
+                                    loss_type='L2')
+            total_loss = total_loss + r_E_loss
+        # TODO: Regularize firing rate
+
         loss_sorted, index_sorted_in_valid = torch.sort(total_loss,
                                                         descending=False)
         valid_param_list = torch.as_tensor(valid_param_list)
@@ -542,6 +587,14 @@ class DLVersionCMAESForward:
         }
         if flag_pFIC_rFIC == 1:
             save_dict['reg_loss'] = reg_loss
+
+        # TODO: Regularize firing rate
+        if mfm_model.r_E:
+            save_dict['r_E_reg_loss'] = r_E_loss
+            # save r_E_for_valid_params
+            save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+        # TODO: Regularize firing rate
+
         torch.save(
             save_dict,
             os.path.join(self.save_param_dir,
@@ -763,6 +816,7 @@ class DLVersionCMAESForward:
         start_point_sigma = torch.matmul(  # noqa
             self.pinv_concat_mat, init_parameters[2 * N + 1:]).squeeze()
 
+        # m0 is the mean of multivariate gaussian
         # Init m_0 for CMA-ES, just by the experience of my seniors
         m_0 = torch.zeros(self.param_dim)
         m_0[0:3] = start_point_wEE
@@ -774,11 +828,12 @@ class DLVersionCMAESForward:
         m_0[7:] = start_point_sigma
         # m_0[7:] = 0
 
-        sigma_0 = 0.2
+        sigma_0 = 0.2  # step size
         p_sigma_0 = torch.zeros(self.param_dim, 1)
         p_c_0 = torch.zeros(self.param_dim, 1)
         V_ini = torch.eye(self.param_dim)
-        Lambda_ini = torch.ones(self.param_dim)
+        Lambda_ini = torch.ones(
+            self.param_dim)  # Lambda is the matrix containing offsprings
         # Lambda_ini[0:3] = start_point_wEE[0] / 2
         # Lambda_ini[3:6] = start_point_wEI[0] / 2
         Lambda_ini[0:3] = start_point_wEE[0]
@@ -786,7 +841,8 @@ class DLVersionCMAESForward:
         Lambda_ini[6] = 0.4
         Lambda_ini[7:] = 0.0005
         cov_0 = torch.matmul(V_ini,
-                             torch.matmul(torch.diag(Lambda_ini**2), V_ini.T))
+                             torch.matmul(torch.diag(Lambda_ini**2),
+                                          V_ini.T))  # covariance matrix
 
         return m_0, sigma_0, cov_0, p_sigma_0, p_c_0
 
@@ -1060,7 +1116,7 @@ class DLVersionCMAESValidator:
         parameter_repeat = parameter.repeat(
             1, self.param_dup)  # [3*N+1, param_sets * param_dup]
         mfm_model = MfmModel2014(parameter_repeat, sc_euler, dt=self.dt)
-        bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
             TR=self.TR)
@@ -1136,7 +1192,11 @@ class DLVersionCMAESValidator:
         parameter = d['parameter']
         parameter = parameter[:, valid_param_list_pre]
         if 'FC_FCD_loss' in d:
-            total_loss = torch.sum(d['FC_FCD_loss'], dim=1)  # [xxx]
+            total_loss = torch.sum(d['FC_FCD_loss'],
+                                   dim=1)  # FC_FCD_loss is [param_sets, 3]
+            # TODO: Regularize firing rate
+            total_loss += d['r_E_reg_loss']  # r_E_reg_loss is [param_sets]
+            # TODO: Regularize firing rate
         else:
             raise Exception("Check the dictionary keys.")
         best_param_ind = torch.argmin(total_loss)
@@ -1148,7 +1208,7 @@ class DLVersionCMAESValidator:
                                  parameter_repeat,
                                  sc_euler,
                                  dt=self.dt)
-        bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
             TR=self.TR)
@@ -1180,6 +1240,12 @@ class DLVersionCMAESValidator:
             'ks_loss': ks_loss,
             'seed': seed
         }
+        # TODO: Regularize firing rate
+        if mfm_model.r_E and valid_M_mask.any():
+            # save r_E_for_valid_params
+            r_E_for_valid_params = r_E_ave[valid_M_mask]
+            save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+        # TODO: Regularize firing rate
         torch.save(
             save_dict,
             os.path.join(self.val_save_dir, f'best_param{epoch}' + '.pth'))
@@ -1234,6 +1300,7 @@ class DLVersionCMAESTester:
             f"DL Version CMA-ES tester has been successfully initialized. Results will be stored in {self.test_dir}"
         )
 
+    # TODO: Modify this as well if we want to regularize firing rate for HCPYA
     def test(self, sc_euler, fc_emp, emp_fcd_cum, seed=None):
         print(" -- Start testing -- ")
 
@@ -1285,7 +1352,7 @@ class DLVersionCMAESTester:
                                  parameter_repeat,
                                  sc_euler,
                                  dt=self.dt)
-        bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
             TR=self.TR)
@@ -1404,6 +1471,7 @@ class DLVersionCMAESTester:
         return 0
 
 
+# TODO: Modify this as well if we want to regularize firing rate for HCPYA
 def simulate_fc_fcd(config,
                     save_path,
                     parameter,
@@ -1435,7 +1503,7 @@ def simulate_fc_fcd(config,
 
     parameter_repeat = parameter.repeat(1, param_dup)  # [3*N+1, param_dup]
     mfm_model = MfmModel2014(config, parameter_repeat, sc_euler, dt=euler_dt)
-    bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+    bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
         simulate_time=simulate_time, burn_in_time=burn_in_time, TR=TR)
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     bold_signal = bold_signal.view(N, param_dup, param_sets, -1).transpose(
@@ -1500,6 +1568,7 @@ def simulate_fc_fcd(config,
     return 0
 
 
+# TODO: Modify this as well if we want to regularize firing rate for HCPYA
 def simulate_fc_fcd_mat(config,
                         save_path,
                         parameter,
@@ -1529,7 +1598,7 @@ def simulate_fc_fcd_mat(config,
 
     parameter_repeat = parameter.repeat(1, param_dup)  # [3*N+1, param_dup]
     mfm_model = MfmModel2014(config, parameter_repeat, sc_euler, dt=euler_dt)
-    bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+    bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
         simulate_time=simulate_time, burn_in_time=burn_in_time, TR=TR)
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     bold_signal = bold_signal.view(N, param_dup, param_sets, -1).transpose(
@@ -1613,7 +1682,7 @@ def simulate_fc(config,
     parameter_repeat = parameter.repeat(
         1, param_dup)  # [3*N+1, param_sets * param_dup]
     mfm_model = MfmModel2014(config, parameter_repeat, sc_euler, dt=euler_dt)
-    bold_signal, valid_M_mask = mfm_model.CBIG_2014_mfm_simulation(
+    bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
         simulate_time=simulate_time, burn_in_time=burn_in_time, TR=TR)
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     if valid_M_mask.any():
@@ -1683,7 +1752,7 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
     parameter_repeat = parameter.repeat(
         1, param_dup)  # [3*N+1, param_sets * param_dup]
     mfm_model = MfmModel2014(config, parameter_repeat, sc_euler, dt=euler_dt)
-    bold_signal, valid_M_mask, s_e_ave, s_i_ave = mfm_model.CBIG_2014_mfm_simulation(
+    bold_signal, valid_M_mask, s_e_ave, s_i_ave, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
         simulate_time=simulate_time,
         burn_in_time=burn_in_time,
         TR=TR,
@@ -1714,6 +1783,12 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
         'parameter': parameter,
         'seed': seed
     }
+    # TODO: Regularize firing rate
+    if mfm_model.r_E and valid_M_mask.any():
+        # save r_E_for_valid_params
+        r_E_for_valid_params = r_E_ave[valid_M_mask]
+        save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+    # TODO: Regularize firing rate
     torch.save(save_dict, save_path)
     print("Successfully saved EI ratio.")
     print(" -- Done simulating -- ")
