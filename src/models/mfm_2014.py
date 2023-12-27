@@ -305,6 +305,7 @@ class MfmModel2014:
         total_loss = corr_loss + L1_loss + ks_loss
         # TODO: Try without FCD KS loss
         # total_loss = corr_loss + L1_loss
+        # TODO: Try without FCD KS loss
         return total_loss, corr_loss, L1_loss, ks_loss
 
     @staticmethod
@@ -366,6 +367,7 @@ class MfmModel2014:
         # L1 version 2: mean(abs) or MAE
         # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
+        # TODO: experiment with different L1 cost
         # L2 or MSE
         # L1_cost = torch.mean(torch.square(vec_emp - vec_sim), dim=1)
 
