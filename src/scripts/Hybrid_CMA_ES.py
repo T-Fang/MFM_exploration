@@ -565,11 +565,9 @@ class DLVersionCMAESForward:
         search_range[N:2 * N, 1] = wei_max
         search_range[2 * N, 0] = 0  # search range for G
         search_range[2 * N, 1] = 3
-        # search_range[2 * N + 1:, 0] = 0.0005  # search range for sigma
-        # search_range[2 * N + 1:, 1] = 0.01
+        search_range[2 * N + 1:, 0] = 0.0005  # search range for sigma
+        search_range[2 * N + 1:, 1] = 0.01
         # TODO: Try without parameterizing sigma
-        search_range[2 * N + 1:, 0] = 0  # search range for sigma
-        search_range[2 * N + 1:, 1] = 0
         self.search_range = search_range
 
         if next_epoch == 0:
