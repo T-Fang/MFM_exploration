@@ -593,6 +593,11 @@ class DLVersionCMAESForward:
             save_dict['r_E_reg_loss'] = r_E_loss
             # save r_E_for_valid_params
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+            # get and save r_E_loss
+            r_E_loss = r_E_reg_loss(r_E_for_valid_params,
+                                    mfm_model.r_E,
+                                    loss_type='L2')
+            save_dict['r_E_loss'] = r_E_loss
         # TODO: Regularize firing rate
 
         torch.save(
@@ -1243,7 +1248,7 @@ class DLVersionCMAESValidator:
         # TODO: Regularize firing rate
         if mfm_model.r_E and valid_M_mask.any():
             # save r_E_for_valid_params
-            r_E_for_valid_params = r_E_ave[valid_M_mask]
+            r_E_for_valid_params = r_E_ave[:, valid_M_mask]
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
         # TODO: Regularize firing rate
         torch.save(
@@ -1786,8 +1791,13 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
     # TODO: Regularize firing rate
     if mfm_model.r_E and valid_M_mask.any():
         # save r_E_for_valid_params
-        r_E_for_valid_params = r_E_ave[valid_M_mask]
+        r_E_for_valid_params = r_E_ave[:, valid_M_mask]
         save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+        # get and save r_E_loss
+        r_E_loss = r_E_reg_loss(r_E_for_valid_params,
+                                mfm_model.r_E,
+                                loss_type='L2')
+        save_dict['r_E_loss'] = r_E_loss
     # TODO: Regularize firing rate
     torch.save(save_dict, save_path)
     print("Successfully saved EI ratio.")
