@@ -79,7 +79,7 @@ def export_EI_from_param_with_lowest_loss_among_seeds(ds_name, target,
                                                       trial_idx, seed_range,
                                                       group_range):
     best_seed_indices = get_seed_indices_with_lowest_loss(
-        target, trial_idx, seed_range, group_range)
+        ds_name, target, trial_idx, seed_range, group_range)
     save_EI_dir = get_run_path(ds_name, target, 'EI_ratio', trial_idx,
                                '_best_among_all')
     for i, best_seed_idx in enumerate(best_seed_indices):
@@ -102,7 +102,7 @@ def export_lowest_losses_among_seeds(ds_name, target, trial_idx, seed_range,
     Hence, in other words, we want to concatenate the values of the keys 'val_total_loss', 'corr_loss', 'l1_loss', 'ks_loss'
     """
     best_seed_indices = get_seed_indices_with_lowest_loss(
-        target, trial_idx, seed_range, group_range)
+        ds_name, target, trial_idx, seed_range, group_range)
     save_dir = get_run_path(ds_name, target, 'test', trial_idx,
                             '_best_among_all')
     lowest_losses_among_seeds = torch.zeros((len(group_range), 4))
@@ -126,8 +126,3 @@ def export_lowest_losses_among_seeds(ds_name, target, trial_idx, seed_range,
         'ks_loss': lowest_losses_among_seeds[:, 3]
     }
     torch.save(losses_dict, os.path.join(save_dir, 'lowest_losses.pth'))
-
-
-def plot_losses_for_diff_trials(target, trial_range):
-    # TODO: Consider how to plot different targets
-    pass

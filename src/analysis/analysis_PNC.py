@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
-from src.analysis.analysis_export import (
+from src.utils.analysis_utils_export import (
     all_groups_EI_to_csv, export_EI_from_param_with_lowest_loss_among_seeds,
     export_lowest_losses_among_seeds)
 from src.utils import tzeng_func
@@ -17,7 +17,8 @@ from src.utils.analysis_utils import (boxplot_network_stats, get_run_path,
                                       get_fig_file_path, visualize_stats,
                                       ttest_1samp_n_plot,
                                       regional_EI_age_slope,
-                                      regional_EI_diff_cohen_d)
+                                      regional_EI_diff_cohen_d,
+                                      plot_losses_for_diff_trials)
 from src.basic.constants import NUM_GROUP_PNC_AGE, NUM_GROUP_PNC_COGNITION, NUM_ROI
 
 
@@ -664,17 +665,28 @@ def analysis_for_trial(trial_idx):
 
 
 if __name__ == "__main__":
+    ALL_TARGETS = [
+        'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
+    ]
+
+    # Run-specific analysis
     # for trial_idx in range(1, 3):
     #     for seed_idx in range(1, 3):
     #         EI_analysis(trial_idx, seed_idx)
-    #         for target in [
-    #                 'age_group', 'overall_acc_group/high',
-    #                 'overall_acc_group/low'
-    #         ]:
+    #         for target in ALL_TARGETS:
     #             all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
     #                                  trial_idx, seed_idx)
-    for trial_idx in range(1, 3):
-        analysis_for_trial(trial_idx)
+
+    # Trial-specific analysis
+    # for trial_idx in range(1, 3):
+    #     analysis_for_trial(trial_idx)
+
+    # Target-specific analysis
+    for target in ALL_TARGETS:
+        plot_losses_for_diff_trials('PNC', target, range(0, 3),
+                                    ['baseline', 'MAE L1', 'no FCD KS'])
+
+    # Debugging
     # plot_pred_loss()
     # corr_mean_EI_vs_age(1, 1)
     # visualize_regional_EI_vs_age_slope(1, 1)
