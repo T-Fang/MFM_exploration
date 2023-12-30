@@ -13,13 +13,11 @@ from src.utils.analysis_utils_export import (
     all_groups_EI_to_csv, export_EI_from_param_with_lowest_loss_among_seeds,
     export_lowest_losses_among_seeds)
 from src.utils import tzeng_func
-from src.utils.analysis_utils import (boxplot_network_stats, get_run_path,
-                                      get_fig_file_path, visualize_stats,
-                                      ttest_1samp_n_plot,
-                                      regional_EI_age_slope,
-                                      regional_EI_diff_cohen_d,
-                                      plot_losses_for_diff_trials)
-from src.basic.constants import NUM_GROUP_PNC_AGE, NUM_GROUP_PNC_COGNITION, NUM_ROI
+from src.utils.analysis_utils import (  # noqa
+    boxplot_network_stats, get_run_path, get_fig_file_path, plot_train_loss,
+    visualize_stats, ttest_1samp_n_plot, regional_EI_age_slope,
+    regional_EI_diff_cohen_d, plot_losses_for_diff_trials)
+from src.basic.constants import NUM_GROUPS_PNC_AGE, NUM_GROUPS_PNC_COGNITION, NUM_ROI
 
 
 def plot_pred_loss():
@@ -60,7 +58,7 @@ def compare_val_loss():
     count = 0
     my_list = []
     shaoshi_list = []
-    for group_nbr in range(1, NUM_GROUP_PNC_AGE + 1):
+    for group_nbr in range(1, NUM_GROUPS_PNC_AGE + 1):
         shaoshi = np.squeeze(
             np.array(
                 pd.read_csv(
@@ -214,7 +212,7 @@ def regional_EI_age_individual():
 
 def generate_EI_ratio_ave_across_trials():
     EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
-    group_range = np.arange(1, NUM_GROUP_PNC_AGE + 1)
+    group_range = np.arange(1, NUM_GROUPS_PNC_AGE + 1)
     trials_range = np.arange(1, 101)
     EI_ratio_tensors = torch.zeros(NUM_ROI, len(group_range))
 
@@ -263,7 +261,7 @@ def statistics_EI_age_group_perturbation():
     EI_dir_all_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/EI_ratio'
     save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/perturbation/age_group/figures/EI_ratio/statistics_50trials.mat'
 
-    nbr_list = np.arange(1, NUM_GROUP_PNC_AGE + 1, 1)
+    nbr_list = np.arange(1, NUM_GROUPS_PNC_AGE + 1, 1)
     n_roi = NUM_ROI
     nbr_num = len(nbr_list)
 
@@ -322,7 +320,7 @@ def statistics_EI_overall_acc_group_perturbation():
     EI_dir_low_trials = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/low/EI_ratio'
     save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/figures/EI_ratio/trial2_statistics.mat'
 
-    nbr_list = np.arange(1, NUM_GROUP_PNC_COGNITION + 1, 1)
+    nbr_list = np.arange(1, NUM_GROUPS_PNC_COGNITION + 1, 1)
     n_roi = NUM_ROI
     nbr_num = len(nbr_list)
 
@@ -482,7 +480,7 @@ def corr_mean_EI_vs_age(trial_idx, seed_idx):
                                       'corr_mean_EI_vs_age.png')
     EI_ave_list = []
     age_list = []
-    for group_nbr in range(1, NUM_GROUP_PNC_AGE + 1):
+    for group_nbr in range(1, NUM_GROUPS_PNC_AGE + 1):
         # age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest_from_surface/age_results/input/{group_nbr}/validation_subject_age.txt'
         EI_path = os.path.join(EI_dir, f'group{group_nbr}.pth')
@@ -503,10 +501,10 @@ def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
         save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
                                           trial_idx, seed_idx,
                                           'regional_EI_vs_age_slope.mat')
-    regional_EIs = np.zeros((NUM_GROUP_PNC_AGE, NUM_ROI))
-    ages = np.zeros(NUM_GROUP_PNC_AGE)
+    regional_EIs = np.zeros((NUM_GROUPS_PNC_AGE, NUM_ROI))
+    ages = np.zeros(NUM_GROUPS_PNC_AGE)
     count = 0
-    for i in range(NUM_GROUP_PNC_AGE):
+    for i in range(NUM_GROUPS_PNC_AGE):
         group_idx = i + 1
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_idx}/validation_subject_age.txt'
         age = np.array(pd.read_csv(age_path, header=None, index_col=False))
@@ -565,7 +563,7 @@ def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
                                       'mean_EI_diff_t_test.png')
     high_list = []
     low_list = []
-    for group_idx in range(1, NUM_GROUP_PNC_COGNITION + 1):
+    for group_idx in range(1, NUM_GROUPS_PNC_COGNITION + 1):
         high_ei_path = os.path.join(high_ei_dir, f'group{group_idx}.pth')
         low_ei_path = os.path.join(low_ei_dir, f'group{group_idx}.pth')
         high_ei = torch.load(high_ei_path, map_location='cpu')
@@ -597,9 +595,9 @@ def export_EI_ratio_diff_effect_size(trial_idx, seed_idx, save_mat_path=None):
                                           'EI_ratio', trial_idx, seed_idx,
                                           'EI_ratio_diff_effect_size.mat')
 
-    EI_matrix_high = np.zeros((NUM_GROUP_PNC_COGNITION, NUM_ROI))
-    EI_matrix_low = np.zeros((NUM_GROUP_PNC_COGNITION, NUM_ROI))
-    for i in range(NUM_GROUP_PNC_COGNITION):
+    EI_matrix_high = np.zeros((NUM_GROUPS_PNC_COGNITION, NUM_ROI))
+    EI_matrix_low = np.zeros((NUM_GROUPS_PNC_COGNITION, NUM_ROI))
+    for i in range(NUM_GROUPS_PNC_COGNITION):
         group_idx = i + 1
         EI_high = torch.load(os.path.join(high_ei_dir,
                                           f'group{group_idx}.pth'),
@@ -656,11 +654,12 @@ def analysis_for_trial(trial_idx):
     ]:
         export_EI_from_param_with_lowest_loss_among_seeds(
             'PNC', target, trial_idx, range(1, 3),
-            range(1, NUM_GROUP_PNC_COGNITION + 1))
-        all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target, trial_idx,
-                             '_best_among_all')
-        export_lowest_losses_among_seeds('PNC', target, trial_idx, range(1, 3),
-                                         range(1, NUM_GROUP_PNC_COGNITION + 1))
+            range(1, NUM_GROUPS_PNC_COGNITION + 1))
+        all_groups_EI_to_csv('PNC', NUM_GROUPS_PNC_COGNITION, target,
+                             trial_idx, '_best_among_all')
+        export_lowest_losses_among_seeds(
+            'PNC', target, trial_idx, range(1, 3),
+            range(1, NUM_GROUPS_PNC_COGNITION + 1))
     EI_analysis(trial_idx, '_best_among_all')
 
 
@@ -668,23 +667,40 @@ if __name__ == "__main__":
     ALL_TARGETS = [
         'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
     ]
+    NUM_GROUPS = {
+        'age_group': NUM_GROUPS_PNC_AGE,
+        'overall_acc_group/high': NUM_GROUPS_PNC_COGNITION,
+        'overall_acc_group/low': NUM_GROUPS_PNC_COGNITION
+    }
 
+    # Group-specific analysis
+    for trial_idx in range(3, 4):
+        for seed_idx in range(1, 3):
+            for target in ALL_TARGETS:
+                # for group_idx in range(1, NUM_GROUPS[target] + 1):
+                for group_idx in range(1, 3):
+                    plot_train_loss('PNC',
+                                    target,
+                                    trial_idx,
+                                    seed_idx,
+                                    group_idx,
+                                    epoch_range=range(49))
     # Run-specific analysis
-    # for trial_idx in range(1, 3):
+    # for trial_idx in range(3, 4):
     #     for seed_idx in range(1, 3):
     #         EI_analysis(trial_idx, seed_idx)
-    #         for target in ALL_TARGETS:
-    #             all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
-    #                                  trial_idx, seed_idx)
+    #         # for target in ALL_TARGETS:
+    #             # all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
+    #             #                      trial_idx, seed_idx)
 
     # Trial-specific analysis
     # for trial_idx in range(1, 3):
     #     analysis_for_trial(trial_idx)
 
     # Target-specific analysis
-    for target in ALL_TARGETS:
-        plot_losses_for_diff_trials('PNC', target, range(0, 3),
-                                    ['baseline', 'MAE L1', 'no FCD KS'])
+    # for target in ALL_TARGETS:
+    #     plot_losses_for_diff_trials('PNC', target, range(0, 3),
+    #                                 ['baseline', 'MAE L1', 'no FCD KS'])
 
     # Debugging
     # plot_pred_loss()

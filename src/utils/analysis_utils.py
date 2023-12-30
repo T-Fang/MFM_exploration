@@ -26,12 +26,29 @@ def get_run_path(ds_name, target, mode, trial_idx, seed_idx):
     return run_path
 
 
+def get_group_path(ds_name, target, mode, trial_idx, seed_idx, group_idx):
+    run_path = os.path.join(get_target_path(ds_name,
+                                            target), mode, f'trial{trial_idx}',
+                            f'seed{seed_idx}', f'group{group_idx}')
+    if not os.path.exists(run_path):
+        os.makedirs(run_path)
+    return run_path
+
+
 def get_fig_dir(ds_name, target, fig_type, trial_idx, seed_idx):
     fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
                            fig_type, f'trial{trial_idx}', f'seed{seed_idx}')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     return fig_dir
+
+
+def get_losses_fig_dir(ds_name, target):
+    losses_fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
+                                  'losses')
+    if not os.path.exists(losses_fig_dir):
+        os.makedirs(losses_fig_dir)
+    return losses_fig_dir
 
 
 def get_fig_file_path(ds_name, target, fig_type, trial_idx, seed_idx,
@@ -183,10 +200,7 @@ def plot_losses_for_diff_trials(
     """
     for loss_type in loss_types:
 
-        fig_save_dir = os.path.join(get_target_path(ds_name, target),
-                                    'figures', 'losses')
-        if not os.path.exists(fig_save_dir):
-            os.makedirs(fig_save_dir)
+        fig_save_dir = get_losses_fig_dir(ds_name, target)
         fig_save_path = os.path.join(fig_save_dir, f'{loss_type}.png')
 
         plt.figure()
@@ -204,6 +218,53 @@ def plot_losses_for_diff_trials(
         plt.ylabel(loss_type)
         plt.savefig(fig_save_path)
         plt.close()
+
+
+def plot_train_loss(ds_name,
+                    target,
+                    trial_idx,
+                    seed_idx,
+                    group_idx,
+                    epoch_range,
+                    save_fig_path=None):
+    param_save_dir = get_group_path(ds_name, target, 'train', trial_idx,
+                                    seed_idx, group_idx)
+    if save_fig_path is None:
+        save_fig_path = get_fig_file_path(
+            ds_name, target, 'losses', trial_idx, seed_idx,
+            f'group{group_idx}_train_losses.png')
+
+    corr_list = []
+    l1_list = []
+    ks_list = []
+    r_E_list = []
+    for i in epoch_range:
+        d = torch.load(os.path.join(param_save_dir,
+                                    f'param_save_epoch{i}.pth'))
+        pred_all_losses = d['FC_FCD_loss']
+
+        corr_list.append(torch.mean(pred_all_losses[:, 0]).item())
+        l1_list.append(torch.mean(pred_all_losses[:, 1]).item())
+        ks_list.append(torch.mean(pred_all_losses[:, 2]).item())
+
+        if 'r_E_reg_loss' in d:
+            r_E_reg_loss = d['r_E_reg_loss']
+            r_E_list.append(torch.mean(r_E_reg_loss).item())
+
+    x = np.array(epoch_range)
+    plt.figure()
+    plt.plot(x, corr_list, 'r-', label='Corr loss')
+    plt.plot(x, l1_list, 'b-', label='L1 loss')
+    plt.plot(x, ks_list, 'g-', label='KS loss')
+    if len(r_E_list) > 0:
+        plt.plot(x, r_E_list, 'y-', label='r_E reg loss')
+    plt.xlabel('iteration')
+    plt.ylabel('loss')
+    plt.title(f'{target.replace("_", " ")} {group_idx} train losses')
+    plt.legend()
+    plt.savefig(save_fig_path)
+    plt.close()
+    print('Saved.')
 
 
 ############################################################
