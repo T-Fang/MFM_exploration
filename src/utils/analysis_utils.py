@@ -36,20 +36,20 @@ def get_fig_file_path(ds_name, target, fig_type, trial_idx, seed_idx,
     return os.path.join(fig_dir, fig_name)
 
 
-def visualize_param(mat_file_path, param_name, fig_file_path):
+def visualize_stats(mat_file_path, stats_name, fig_file_path):
     """
     First, cd into MATLAB_SCRIPT_PATH.
-    Then, load the parameter stored in the `mat_file_path` file.
-    Finally, run the visualize_parameter_desikan_fslr function to visualize the parameter.
+    Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
+    Finally, run the visualize_parameter_desikan_fslr function to visualize the stats.
     """
 
-    print(f"Visualizing {param_name} from {mat_file_path}...")
+    print(f"Visualizing {stats_name} from {mat_file_path}...")
 
     command = [
         (f"cd {MATLAB_SCRIPT_PATH}; "
          f"matlab -nodisplay -nosplash -nodesktop -r "
-         f"\"load('{mat_file_path}', '{param_name}'); "
-         f"visualize_parameter_desikan_fslr({param_name}, '{fig_file_path}'); "
+         f"\"load('{mat_file_path}', '{stats_name}'); "
+         f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
          f"exit;\"")
     ]
 
@@ -61,6 +61,33 @@ def visualize_param(mat_file_path, param_name, fig_file_path):
     print(result.stderr)
 
     print(f'Visualization saved to {fig_file_path}')
+
+
+def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
+    """
+    First, cd into MATLAB_SCRIPT_PATH.
+    Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
+    Finally, run the visualize_parameter_desikan_fslr function to
+    generates a box plot depicting the network pattern of the input statistic.
+    """
+
+    print(f"Boxploting {stats_name} from {mat_file_path}...")
+
+    command = [(
+        f"cd {MATLAB_SCRIPT_PATH}; "
+        f"matlab -nodisplay -nosplash -nodesktop -r "
+        f"\"load('{mat_file_path}', '{stats_name}'); "
+        f"yeo7_network_boxplot({stats_name}, '{stats_name.replace('_', ' ')}', '{fig_file_path}'); "
+        f"exit;\"")]
+
+    result = subprocess.run(command,
+                            shell=True,
+                            capture_output=True,
+                            text=True)
+    print(result.stdout)
+    print(result.stderr)
+
+    print(f'Network boxplot saved to {fig_file_path}')
 
 
 def ttest_1samp_n_plot(list_1,

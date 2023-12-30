@@ -1,4 +1,3 @@
-import shutil
 import torch
 import scipy.io as sio
 import scipy.stats as stats
@@ -10,9 +9,13 @@ import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
+from src.analysis.analysis_export import (
+    all_groups_EI_to_csv, export_EI_from_param_with_lowest_loss_among_seeds,
+    export_lowest_losses_among_seeds)
 from src.utils import tzeng_func
-from src.utils.analysis_utils import (get_run_path, get_fig_file_path,
-                                      visualize_param, ttest_1samp_n_plot,
+from src.utils.analysis_utils import (boxplot_network_stats, get_run_path,
+                                      get_fig_file_path, visualize_stats,
+                                      ttest_1samp_n_plot,
                                       regional_EI_age_slope,
                                       regional_EI_diff_cohen_d)
 from src.basic.constants import NUM_GROUP_PNC_AGE, NUM_GROUP_PNC_COGNITION, NUM_ROI
@@ -541,8 +544,14 @@ def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
     export_regional_EI_vs_age_slope(trial_idx,
                                     seed_idx,
                                     save_mat_path=save_mat_path)
-    visualize_param(save_mat_path, 'regional_EI_vs_age_slope',
-                    save_mat_path.replace('.mat', '.png'))
+
+    visualize_stats(save_mat_path, 'regional_EI_vs_age_slope',
+                    save_mat_path.replace('.mat', '_surf_map.png'))
+    boxplot_network_stats(
+        save_mat_path,
+        'regional_EI_vs_age_slope',
+        save_mat_path.replace('.mat', '_boxplot.png'),
+    )
 
 
 def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
@@ -615,8 +624,14 @@ def visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx):
     export_EI_ratio_diff_effect_size(trial_idx,
                                      seed_idx,
                                      save_mat_path=save_mat_path)
-    visualize_param(save_mat_path, 'EI_ratio_diff_effect_size',
+
+    visualize_stats(save_mat_path, 'EI_ratio_diff_effect_size',
                     save_mat_path.replace('.mat', '.png'))
+    boxplot_network_stats(
+        save_mat_path,
+        'EI_ratio_diff_effect_size',
+        save_mat_path.replace('.mat', '_boxplot.png'),
+    )
 
 
 def EI_analysis_age_group(trial_idx, seed_idx):
@@ -634,134 +649,32 @@ def EI_analysis(trial_idx, seed_idx):
     EI_analysis_overall_acc_group(trial_idx, seed_idx)
 
 
-def export_all_group_EI(target, trial_idx, seed_idx, save_csv_path=None):
-    # TODO: export along with losses figures as well
-    ei_dir = get_run_path('PNC', target, 'EI_ratio', trial_idx, seed_idx)
-    if save_csv_path is None:
-        save_csv_path = os.path.join(ei_dir, 'all_EI_ratios.csv')
-
-    EI_matrix = np.zeros((NUM_ROI, NUM_GROUP_PNC_COGNITION))
-    for i in range(NUM_GROUP_PNC_COGNITION):
-        group_idx = i + 1
-        EI_high = torch.load(os.path.join(ei_dir, f'group{group_idx}.pth'),
-                             map_location='cpu')
-        EI_high = torch.squeeze(EI_high['ei_ratio']).numpy()
-        EI_matrix[:, i] = EI_high
-
-    # save to csv
-    df = pd.DataFrame(EI_matrix)
-
-    print(f'Saving to {save_csv_path}...')
-    df.to_csv(save_csv_path, index=False, header=False)
-
-    print("Saved successfully.")
-
-
-def seed_indices_with_lowest_loss(target, trial_idx, seed_range, group_range):
-    best_seed_indices = []
-
-    for group_idx in group_range:
-        best_seed_idx = 0
-        lowest_loss = np.inf
-
-        # get the seed idx with lowest loss
-        for seed_idx in seed_range:
-            test_dir = get_run_path('PNC', target, 'test', trial_idx, seed_idx)
-            test_param_dict = torch.load(os.path.join(test_dir,
-                                                      f'group{group_idx}',
-                                                      'val_results.pth'),
-                                         map_location='cpu')
-            loss = test_param_dict['val_total_loss'].item()
-            if loss < lowest_loss:
-                lowest_loss = loss
-                best_seed_idx = seed_idx
-
-        best_seed_indices.append(best_seed_idx)
-
-    # save seed_indices_with_lowest_loss as csv
-    df = pd.DataFrame(best_seed_indices)
-    save_dir = get_run_path('PNC', target, 'test', trial_idx,
-                            '_best_among_all')
-    save_csv_path = os.path.join(save_dir, 'best_seed_indices.csv')
-
-    print(f'Saving to {save_csv_path}...')
-    df.to_csv(save_csv_path, index=False, header=False)
-    print("Saved successfully.")
-
-    return best_seed_indices
-
-
-def get_EI_from_param_with_lowest_loss_among_all_seeds(target, trial_idx,
-                                                       seed_range,
-                                                       group_range):
-    best_seed_indices = seed_indices_with_lowest_loss(target, trial_idx,
-                                                      seed_range, group_range)
-    save_EI_dir = get_run_path('PNC', target, 'EI_ratio', trial_idx,
-                               '_best_among_all')
-    for i, best_seed_idx in enumerate(best_seed_indices):
-        group_idx = group_range[i]
-        # find the EI ratio file and save to the 'seed_best_among_all' directory
-        ei_dir = get_run_path('PNC', target, 'EI_ratio', trial_idx,
-                              best_seed_idx)
-        ei_file = os.path.join(ei_dir, f'group{group_idx}.pth')
-        shutil.copy(ei_file, save_EI_dir)
-
-
-def get_lowest_losses_among_seeds(target, trial_idx, seed_range, group_range):
-    """
-    For the given trial, extract the lowest losses among all seeds for each group,
-    and stack the losses horizontally (column wise) for each type of loss
-
-    The file stored for each trial, seed, and group in the test directory is a dictionary
-    containing keys ['parameter', 'val_total_loss', 'sorted_index', 'corr_loss', 'l1_loss', 'ks_loss'].
-    Hence, in other words, we want to concatenate the values of the keys 'val_total_loss', 'corr_loss', 'l1_loss', 'ks_loss'
-    """
-    best_seed_indices = seed_indices_with_lowest_loss(target, trial_idx,
-                                                      seed_range, group_range)
-    save_dir = get_run_path('PNC', target, 'test', trial_idx,
-                            '_best_among_all')
-    lowest_losses_among_seeds = torch.zeros((len(group_range), 4))
-    for i, best_seed_idx in enumerate(best_seed_indices):
-        group_idx = group_range[i]
-        test_dir = get_run_path('PNC', target, 'test', trial_idx,
-                                best_seed_idx)
-        saved_dict = torch.load(os.path.join(test_dir, f'group{group_idx}',
-                                             'val_results.pth'),
-                                map_location='cpu')
-        lowest_losses_among_seeds[i] = torch.tensor([
-            saved_dict['val_total_loss'], saved_dict['corr_loss'],
-            saved_dict['l1_loss'], saved_dict['ks_loss']
-        ])
-
-    # split seed_indices_with_lowest_loss into separate losses and form a dictionary and finally save as pth
-    losses_dict = {
-        'total_loss': lowest_losses_among_seeds[:, 0],
-        'corr_loss': lowest_losses_among_seeds[:, 1],
-        'l1_loss': lowest_losses_among_seeds[:, 2],
-        'ks_loss': lowest_losses_among_seeds[:, 3]
-    }
-    torch.save(losses_dict, os.path.join(save_dir, 'lowest_losses.pth'))
-
-
-def plot_losses_for_diff_trials(target, trial_range):
-    # TODO: Consider how to plot different targets
-    pass
+def analysis_for_trial(trial_idx):
+    for target in [
+            'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
+    ]:
+        export_EI_from_param_with_lowest_loss_among_seeds(
+            'PNC', target, trial_idx, range(1, 3),
+            range(1, NUM_GROUP_PNC_COGNITION + 1))
+        all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target, trial_idx,
+                             '_best_among_all')
+        export_lowest_losses_among_seeds('PNC', target, trial_idx, range(1, 3),
+                                         range(1, NUM_GROUP_PNC_COGNITION + 1))
+    EI_analysis(trial_idx, '_best_among_all')
 
 
 if __name__ == "__main__":
+    # for trial_idx in range(1, 3):
+    #     for seed_idx in range(1, 3):
+    #         EI_analysis(trial_idx, seed_idx)
+    #         for target in [
+    #                 'age_group', 'overall_acc_group/high',
+    #                 'overall_acc_group/low'
+    #         ]:
+    #             all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
+    #                                  trial_idx, seed_idx)
     for trial_idx in range(1, 3):
-        for seed_idx in range(1, 3):
-            # EI_analysis(trial_idx, seed_idx)
-            for target in ['overall_acc_group/high', 'overall_acc_group/low']:
-                # export_all_group_EI(target, trial_idx, seed_idx)
-                # get_EI_from_param_with_lowest_loss_among_all_seeds(
-                #     target, trial_idx, range(1, 3),
-                #     range(1, NUM_GROUP_PNC_COGNITION + 1))
-                # export_all_group_EI(target, trial_idx, '_best_among_all')
-                get_lowest_losses_among_seeds(
-                    target, trial_idx, range(1, 3),
-                    range(1, NUM_GROUP_PNC_COGNITION + 1))
-
+        analysis_for_trial(trial_idx)
     # plot_pred_loss()
     # corr_mean_EI_vs_age(1, 1)
     # visualize_regional_EI_vs_age_slope(1, 1)
