@@ -3,8 +3,12 @@ import subprocess
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import stats
+import torch
 
 from src.basic.constants import LOG_PATH, MATLAB_SCRIPT_PATH
+############################################################
+# Path related
+############################################################
 
 
 def get_target_path(ds_name, target):
@@ -36,20 +40,25 @@ def get_fig_file_path(ds_name, target, fig_type, trial_idx, seed_idx,
     return os.path.join(fig_dir, fig_name)
 
 
-def visualize_param(mat_file_path, param_name, fig_file_path):
+############################################################
+# Visualization related
+############################################################
+
+
+def visualize_stats(mat_file_path, stats_name, fig_file_path):
     """
     First, cd into MATLAB_SCRIPT_PATH.
-    Then, load the parameter stored in the `mat_file_path` file.
-    Finally, run the visualize_parameter_desikan_fslr function to visualize the parameter.
+    Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
+    Finally, run the visualize_parameter_desikan_fslr function to visualize the stats.
     """
 
-    print(f"Visualizing {param_name} from {mat_file_path}...")
+    print(f"Visualizing {stats_name} from {mat_file_path}...")
 
     command = [
         (f"cd {MATLAB_SCRIPT_PATH}; "
          f"matlab -nodisplay -nosplash -nodesktop -r "
-         f"\"load('{mat_file_path}', '{param_name}'); "
-         f"visualize_parameter_desikan_fslr({param_name}, '{fig_file_path}'); "
+         f"\"load('{mat_file_path}', '{stats_name}'); "
+         f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
          f"exit;\"")
     ]
 
@@ -61,6 +70,33 @@ def visualize_param(mat_file_path, param_name, fig_file_path):
     print(result.stderr)
 
     print(f'Visualization saved to {fig_file_path}')
+
+
+def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
+    """
+    First, cd into MATLAB_SCRIPT_PATH.
+    Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
+    Finally, run the visualize_parameter_desikan_fslr function to
+    generates a box plot depicting the network pattern of the input statistic.
+    """
+
+    print(f"Boxplotting {stats_name} from {mat_file_path}...")
+
+    command = [(
+        f"cd {MATLAB_SCRIPT_PATH}; "
+        f"matlab -nodisplay -nosplash -nodesktop -r "
+        f"\"load('{mat_file_path}', '{stats_name}'); "
+        f"yeo7_network_boxplot({stats_name}, '{stats_name.replace('_', ' ')}', '{fig_file_path}'); "
+        f"exit;\"")]
+
+    result = subprocess.run(command,
+                            shell=True,
+                            capture_output=True,
+                            text=True)
+    print(result.stdout)
+    print(result.stderr)
+
+    print(f'Network boxplot saved to {fig_file_path}')
 
 
 def ttest_1samp_n_plot(list_1,
@@ -117,11 +153,66 @@ def ttest_1samp_n_plot(list_1,
 
 
 ############################################################
+# Loss related analysis
+############################################################
+
+
+def plot_losses_for_diff_trials(
+        ds_name,
+        target,
+        trial_range,
+        trial_names,
+        loss_types=['total_loss', 'corr_loss', 'l1_loss', 'ks_loss']):
+    """
+    For each loss from loss_types, draw a box plot, where box represents a trial,
+    and every dot in a box represents a group's lowest loss among all seeds under the setup of the trial.
+
+    This function assumes that the target's directory contains
+    a pth file at f'trial{trial_idx}/seed_best_among_all/lowest_losses.pth'.
+    Each of the file contains a dictionary, with keys ['total_loss', 'corr_loss', 'l1_loss', 'ks_loss'],
+    and values the corresponding losses in torch tensor of size (num_of_groups, )
+
+    Args:
+        ds_name (str): The dataset name.
+        target (str): The target name. (e.g., 'age_group')
+        trial_range (range): The range of trial indices.
+        trial_names (list): The display names of the trials.
+
+    Returns:
+        None (the plots will be stored in the f'PROJECT_PATH/logs/{ds_name}/{target}/figures/losses/')
+    """
+    for loss_type in loss_types:
+
+        fig_save_dir = os.path.join(get_target_path(ds_name, target),
+                                    'figures', 'losses')
+        if not os.path.exists(fig_save_dir):
+            os.makedirs(fig_save_dir)
+        fig_save_path = os.path.join(fig_save_dir, f'{loss_type}.png')
+
+        plt.figure()
+        data = []
+        for trial_idx in trial_range:
+            losses_file_dir = get_run_path(ds_name, target, 'test', trial_idx,
+                                           '_best_among_all')
+            losses_dict = torch.load(os.path.join(losses_file_dir,
+                                                  'lowest_losses.pth'),
+                                     map_location='cpu')
+            losses = losses_dict[loss_type]
+            data.append(losses.numpy())
+        plt.boxplot(data, labels=trial_names)
+        plt.xlabel('Setups')
+        plt.ylabel(loss_type)
+        plt.savefig(fig_save_path)
+        plt.close()
+
+
+############################################################
 # EI related analysis
 ############################################################
 
 
 def regional_EI_age_slope(n_roi, ages, regional_EIs):
+
     # regional_EIs = np.zeros((nbr_num, n_roi))    # ages = np.zeros((nbr_num))
 
     slope_arr = np.zeros((n_roi))

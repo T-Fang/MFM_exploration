@@ -625,7 +625,6 @@ class DLVersionCMAESForward:
         search_range[2 * N, 1] = 3
         search_range[2 * N + 1:, 0] = 0.0005  # search range for sigma
         search_range[2 * N + 1:, 1] = 0.01
-        # TODO: Try without parameterizing sigma
         self.search_range = search_range
 
         if next_epoch == 0:
@@ -766,6 +765,14 @@ class DLVersionCMAESForward:
             print("Sampling failed!")
             return None
 
+        # TODO: Try without parameterizing sigma
+        # FIXED_SIGMA = 0.005
+        # # fixed_coeff = torch.tensor([FIXED_SIGMA, 0, 0])
+        # # fill the last [7:, :] of param_10_k with repeated fixed_coeff
+        # # param_10_k[7:, :] = fixed_coeff.unsqueeze(1).repeat(
+        # #     1, param_10_k.shape[1])
+        # parameter_k[2 * self.N + 1:, :] = FIXED_SIGMA
+        # TODO: Try without parameterizing sigma
         if k in self.dl_pfic_range:
             loss_k, index_k = self.mfm_model_loss_dl(parameter_k, k)
         elif k in self.euler_pfic_range:
@@ -829,9 +836,7 @@ class DLVersionCMAESForward:
         m_0[3:6] = start_point_wEI
         # m_0[4] = start_point_wEI[1] / 2
         m_0[6] = init_parameters[2 * N]  # G
-        # TODO: Try without parameterizing sigma
         m_0[7:] = start_point_sigma
-        # m_0[7:] = 0
 
         sigma_0 = 0.2  # step size
         p_sigma_0 = torch.zeros(self.param_dim, 1)

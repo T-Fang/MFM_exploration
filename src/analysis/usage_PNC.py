@@ -515,14 +515,14 @@ def age_match():
         plt.savefig(
             os.path.join(
                 '/home/ftian/storage/projects/MFM_exploration/reports/figures/EI',
-                f'Age_match_Compare_Overall_accuracy.png'))
+                'Age_match_Compare_Overall_accuracy.png'))
         plt.close()
         print("Cog figure saved.")
 
         print('Drawing box plot...')
         plt.figure()
         plt.boxplot([ei_1_list, ei_2_list],
-                    labels=[f'high performance', f'low performance'],
+                    labels=['high performance', 'low performance'],
                     showfliers=False)
         plt.xlabel('Different group')
         plt.ylabel('EI ratio')
@@ -941,5 +941,67 @@ def check_wEI_n_range_individual():
     return
 
 
+############################################################
+# Written by Tian Fang
+############################################################
+def gather_baseline_losses():
+    """
+    baseline results are stored in /home/shaoshi.z/storage/MFM/Zhang2023_pFIC_github_pr_231128/replication/PNC/age_effect/reference_output/test/{age_group}/test_all.csv
+    where age group is within range(1, 30)
+    the 11th to 14th (1-indexed) rows are FC corr, FC L1, FCD, and total loss, respectively.
+    We want to extract these values from different groups and put them into a dictionary,
+    with keys ['total_loss', 'corr_loss', 'l1_loss', 'ks_loss'], and values the corresponding losses in torch tensor of size (num_of_groups, )
+    Finally, use torch.save to save the dictionary to the given save_path
+    """
+    save_path = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/age_group/test/trial0/seed_best_among_all/lowest_losses.pth'
+    losses = {
+        'total_loss': torch.zeros(29),
+        'corr_loss': torch.zeros(29),
+        'l1_loss': torch.zeros(29),
+        'ks_loss': torch.zeros(29)
+    }
+    for age_group in range(1, 30):
+        test_path = f'/home/shaoshi.z/storage/MFM/Zhang2023_pFIC_github_pr_231128/replication/PNC/age_effect/reference_output/test/{age_group}/test_all.csv'
+        test_res = pd.read_csv(test_path, header=None, index_col=False)
+        losses['corr_loss'][age_group - 1] = test_res.iloc[10, 0]
+        losses['l1_loss'][age_group - 1] = test_res.iloc[11, 0]
+        losses['ks_loss'][age_group - 1] = test_res.iloc[12, 0]
+        losses['total_loss'][age_group - 1] = test_res.iloc[13, 0]
+    torch.save(losses, save_path)
+    print("Saved.")
+
+
+def gather_baseline_losses_cognition():
+    """
+    baseline results are stored in /home/shaoshi.z/storage/MFM/Zhang2023_pFIC_github_pr_231128/replication/PNC/cognition_effect/reference_output/{perf_group}_performance/test/{group}/test_all.csv
+    where group is within range(1, 15), and perf_group is either 'low' or 'high'
+    the 11th to 14th (1-indexed) rows are FC corr, FC L1, FCD, and total loss, respectively.
+    We want to extract these values from different groups and put them into a dictionary,
+    with keys ['total_loss', 'corr_loss', 'l1_loss', 'ks_loss'], and values the corresponding losses in torch tensor of size (num_of_groups, )
+    Finally, use torch.save to save the dictionary to the given save_path
+    """
+
+    for perf_group in ['low', 'high']:
+        losses = {
+            'total_loss': torch.zeros(14),
+            'corr_loss': torch.zeros(14),
+            'l1_loss': torch.zeros(14),
+            'ks_loss': torch.zeros(14)
+        }
+        save_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/{perf_group}/test/trial0/seed_best_among_all/lowest_losses.pth'
+        # create parent dir of save_path is necessary
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        for group in range(1, 15):
+            test_path = f'/home/shaoshi.z/storage/MFM/Zhang2023_pFIC_github_pr_231128/replication/PNC/cognition_effect/reference_output/{perf_group}_performance/test/{group}/test_all.csv'
+            test_res = pd.read_csv(test_path, header=None, index_col=False)
+            losses['corr_loss'][group - 1] = test_res.iloc[10, 0]
+            losses['l1_loss'][group - 1] = test_res.iloc[11, 0]
+            losses['ks_loss'][group - 1] = test_res.iloc[12, 0]
+            losses['total_loss'][group - 1] = test_res.iloc[13, 0]
+
+        torch.save(losses, save_path)
+    print("Saved.")
+
+
 if __name__ == "__main__":
-    check_wEI_n_range_individual()
+    gather_baseline_losses_cognition()
