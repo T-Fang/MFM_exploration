@@ -57,7 +57,7 @@ def regularization_loss(parameter,
                          sigma_regularization_loss.unsqueeze(1)))
 
 
-def r_E_reg_loss(r_E, target_r_E, loss_type='L2'):
+def get_r_E_reg_loss(r_E, target_r_E, loss_type='L2'):
     """
     firing rate r_E regularization loss using the specified loss, the target firing rate comes from mfm_model.r_E
     Args:
@@ -66,15 +66,15 @@ def r_E_reg_loss(r_E, target_r_E, loss_type='L2'):
         loss_type: 'L2' or 'L1'
 
     Returns:
-        r_E_loss: r_E regularization loss [param_sets, ]
+        r_E_reg_loss: r_E regularization loss [param_sets, ]
     """
     if loss_type == 'L2':
-        r_E_loss = torch.mean(torch.square(r_E - target_r_E), dim=0)
+        r_E_reg_loss = torch.mean(torch.square(r_E - target_r_E), dim=0)
     elif loss_type == 'L1':
-        r_E_loss = torch.mean(torch.abs(r_E - target_r_E), dim=0)
+        r_E_reg_loss = torch.mean(torch.abs(r_E - target_r_E), dim=0)
     else:
         raise NotImplementedError
-    return r_E_loss
+    return r_E_reg_loss
 
 
 def select_best_parameter_from_savedict(save_dict):
@@ -568,10 +568,10 @@ class DLVersionCMAESForward:
 
         # TODO: Regularize firing rate
         if mfm_model.r_E:
-            r_E_loss = r_E_reg_loss(r_E_for_valid_params,
+            r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
                                     mfm_model.r_E,
                                     loss_type='L2')
-            total_loss = total_loss + r_E_loss
+            total_loss = total_loss + r_E_reg_loss
         # TODO: Regularize firing rate
 
         loss_sorted, index_sorted_in_valid = torch.sort(total_loss,
@@ -590,14 +590,10 @@ class DLVersionCMAESForward:
 
         # TODO: Regularize firing rate
         if mfm_model.r_E:
-            save_dict['r_E_reg_loss'] = r_E_loss
             # save r_E_for_valid_params
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
-            # get and save r_E_loss
-            r_E_loss = r_E_reg_loss(r_E_for_valid_params,
-                                    mfm_model.r_E,
-                                    loss_type='L2')
-            save_dict['r_E_loss'] = r_E_loss
+            # save r_E_reg_loss
+            save_dict['r_E_reg_loss'] = r_E_reg_loss
         # TODO: Regularize firing rate
 
         torch.save(
@@ -1798,11 +1794,11 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
         # save r_E_for_valid_params
         r_E_for_valid_params = r_E_ave[:, valid_M_mask]
         save_dict['r_E_for_valid_params'] = r_E_for_valid_params
-        # get and save r_E_loss
-        r_E_loss = r_E_reg_loss(r_E_for_valid_params,
+        # get and save r_E_reg_loss
+        r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
                                 mfm_model.r_E,
                                 loss_type='L2')
-        save_dict['r_E_loss'] = r_E_loss
+        save_dict['r_E_reg_loss'] = r_E_reg_loss
     # TODO: Regularize firing rate
     torch.save(save_dict, save_path)
     print("Successfully saved EI ratio.")
