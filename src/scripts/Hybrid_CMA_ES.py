@@ -1250,6 +1250,9 @@ class DLVersionCMAESValidator:
         if mfm_model.r_E and valid_M_mask.any():
             # save r_E_for_valid_params
             r_E_for_valid_params = r_E_ave[:, valid_M_mask]
+            r_E_for_valid_params = torch.mean(r_E_for_valid_params,
+                                              dim=1,
+                                              keepdim=True)
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
         # TODO: Regularize firing rate
         torch.save(
@@ -1415,10 +1418,14 @@ class DLVersionCMAESTester:
     def select_best_from_val(self):
         print(" -- Start testing -- ")
 
-        parameter_sets = torch.zeros(self.parameters_dim, self.val_dirs_len *
-                                     self.trained_epochs)  # [10, 500]
+        parameter_sets = torch.zeros(
+            self.parameters_dim, self.val_dirs_len *
+            self.trained_epochs)  # [205, 50 * num_of_tried_seeds]
+        # TODO: Regularize firing rate
+        num_of_losses = 5  # was 4 without r_E_reg_loss
+        # TODO: Regularize firing rate
         val_loss_sets = torch.ones(self.val_dirs_len * self.trained_epochs,
-                                   4) * 3
+                                   num_of_losses) * 3
         # [total, corr, L1, ks]
         valid_val_dir_count = 0
         for val_dir_i in range(self.val_dirs_len):
@@ -1443,6 +1450,12 @@ class DLVersionCMAESTester:
                               2] = d['l1_loss']
                 val_loss_sets[val_dir_i * self.trained_epochs + epoch,
                               3] = d['ks_loss']
+                # TODO: Regularize firing rate
+                # key for the r_E regularization loss is 'r_E_reg_loss'
+                if 'r_E_reg_loss' in d:
+                    val_loss_sets[val_dir_i * self.trained_epochs + epoch,
+                                  4] = d['r_E_reg_loss']
+                # TODO: Regularize firing rate
         if valid_val_dir_count == 0:
             print("No valid validated directories.")
             return 1
@@ -1464,6 +1477,11 @@ class DLVersionCMAESTester:
             'l1_loss': all_loss[:, 2],
             'ks_loss': all_loss[:, 3]
         }
+        # TODO: Regularize firing rate
+        if all_loss.shape[1] > 4:
+            save_dict['r_E_reg_loss'] = all_loss[:, 4]
+        # TODO: Regularize firing rate
+
         torch.save(save_dict, os.path.join(self.test_dir, 'val_results.pth'))
         print("Successfully saved test results.")
 
