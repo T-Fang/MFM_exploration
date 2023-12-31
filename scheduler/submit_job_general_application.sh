@@ -28,7 +28,7 @@ mkdir -p ${logpath}
 echo $dataset_name $target $mode
 
 # ! Need to modify on every run
-trial_list=(4)
+trial_list=(6)
 seed_list=(2)
 
 # For group

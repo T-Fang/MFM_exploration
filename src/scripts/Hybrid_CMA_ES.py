@@ -571,7 +571,10 @@ class DLVersionCMAESForward:
             r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
                                             mfm_model.r_E,
                                             loss_type='L2')
-            total_loss = total_loss + r_E_reg_loss
+            # TODO: Try without any constraint on r_E
+            # total_loss = total_loss + r_E_reg_loss
+            # TODO: Try without any constraint on r_E
+
         # TODO: Regularize firing rate
 
         loss_sorted, index_sorted_in_valid = torch.sort(total_loss,
@@ -1201,7 +1204,9 @@ class DLVersionCMAESValidator:
             total_loss = torch.sum(d['FC_FCD_loss'],
                                    dim=1)  # FC_FCD_loss is [param_sets, 3]
             # TODO: Regularize firing rate
-            total_loss += d['r_E_reg_loss']  # r_E_reg_loss is [param_sets]
+            # TODO: Try without any constraint on r_E
+            # total_loss += d['r_E_reg_loss']  # r_E_reg_loss is [param_sets]
+            # TODO: Try without any constraint on r_E
             # TODO: Regularize firing rate
         else:
             raise Exception("Check the dictionary keys.")
@@ -1453,8 +1458,12 @@ class DLVersionCMAESTester:
                 # TODO: Regularize firing rate
                 # key for the r_E regularization loss is 'r_E_reg_loss'
                 if 'r_E_reg_loss' in d:
+                    # TODO: Try without any constraint on r_E, can change the following line to assign zero values
+                    # val_loss_sets[val_dir_i * self.trained_epochs + epoch,
+                    #               4] = d['r_E_reg_loss']
                     val_loss_sets[val_dir_i * self.trained_epochs + epoch,
-                                  4] = d['r_E_reg_loss']
+                                  4] = 0
+                    # TODO: Try without any constraint on r_E
                 # TODO: Regularize firing rate
         if valid_val_dir_count == 0:
             print("No valid validated directories.")

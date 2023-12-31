@@ -339,13 +339,18 @@ def apply_overall_acc_group(mode,
 
     elif mode == 'test':
         seed_nbr = int(seed_nbr)
+        # val_dirs = [
+        #     os.path.join(
+        #         parent_dir,
+        #         f'validation/trial{trial_nbr}/seed{i}/group{group_nbr}')
+        #     for i in np.arange(1, seed_nbr + 1)
+        # ]
         val_dirs = [
             os.path.join(
                 parent_dir,
                 f'validation/trial{trial_nbr}/seed{i}/group{group_nbr}')
-            for i in np.arange(1, seed_nbr + 1)
+            for i in [seed_nbr]
         ]
-        # val_dirs = [os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}/group{group_nbr}') for i in [seed_nbr]]
         test_dir = os.path.join(
             parent_dir,
             f'test/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')

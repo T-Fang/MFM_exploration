@@ -649,23 +649,23 @@ def EI_analysis(trial_idx, seed_idx):
 
 
 def analysis_for_trial(trial_idx):
-    # for target in [
-    #         'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
-    # ]:
-    #     export_EI_from_param_with_lowest_loss_among_seeds(
-    #         'PNC', target, trial_idx, range(1, 3),
-    #         range(1, NUM_GROUPS_PNC_COGNITION + 1))
-    #     all_groups_EI_to_csv('PNC', NUM_GROUPS_PNC_COGNITION, target,
-    #                          trial_idx, '_best_among_all')
-    #     export_lowest_losses_among_seeds(
-    #         'PNC', target, trial_idx, range(1, 3),
-    #         range(1, NUM_GROUPS_PNC_COGNITION + 1))
-    # EI_analysis(trial_idx, '_best_among_all')
+    for target in [
+            'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
+    ]:
+        export_EI_from_param_with_lowest_loss_among_seeds(
+            'PNC', target, trial_idx, range(1, 3),
+            range(1, NUM_GROUPS_PNC_COGNITION + 1))
+        all_groups_EI_to_csv('PNC', NUM_GROUPS_PNC_COGNITION, target,
+                             trial_idx, '_best_among_all')
+        export_lowest_losses_among_seeds(
+            'PNC', target, trial_idx, range(1, 3),
+            range(1, NUM_GROUPS_PNC_COGNITION + 1))
+    EI_analysis(trial_idx, '_best_among_all')
 
-    # * each seed's Tester will compare the current seed's validation results
-    # * with previous seeds' validation results and get the best one
-    last_seed_idx = 2
-    EI_analysis(trial_idx, last_seed_idx)
+    # # * each seed's Tester will compare the current seed's validation results
+    # # * with previous seeds' validation results and get the best one
+    # last_seed_idx = 2
+    # EI_analysis(trial_idx, last_seed_idx)
 
 
 if __name__ == "__main__":

@@ -155,7 +155,7 @@ class MfmModel2014:
 
         print("Successfully init MFM 2014 model!")
 
-    # TODO: Check all occurence of CBIG_2014_mfm_simulation, if we want to remove r_E regularization loss
+    # TODO: Check all occurrence of CBIG_2014_mfm_simulation, if we want to remove r_E regularization loss
     def CBIG_2014_mfm_simulation(self,
                                  simulate_time,
                                  burn_in_time,
