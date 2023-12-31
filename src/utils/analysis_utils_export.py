@@ -17,7 +17,6 @@ def all_groups_EI_to_csv(ds_name,
                          trial_idx,
                          seed_idx,
                          save_csv_path=None):
-    # TODO: export along with losses figures as well
     ei_dir = get_run_path(ds_name, target, 'EI_ratio', trial_idx, seed_idx)
     if save_csv_path is None:
         save_csv_path = os.path.join(ei_dir, 'all_EI_ratios.csv')

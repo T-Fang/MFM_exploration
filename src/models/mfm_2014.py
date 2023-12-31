@@ -271,11 +271,13 @@ class MfmModel2014:
             if torch.isnan(r_E_ave[:, i]).any():
                 print("r_E exploded!")
                 valid_M_mask[i] = False
+            # TODO: try without r_E constraints
             elif (r_E_ave[:, i]
                   < self.r_E_min).any() or (r_E_ave[:, i]
                                             > self.r_E_max).any():
                 bold[:, i, :] = float('nan')
                 valid_M_mask[i] = False
+            # TODO: try without r_E constraints
             elif torch.isnan(bold[:, i, :]).any():
                 valid_M_mask[i] = False
 
