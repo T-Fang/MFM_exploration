@@ -226,7 +226,8 @@ def plot_train_loss(ds_name,
                     seed_idx,
                     group_idx,
                     epoch_range,
-                    save_fig_path=None):
+                    save_fig_path=None,
+                    lowest_top_k=10):
     param_save_dir = get_group_path(ds_name, target, 'train', trial_idx,
                                     seed_idx, group_idx)
     if save_fig_path is None:
@@ -243,13 +244,22 @@ def plot_train_loss(ds_name,
                                     f'param_save_epoch{i}.pth'))
         pred_all_losses = d['FC_FCD_loss']
 
-        corr_list.append(torch.mean(pred_all_losses[:, 0]).item())
-        l1_list.append(torch.mean(pred_all_losses[:, 1]).item())
-        ks_list.append(torch.mean(pred_all_losses[:, 2]).item())
+        mean_of_lowest_k_corr_loss = torch.mean(
+            torch.sort(pred_all_losses[:, 0])[0][:lowest_top_k])
+        mean_of_lowest_k_l1_loss = torch.mean(
+            torch.sort(pred_all_losses[:, 1])[0][:lowest_top_k])
+        mean_of_lowest_k_ks_loss = torch.mean(
+            torch.sort(pred_all_losses[:, 2])[0][:lowest_top_k])
+
+        corr_list.append(mean_of_lowest_k_corr_loss.item())
+        l1_list.append(mean_of_lowest_k_l1_loss.item())
+        ks_list.append(mean_of_lowest_k_ks_loss.item())
 
         if 'r_E_reg_loss' in d:
-            r_E_reg_loss = d['r_E_reg_loss']
-            r_E_list.append(torch.mean(r_E_reg_loss).item())
+            mean_of_lowest_k_r_E_reg_loss = torch.mean(
+                torch.sort(d['r_E_reg_loss'])[0][:lowest_top_k])
+
+            r_E_list.append(mean_of_lowest_k_r_E_reg_loss.item())
 
     x = np.array(epoch_range)
     plt.figure()
