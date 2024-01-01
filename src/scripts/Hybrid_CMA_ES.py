@@ -1259,6 +1259,12 @@ class DLVersionCMAESValidator:
                                               dim=1,
                                               keepdim=True)
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+            # get and save r_E_reg_loss
+            r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
+                                            mfm_model.r_E,
+                                            loss_type='L2')
+            save_dict['r_E_reg_loss'] = r_E_reg_loss
+
         # TODO: Regularize firing rate
         torch.save(
             save_dict,
