@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.basic.constants import NUM_ROI
-from src.utils.analysis_utils import get_run_path
+from src.utils.file_utils import get_run_path
 
 
 def all_groups_EI_to_csv(ds_name,

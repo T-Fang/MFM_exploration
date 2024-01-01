@@ -2,60 +2,11 @@ import os
 import subprocess
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy import stats
+from scipy import stats, io as sio
 import torch
 
-from src.basic.constants import LOG_PATH, MATLAB_SCRIPT_PATH
-############################################################
-# Path related
-############################################################
-
-
-def get_target_path(ds_name, target):
-    target_path = os.path.join(LOG_PATH, ds_name, target)
-    if not os.path.exists(target_path):
-        os.makedirs(target_path)
-    return target_path
-
-
-def get_run_path(ds_name, target, mode, trial_idx, seed_idx):
-    run_path = os.path.join(get_target_path(ds_name, target), mode,
-                            f'trial{trial_idx}', f'seed{seed_idx}')
-    if not os.path.exists(run_path):
-        os.makedirs(run_path)
-    return run_path
-
-
-def get_group_path(ds_name, target, mode, trial_idx, seed_idx, group_idx):
-    run_path = os.path.join(get_target_path(ds_name,
-                                            target), mode, f'trial{trial_idx}',
-                            f'seed{seed_idx}', f'group{group_idx}')
-    if not os.path.exists(run_path):
-        os.makedirs(run_path)
-    return run_path
-
-
-def get_fig_dir(ds_name, target, fig_type, trial_idx, seed_idx):
-    fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
-                           fig_type, f'trial{trial_idx}', f'seed{seed_idx}')
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
-    return fig_dir
-
-
-def get_losses_fig_dir(ds_name, target):
-    losses_fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
-                                  'losses')
-    if not os.path.exists(losses_fig_dir):
-        os.makedirs(losses_fig_dir)
-    return losses_fig_dir
-
-
-def get_fig_file_path(ds_name, target, fig_type, trial_idx, seed_idx,
-                      fig_name):
-    fig_dir = get_fig_dir(ds_name, target, fig_type, trial_idx, seed_idx)
-    return os.path.join(fig_dir, fig_name)
-
+from src.basic.constants import MATLAB_SCRIPT_PATH
+from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, load_train_dict
 
 ############################################################
 # Visualization related
@@ -174,6 +125,28 @@ def ttest_1samp_n_plot(list_1,
 ############################################################
 
 
+def get_train_top_k_indices(saved_dict, top_k=1):
+    """
+    For each epoch, get the indices of the top k children with the lowest total loss
+    """
+    FC_FCD_loss = saved_dict['FC_FCD_loss']
+    if 'r_E_reg_loss' in saved_dict.keys():
+        r_E_reg_loss = saved_dict['r_E_reg_loss']
+    else:
+        r_E_reg_loss = None
+
+    # sum up all losses for each child at each epoch
+    total_loss = torch.sum(FC_FCD_loss, dim=1)
+    if r_E_reg_loss is not None:
+        total_loss += r_E_reg_loss
+
+    # sort the total losses and find the index for the child with the lowest total loss
+    sorted_index = torch.argsort(total_loss)
+    best_child_idx = sorted_index[:top_k]
+
+    return best_child_idx
+
+
 def plot_losses_for_diff_trials(
         ds_name,
         target,
@@ -227,48 +200,56 @@ def plot_train_loss(ds_name,
                     group_idx,
                     epoch_range,
                     save_fig_path=None,
-                    lowest_top_k=10):
-    param_save_dir = get_group_path(ds_name, target, 'train', trial_idx,
-                                    seed_idx, group_idx)
+                    lowest_top_k=10,
+                    show_individual_loss=None):
     if save_fig_path is None:
+        postfix = '' if show_individual_loss is None else f'_{show_individual_loss}'
         save_fig_path = get_fig_file_path(
             ds_name, target, 'losses', trial_idx, seed_idx,
-            f'group{group_idx}_train_losses.png')
+            f'group{group_idx}_train_losses{postfix}.png')
 
     corr_list = []
     l1_list = []
     ks_list = []
     r_E_list = []
-    for i in epoch_range:
-        d = torch.load(os.path.join(param_save_dir,
-                                    f'param_save_epoch{i}.pth'))
-        pred_all_losses = d['FC_FCD_loss']
-
-        mean_of_lowest_k_corr_loss = torch.mean(
-            torch.sort(pred_all_losses[:, 0])[0][:lowest_top_k])
-        mean_of_lowest_k_l1_loss = torch.mean(
-            torch.sort(pred_all_losses[:, 1])[0][:lowest_top_k])
-        mean_of_lowest_k_ks_loss = torch.mean(
-            torch.sort(pred_all_losses[:, 2])[0][:lowest_top_k])
-
-        corr_list.append(mean_of_lowest_k_corr_loss.item())
-        l1_list.append(mean_of_lowest_k_l1_loss.item())
-        ks_list.append(mean_of_lowest_k_ks_loss.item())
-
-        if 'r_E_reg_loss' in d:
-            mean_of_lowest_k_r_E_reg_loss = torch.mean(
-                torch.sort(d['r_E_reg_loss'])[0][:lowest_top_k])
-
-            r_E_list.append(mean_of_lowest_k_r_E_reg_loss.item())
+    for epoch_idx in epoch_range:
+        d = load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
+                            epoch_idx)
+        lowest_top_k_indices = get_train_top_k_indices(d, top_k=lowest_top_k)
+        lowest_top_k_indices = lowest_top_k_indices.numpy()
+        corr_losses = d['FC_FCD_loss'][:, 0][lowest_top_k_indices]
+        corr_list.append(torch.mean(corr_losses).item())
+        l1_losses = d['FC_FCD_loss'][:, 1][lowest_top_k_indices]
+        l1_list.append(torch.mean(l1_losses).item())
+        ks_losses = d['FC_FCD_loss'][:, 2][lowest_top_k_indices]
+        ks_list.append(torch.mean(ks_losses).item())
+        if 'r_E_reg_loss' in d.keys():
+            r_E_reg_losses = d['r_E_reg_loss'][lowest_top_k_indices]
+            r_E_list.append(torch.mean(r_E_reg_losses).item())
 
     x = np.array(epoch_range)
     plt.figure()
-    plt.plot(x, corr_list, 'r-', label='Corr loss')
-    plt.plot(x, l1_list, 'b-', label='L1 loss')
-    plt.plot(x, ks_list, 'g-', label='KS loss')
-    if len(r_E_list) > 0:
-        plt.plot(x, r_E_list, 'y-', label='r_E reg loss')
-    plt.xlabel('iteration')
+    if show_individual_loss is None:
+        print('Plotting all losses...')
+        plt.plot(x, corr_list, 'r-', label='Corr loss')
+        plt.plot(x, l1_list, 'b-', label='L1 loss')
+        plt.plot(x, ks_list, 'g-', label='KS loss')
+        if len(r_E_list) > 0:
+            plt.plot(x, r_E_list, 'y-', label='r_E reg loss')
+    else:
+        print(f'Plotting {show_individual_loss}...')
+        if show_individual_loss == 'corr_loss':
+            plt.plot(x, corr_list, 'r-', label='Corr loss')
+        elif show_individual_loss == 'l1_loss':
+            plt.plot(x, l1_list, 'b-', label='L1 loss')
+        elif show_individual_loss == 'ks_loss':
+            plt.plot(x, ks_list, 'g-', label='KS loss')
+        elif show_individual_loss == 'r_E_reg_loss':
+            plt.plot(x, r_E_list, 'y-', label='r_E reg loss')
+        else:
+            raise Exception(
+                f'Invalid show_individual_loss {show_individual_loss}')
+    plt.xlabel('iterations')
     plt.ylabel('loss')
     plt.title(f'{target.replace("_", " ")} {group_idx} train losses')
     plt.legend()
@@ -315,3 +296,42 @@ def regional_EI_diff_cohen_d(EI_matrix_high, EI_matrix_low):
     cohen_ds = EI_ratio_diff_mean / EI_ratio_diff_std
     cohen_ds = np.reshape(cohen_ds, (cohen_ds.shape[0], 1))  # Reshape to 68x1
     return cohen_ds
+
+
+############################################################
+# r_E related analysis
+############################################################
+
+
+def export_train_r_E(ds_name,
+                     target,
+                     trial_idx,
+                     seed_idx,
+                     group_idx,
+                     epoch_idx,
+                     save_mat_path=None):
+    saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
+                                 group_idx, epoch_idx)
+    top_k_indices = get_train_top_k_indices(saved_dict, top_k=1)
+    r_E_for_valid_params = saved_dict['r_E_for_valid_params']
+
+    # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor
+    r_E_at_epoch = r_E_for_valid_params[:, top_k_indices]
+
+    # save the r_E_at_epoch as mat
+    if save_mat_path is None:
+        save_mat_path = get_fig_file_path(
+            ds_name, target, 'train_r_E', trial_idx, seed_idx,
+            f'r_E_of_group{group_idx}_at_epoch{epoch_idx}')
+    sio.savemat(save_mat_path, {'r_E': r_E_at_epoch})
+
+
+def visualize_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
+                        epoch_idx):
+    save_mat_path = get_fig_file_path(
+        ds_name, target, 'train_r_E', trial_idx, seed_idx,
+        f'r_E_of_group{group_idx}_at_epoch{epoch_idx}.mat')
+    export_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
+                     epoch_idx, save_mat_path)
+    visualize_stats(save_mat_path, 'r_E',
+                    save_mat_path.replace('.mat', '_surf_map.png'))
