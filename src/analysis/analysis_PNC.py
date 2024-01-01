@@ -19,6 +19,12 @@ from src.utils.analysis_utils import (  # noqa
     regional_EI_diff_cohen_d, plot_losses_for_diff_trials)
 from src.basic.constants import NUM_GROUPS_PNC_AGE, NUM_GROUPS_PNC_COGNITION, NUM_ROI
 
+NUM_GROUPS = {
+    'age_group': NUM_GROUPS_PNC_AGE,
+    'overall_acc_group/high': NUM_GROUPS_PNC_COGNITION,
+    'overall_acc_group/low': NUM_GROUPS_PNC_COGNITION
+}
+
 
 def plot_pred_loss():
     param_save_dir = '/home/ftian/storage/projects/MFM_exploration/logs/PNC/overall_acc_group/high/train/trial3/seed1/group14'
@@ -625,7 +631,7 @@ def visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx):
                                      save_mat_path=save_mat_path)
 
     visualize_stats(save_mat_path, 'EI_ratio_diff_effect_size',
-                    save_mat_path.replace('.mat', '.png'))
+                    save_mat_path.replace('.mat', '_surf_map.png'))
     boxplot_network_stats(
         save_mat_path,
         'EI_ratio_diff_effect_size',
@@ -643,24 +649,23 @@ def EI_analysis_overall_acc_group(trial_idx, seed_idx):
     visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx)
 
 
-def EI_analysis(trial_idx, seed_idx):
-    EI_analysis_age_group(trial_idx, seed_idx)
-    EI_analysis_overall_acc_group(trial_idx, seed_idx)
+def EI_analysis(target, trial_idx, seed_idx):
+    if target == 'age_group':
+        EI_analysis_age_group(trial_idx, seed_idx)
+    elif target == 'overall_acc_group/low':
+        # no need to repeat analysis for high since high and low are considered together
+        EI_analysis_overall_acc_group(trial_idx, seed_idx)
 
 
-def analysis_for_trial(trial_idx):
-    for target in [
-            'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
-    ]:
-        export_EI_from_param_with_lowest_loss_among_seeds(
-            'PNC', target, trial_idx, range(1, 3),
-            range(1, NUM_GROUPS_PNC_COGNITION + 1))
-        all_groups_EI_to_csv('PNC', NUM_GROUPS_PNC_COGNITION, target,
-                             trial_idx, '_best_among_all')
-        export_lowest_losses_among_seeds(
-            'PNC', target, trial_idx, range(1, 3),
-            range(1, NUM_GROUPS_PNC_COGNITION + 1))
-    EI_analysis(trial_idx, '_best_among_all')
+def analysis_for_trial(target, trial_idx):
+    export_EI_from_param_with_lowest_loss_among_seeds(
+        'PNC', target, trial_idx, range(1, 3), range(1,
+                                                     NUM_GROUPS[target] + 1))
+    all_groups_EI_to_csv('PNC', NUM_GROUPS[target], target, trial_idx,
+                         '_best_among_all')
+    export_lowest_losses_among_seeds('PNC', target, trial_idx, range(1, 3),
+                                     range(1, NUM_GROUPS[target] + 1))
+    EI_analysis(target, trial_idx, '_best_among_all')
 
     # # * each seed's Tester will compare the current seed's validation results
     # # * with previous seeds' validation results and get the best one
@@ -672,24 +677,18 @@ if __name__ == "__main__":
     ALL_TARGETS = [
         'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
     ]
-    NUM_GROUPS = {
-        'age_group': NUM_GROUPS_PNC_AGE,
-        'overall_acc_group/high': NUM_GROUPS_PNC_COGNITION,
-        'overall_acc_group/low': NUM_GROUPS_PNC_COGNITION
-    }
-
     # Group-specific analysis
-    for trial_idx in range(3, 4):
-        for seed_idx in range(1, 3):
-            for target in ALL_TARGETS:
-                # for group_idx in range(1, NUM_GROUPS[target] + 1):
-                for group_idx in range(1, 3):
-                    plot_train_loss('PNC',
-                                    target,
-                                    trial_idx,
-                                    seed_idx,
-                                    group_idx,
-                                    epoch_range=range(49))
+    # for trial_idx in range(3, 4):
+    #     for seed_idx in range(1, 3):
+    #         for target in ALL_TARGETS:
+    #             # for group_idx in range(1, NUM_GROUPS[target] + 1):
+    #             for group_idx in range(1, 3):
+    #                 plot_train_loss('PNC',
+    #                                 target,
+    #                                 trial_idx,
+    #                                 seed_idx,
+    #                                 group_idx,
+    #                                 epoch_range=range(49))
     # Run-specific analysis
     # for trial_idx in range(3, 4):
     #     for seed_idx in range(1, 3):
@@ -699,13 +698,14 @@ if __name__ == "__main__":
     #             #                      trial_idx, seed_idx)
 
     # Trial-specific analysis
-    # for trial_idx in range(1, 3):
-    #     analysis_for_trial(trial_idx)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in range(1, 7):
+    #         analysis_for_trial(target, trial_idx)
 
     # Target-specific analysis
-    # for target in ALL_TARGETS:
-    #     plot_losses_for_diff_trials('PNC', target, range(0, 3),
-    #                                 ['baseline', 'MAE L1', 'no FCD KS'])
+    for target in ALL_TARGETS:
+        plot_losses_for_diff_trials('PNC', target, [0, 1, 4, 3, 6],
+                                    ['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'])
 
     # Debugging
     # plot_pred_loss()
