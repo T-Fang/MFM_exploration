@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
+from src.scripts.Hybrid_CMA_ES import get_r_E_reg_loss
 from src.analysis import analysis_functions
 from src.utils.analysis_utils_export import (
     all_groups_EI_to_csv, export_EI_from_param_with_lowest_loss_among_seeds,
@@ -668,6 +669,28 @@ def analysis_for_trial(trial_idx):
     # EI_analysis(trial_idx, last_seed_idx)
 
 
+def compute_r_E_reg_loss(target, trial_idx, seed_idx, group_idx):
+    # get and load the pth file, use the get_r_E_reg_loss function to compute the loss and save to the pth file again and overwrite it
+
+    # print target, trial idx seed idx and group idx
+    print(
+        f"Computing r_E_reg_loss for {target}, trial {trial_idx}, seed {seed_idx}, group {group_idx}..."
+    )
+    for epoch in range(50):
+        param_save_dir = get_run_path('PNC', target, 'validation', trial_idx,
+                                      seed_idx)
+        param_save_path = os.path.join(param_save_dir, f'group{group_idx}',
+                                       f'best_param{epoch}.pth')
+        if not os.path.exists(param_save_path):
+            raise Exception("Check path first.")
+        d = torch.load(param_save_path, map_location='cpu')
+        r_E_reg_loss = get_r_E_reg_loss(d['r_E_for_valid_params'], 3)
+        d['r_E_reg_loss'] = r_E_reg_loss
+        torch.save(d, param_save_path)
+        print(f"Epoch {epoch} saved.")
+    print("Done.")
+
+
 if __name__ == "__main__":
     ALL_TARGETS = [
         'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
@@ -679,24 +702,26 @@ if __name__ == "__main__":
     }
 
     # Group-specific analysis
-    for trial_idx in range(3, 4):
-        for seed_idx in range(1, 3):
-            for target in ALL_TARGETS:
-                # for group_idx in range(1, NUM_GROUPS[target] + 1):
-                for group_idx in range(1, 3):
-                    plot_train_loss('PNC',
-                                    target,
-                                    trial_idx,
-                                    seed_idx,
-                                    group_idx,
-                                    epoch_range=range(49))
+    for target in ALL_TARGETS:
+        for trial_idx in [6]:
+            for seed_idx in range(1, 3):
+                for group_idx in range(1, NUM_GROUPS[target] + 1):
+                    # for group_idx in range(1, 3):  # noqa
+                    # plot_train_loss('PNC',
+                    #                 target,
+                    #                 trial_idx,
+                    #                 seed_idx,
+                    #                 group_idx,
+                    #                 epoch_range=range(49))
+                    compute_r_E_reg_loss(target, trial_idx, seed_idx,
+                                         group_idx)
+
     # Run-specific analysis
-    # for trial_idx in range(3, 4):
-    #     for seed_idx in range(1, 3):
-    #         EI_analysis(trial_idx, seed_idx)
-    #         # for target in ALL_TARGETS:
-    #             # all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
-    #             #                      trial_idx, seed_idx)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in [3, 6]:
+    #         for seed_idx in range(1, 3):
+    #             all_groups_EI_to_csv('PNC', NUM_GROUP_PNC_COGNITION, target,
+    #                                  trial_idx, seed_idx)
 
     # Trial-specific analysis
     # for trial_idx in range(1, 3):
