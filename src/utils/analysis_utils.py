@@ -6,7 +6,7 @@ from scipy import stats, io as sio
 import torch
 
 from src.basic.constants import MATLAB_SCRIPT_PATH
-from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, load_train_dict
+from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, load_all_val_dicts, load_train_dict
 
 ############################################################
 # Visualization related
@@ -123,9 +123,68 @@ def ttest_1samp_n_plot(list_1,
 ############################################################
 # Loss related analysis
 ############################################################
+def unravel_index(indices, shape):
+    """
+    Converts a tensor of flat indices into a tensor of coordinate vectors.
+    (Extracted from https://github.com/pytorch/pytorch/issues/35674)
+
+    This is a `torch` implementation of `numpy.unravel_index`.
+
+    Args:
+        indices: A tensor of flat indices, (*,).
+        shape: The target shape.
+
+    Returns:
+        The unraveled coordinates, (*, D).
+    """
+
+    shape = indices.new_tensor((*shape, 1))
+    coefs = shape[1:].flipud().cumprod(dim=0).flipud()
+
+    return torch.div(indices[..., None], coefs,
+                     rounding_mode='trunc') % shape[:-1]
 
 
-def get_train_top_k_indices(saved_dict, top_k=1):
+def get_val_top_k(val_dicts, k=10):
+    """
+    For a given validation dictionary, get the indices of the top k children with the lowest total loss
+
+    val_dicts is a dictionary with the same keys as every saved validation dictionary.
+    But the value of each key in the dictionary now has an extra two dimensions (seed, epoch)
+    compared to the original dictionary value, which should all be torch tensors.
+
+    Specifically, we will look values for keys ['corr_loss', 'l1_loss', 'ks_loss'], and 'r_E_reg_loss' if present.
+
+    """
+    corr_loss = val_dicts['corr_loss']
+    l1_loss = val_dicts['l1_loss']
+    ks_loss = val_dicts['ks_loss']
+    if 'r_E_reg_loss' in val_dicts.keys():
+        r_E_reg_loss = val_dicts['r_E_reg_loss']
+    else:
+        r_E_reg_loss = None
+
+    # sum up all losses for each child at each epoch
+    total_loss = corr_loss + l1_loss + ks_loss
+    if r_E_reg_loss is not None:
+        total_loss += r_E_reg_loss
+
+    # total_loss is of shape (num_of_seeds, num_of_epochs, num_of_chosen_val_params)
+    # we want to find the indices of the top k children with the lowest total loss across all seeds and epochs
+    # so we first flatten the tensor to (num_of_seeds * num_of_epochs, num_of_chosen_val_params)
+    # then we find the indices of the top k children with the lowest total loss
+    # finally, we convert the indices back to the original shape
+    original_shape = total_loss.shape
+    total_loss = total_loss.view(-1)
+    k_lowest_total_losses, topk_indices = torch.topk(total_loss,
+                                                     k,
+                                                     largest=False)
+    topk_indices = unravel_index(topk_indices, original_shape)
+
+    return k_lowest_total_losses, topk_indices
+
+
+def get_train_top_k(saved_dict, k=1):
     """
     For each epoch, get the indices of the top k children with the lowest total loss
     """
@@ -140,14 +199,81 @@ def get_train_top_k_indices(saved_dict, top_k=1):
     if r_E_reg_loss is not None:
         total_loss += r_E_reg_loss
 
-    # sort the total losses and find the index for the child with the lowest total loss
-    sorted_index = torch.argsort(total_loss)
-    best_child_idx = sorted_index[:top_k]
+    # Find the index for k children with the lowest total loss
+    # use topk instead of sort to speed up
 
-    return best_child_idx
+    k_lowest_total_losses, topk_indices = torch.topk(total_loss,
+                                                     k,
+                                                     largest=False)
+
+    return k_lowest_total_losses, topk_indices
 
 
 def plot_losses_for_diff_trials(
+        ds_name,
+        target,
+        trial_range,
+        trial_names,
+        seed_range,
+        group_idx,
+        epoch_range,
+        loss_types=['total_loss', 'corr_loss', 'l1_loss', 'ks_loss']):
+    """
+    This function plot the different losses for a given validation subject group across different trials.
+
+    For each loss from loss_types, draw a box plot, where box represents a trial,
+    and every dot in a box represents 1 of the 10 param vectors with the lowest total loss among all seeds under the setup of the trial.
+
+    This function assumes that the target's directory contains
+    pth files at f'validation/trial{trial_idx}/seed{seed_idx}/group{group_idx}/best_param{epoch_idx}.pth'.
+    Each of the file contains a dictionary, with keys ['corr_loss', 'l1_loss', 'ks_loss'], and possibly 'r_E_reg_loss',
+    and values the corresponding losses in torch tensor of size (num_of_chosen_val_params, )
+
+    Args:
+        ds_name (str): The dataset name.
+        target (str): The target name. (e.g., 'age_group')
+        trial_range (range): The range of trial indices.
+        trial_names (list): The display names of the trials.
+        seed_range (range): The range of seed indices.
+        group_idx (int): The index of the validation subject group.
+        epoch_range (range): The range of epoch indices.
+        loss_types (list, optional): The loss types to plot.
+
+    Returns:
+        None (the plots will be stored in the f'PROJECT_PATH/logs/{ds_name}/{target}/figures/losses/')
+    """
+    for loss_type in loss_types:
+
+        fig_save_dir = get_losses_fig_dir(ds_name, target)
+        fig_save_path = os.path.join(fig_save_dir,
+                                     f'group{group_idx}_{loss_type}.png')
+
+        print(
+            f'Plotting {loss_type} for {target} group {group_idx} across trials {trial_names}...'
+        )
+        plt.figure()
+        all_trials_losses = []
+        for trial_idx in trial_range:
+            val_dicts = load_all_val_dicts(ds_name, target, trial_idx,
+                                           seed_range, group_idx, epoch_range)
+            k_lowest_total_loss, topk_indices = get_val_top_k(val_dicts, k=10)
+            if loss_type == 'total_loss':
+                losses = k_lowest_total_loss
+            else:
+                losses = np.array(
+                    [val_dicts[loss_type][tuple(i)] for i in topk_indices])
+            all_trials_losses.append(losses)
+        plt.boxplot(all_trials_losses, labels=trial_names)
+        plt.xlabel('Setups')
+        plt.ylabel(loss_type)
+        plt.savefig(fig_save_path)
+        plt.close()
+
+
+@DeprecationWarning
+# ! Since it's difficult to pinpoint each group's losses,
+# ! we will use the plot_losses_for_diff_trials function instead
+def plot_losses_for_diff_trials_all_groups(
         ds_name,
         target,
         trial_range,
@@ -177,7 +303,7 @@ def plot_losses_for_diff_trials(
         fig_save_path = os.path.join(fig_save_dir, f'{loss_type}.png')
 
         plt.figure()
-        data = []
+        all_trials_losses = []
         for trial_idx in trial_range:
             losses_file_dir = get_run_path(ds_name, target, 'test', trial_idx,
                                            '_best_among_all')
@@ -185,8 +311,8 @@ def plot_losses_for_diff_trials(
                                                   'lowest_losses.pth'),
                                      map_location='cpu')
             losses = losses_dict[loss_type]
-            data.append(losses.numpy())
-        plt.boxplot(data, labels=trial_names)
+            all_trials_losses.append(losses.numpy())
+        plt.boxplot(all_trials_losses, labels=trial_names)
         plt.xlabel('Setups')
         plt.ylabel(loss_type)
         plt.savefig(fig_save_path)
@@ -215,7 +341,7 @@ def plot_train_loss(ds_name,
     for epoch_idx in epoch_range:
         d = load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
                             epoch_idx)
-        lowest_top_k_indices = get_train_top_k_indices(d, top_k=lowest_top_k)
+        _, lowest_top_k_indices = get_train_top_k(d, k=lowest_top_k)
         lowest_top_k_indices = lowest_top_k_indices.numpy()
         corr_losses = d['FC_FCD_loss'][:, 0][lowest_top_k_indices]
         corr_list.append(torch.mean(corr_losses).item())
@@ -312,7 +438,7 @@ def export_train_r_E(ds_name,
                      save_mat_path=None):
     saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
                                  group_idx, epoch_idx)
-    top_k_indices = get_train_top_k_indices(saved_dict, top_k=1)
+    _, top_k_indices = get_train_top_k(saved_dict, k=1)
     r_E_for_valid_params = saved_dict['r_E_for_valid_params']
 
     # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor

@@ -77,3 +77,38 @@ def load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
         saved_dict['r_E_reg_loss'] = saved_dict['r_E_reg_loss'][
             valid_param_list]
     return saved_dict
+
+
+def load_all_val_dicts(ds_name, target, trial_idx, seed_range, group_idx,
+                       epoch_range):
+    """
+    Load all validation dictionaries for the given trial and group.
+
+    This function will still return a dictionary with the same keys.
+    But the value of each key in the dictionary now has an extra two dimensions (seed, epoch)
+    compared to the original dictionary value, which should all be torch tensors.
+    """
+    val_dicts = {}
+    for seed_idx in seed_range:
+        for epoch_idx in epoch_range:
+            val_group_dir = get_group_path(ds_name, target, 'validation',
+                                           trial_idx, seed_idx, group_idx)
+            val_dict_path = os.path.join(val_group_dir,
+                                         f'best_param{epoch_idx}.pth')
+            # check if the file exists
+            if not os.path.exists(val_dict_path):
+                continue
+
+            val_dict = torch.load(val_dict_path, map_location='cpu')
+
+            if len(val_dicts) == 0:
+                for key in val_dict.keys():
+                    if hasattr(val_dict[key], "shape"):
+                        val_dicts[key] = torch.full(
+                            (len(seed_range), len(epoch_range)) +
+                            val_dict[key].shape, float('nan'))
+            for key in val_dict.keys():
+                if hasattr(val_dict[key], "shape"):
+                    val_dicts[key][seed_idx - 1, epoch_idx] = val_dict[key]
+
+    return val_dicts
