@@ -6,7 +6,7 @@ from scipy import stats, io as sio
 import torch
 
 from src.basic.constants import MATLAB_SCRIPT_PATH
-from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, load_all_val_dicts, load_train_dict
+from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, get_target_path, load_all_val_dicts, load_train_dict
 
 ############################################################
 # Visualization related
@@ -432,6 +432,50 @@ def regional_EI_diff_cohen_d(EI_matrix_high, EI_matrix_low):
 ############################################################
 
 
+def boxplot_val_r_E_for_diff_trials(ds_name,
+                                    target,
+                                    trial_range,
+                                    trial_names,
+                                    seed_range,
+                                    group_idx,
+                                    epoch_range,
+                                    save_fig_path=None):
+    """
+    Choose the top 10 sets of validation parameters with the lowest loss from all seeds
+    plot a box plot of different trials, where each dot represents a parameter's rE averaged across time and across ROIs
+    """
+    if save_fig_path is None:
+
+        save_fig_dir = os.path.join(get_target_path(ds_name,
+                                                    target), 'figures',
+                                    'val_r_E_for_diff_trials_boxplot')
+        if not os.path.exists(save_fig_dir):
+            os.makedirs(save_fig_dir)
+        save_fig_path = os.path.join(
+            save_fig_dir, f'val_r_E_of_group{group_idx}_boxplot.png')
+
+    print(
+        f'Plotting r_E for {target} group {group_idx} across trials {trial_names}...'
+    )
+    plt.figure()
+    all_trials_r_E_ave = []
+    for trial_idx in trial_range:
+        val_dicts = load_all_val_dicts(ds_name, target, trial_idx, seed_range,
+                                       group_idx, epoch_range)
+        k_lowest_total_loss, topk_indices = get_val_top_k(val_dicts, k=10)
+        r_E_ave_across_time_n_ROI = np.array([
+            torch.mean(val_dicts['r_E_for_valid_params'][tuple(i)])
+            for i in topk_indices
+        ])
+        all_trials_r_E_ave.append(r_E_ave_across_time_n_ROI)
+    plt.boxplot(all_trials_r_E_ave, labels=trial_names)
+    plt.xlabel('Setups')
+    plt.ylabel('mean r_E')
+    plt.title(f'{target.replace("_", " ")} {group_idx} mean r_E')
+    plt.savefig(save_fig_path)
+    plt.close()
+
+
 def boxplot_train_r_E(ds_name,
                       target,
                       trial_idx,
@@ -470,8 +514,8 @@ def boxplot_train_r_E(ds_name,
     plt.boxplot(all_epochs_r_E, labels=epoch_range)
     plt.xlabel('Epochs')
     plt.ylabel('r_E')
-    postfix = ' (outlier)' if plot_outlier_r_E else ''
-    plt.title(f'{target.replace("_", " ")} {group_idx} r_E{postfix}')
+    postfix = ' r_E (outlier)' if plot_outlier_r_E else ' mean r_E'
+    plt.title(f'{target.replace("_", " ")} {group_idx}{postfix}')
     plt.savefig(save_fig_path)
     plt.close()
     print('Saved.')
@@ -495,7 +539,7 @@ def export_train_r_E(ds_name,
     # save the r_E_at_epoch as mat
     if save_mat_path is None:
         save_mat_path = get_fig_file_path(
-            ds_name, target, 'train_r_E', trial_idx, seed_idx,
+            ds_name, target, 'train_r_E_surf_map', trial_idx, seed_idx,
             f'r_E_of_group{group_idx}_at_epoch{epoch_idx}')
     sio.savemat(save_mat_path, {'r_E': r_E_at_epoch})
 

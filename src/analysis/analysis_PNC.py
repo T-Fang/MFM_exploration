@@ -14,9 +14,10 @@ from src.utils.export_utils import (  # noqa
     export_lowest_losses_among_seeds)
 from src.utils import tzeng_func
 from src.utils.analysis_utils import (  # noqa
-    boxplot_network_stats, boxplot_train_r_E, get_run_path, get_fig_file_path,
-    plot_losses_for_diff_trials, plot_train_loss, visualize_stats,
-    ttest_1samp_n_plot, regional_EI_age_slope, regional_EI_diff_cohen_d,
+    boxplot_network_stats, boxplot_train_r_E, boxplot_val_r_E_for_diff_trials,
+    get_run_path, get_fig_file_path, plot_losses_for_diff_trials,
+    plot_train_loss, visualize_stats, ttest_1samp_n_plot,
+    regional_EI_age_slope, regional_EI_diff_cohen_d,
     plot_losses_for_diff_trials_all_groups, visualize_train_r_E)
 from src.basic.constants import NUM_GROUPS_PNC_AGE, NUM_GROUPS_PNC_COGNITION, NUM_ROI
 
@@ -712,53 +713,57 @@ def analyze_target(target):
     """
     Analyze the target-level results.
     """
+    GROUP_IDX = 1
+    boxplot_val_r_E_for_diff_trials('PNC',
+                                    target, [3, 6], ['rE reg', 'free rE'],
+                                    range(1, 3), GROUP_IDX, range(50))
+
     # plot_losses_for_diff_trials_all_groups(
     #     'PNC', target, [0, 1, 4, 3, 6],
     #     ['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'])
 
     # # Plot losses
 
-    GROUP_IDX = 1
-    COMMON_KWARGS = {
-        'ds_name': 'PNC',
-        'target': target,
-        'seed_range': range(1, 3),
-        'group_idx': GROUP_IDX,
-        'epoch_range': range(49)
-    }
-    # Compare total loss between different setups
-    plot_losses_for_diff_trials(
-        loss_types=['total_loss'],
-        trial_range=[5, 4, 6],
-        trial_names=['baseline', 'fixed sigma', 'free rE'],
-        **COMMON_KWARGS)
+    # COMMON_KWARGS = {
+    #     'ds_name': 'PNC',
+    #     'target': target,
+    #     'seed_range': range(1, 3),
+    #     'group_idx': GROUP_IDX,
+    #     'epoch_range': range(49)
+    # }
+    # # Compare total loss between different setups
+    # plot_losses_for_diff_trials(
+    #     loss_types=['total_loss'],
+    #     trial_range=[5, 4, 6],
+    #     trial_names=['baseline', 'fixed sigma', 'free rE'],
+    #     **COMMON_KWARGS)
 
-    # Compare corr loss between different setups
-    plot_losses_for_diff_trials(
-        loss_types=['corr_loss'],
-        trial_range=[5, 1, 4, 3, 6],
-        trial_names=['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'],
-        **COMMON_KWARGS)
+    # # Compare corr loss between different setups
+    # plot_losses_for_diff_trials(
+    #     loss_types=['corr_loss'],
+    #     trial_range=[5, 1, 4, 3, 6],
+    #     trial_names=['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'],
+    #     **COMMON_KWARGS)
 
-    # Compare l1 loss between different setups
-    plot_losses_for_diff_trials(
-        loss_types=['l1_loss'],
-        trial_range=[5, 4, 3, 6],
-        trial_names=['baseline', 'fixed sigma', 'rE reg', 'free rE'],
-        **COMMON_KWARGS)
+    # # Compare l1 loss between different setups
+    # plot_losses_for_diff_trials(
+    #     loss_types=['l1_loss'],
+    #     trial_range=[5, 4, 3, 6],
+    #     trial_names=['baseline', 'fixed sigma', 'rE reg', 'free rE'],
+    #     **COMMON_KWARGS)
 
-    # Compare ks loss between different setups
-    plot_losses_for_diff_trials(
-        loss_types=['ks_loss'],
-        trial_range=[5, 1, 4, 3, 6],
-        trial_names=['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'],
-        **COMMON_KWARGS)
+    # # Compare ks loss between different setups
+    # plot_losses_for_diff_trials(
+    #     loss_types=['ks_loss'],
+    #     trial_range=[5, 1, 4, 3, 6],
+    #     trial_names=['baseline', 'MAE L1', 'fixed sigma', 'rE reg', 'free rE'],
+    #     **COMMON_KWARGS)
 
-    # Compare r_E reg loss between different setups
-    plot_losses_for_diff_trials(loss_types=['r_E_reg_loss'],
-                                trial_range=[3],
-                                trial_names=['rE reg'],
-                                **COMMON_KWARGS)
+    # # Compare r_E reg loss between different setups
+    # plot_losses_for_diff_trials(loss_types=['r_E_reg_loss'],
+    #                             trial_range=[3],
+    #                             trial_names=['rE reg'],
+    #                             **COMMON_KWARGS)
 
 
 if __name__ == "__main__":
@@ -775,12 +780,12 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # Group-level analysis
-    for target in ALL_TARGETS:
-        for trial_idx in [3, 6]:
-            for seed_idx in range(1, 2):
-                # for group_idx in range(1, NUM_GROUPS[target] + 1):
-                for group_idx in range(1, 2):
-                    analyze_group(target, trial_idx, seed_idx, group_idx)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in [3, 6]:
+    #         for seed_idx in range(1, 2):
+    #             # for group_idx in range(1, NUM_GROUPS[target] + 1):
+    #             for group_idx in range(1, 2):
+    #                 analyze_group(target, trial_idx, seed_idx, group_idx)
 
     # Run-level analysis
     # for target in ALL_TARGETS:
@@ -794,8 +799,8 @@ if __name__ == "__main__":
     #         analyze_trial(target, trial_idx)
 
     # Target-level analysis
-    # for target in ALL_TARGETS:
-    #     analyze_target(target)
+    for target in ALL_TARGETS:
+        analyze_target(target)
 
     # Debugging
     # plot_pred_loss()
