@@ -202,9 +202,12 @@ def get_train_top_k(saved_dict, k=1):
     # Find the index for k children with the lowest total loss
     # use topk instead of sort to speed up
 
-    k_lowest_total_losses, topk_indices = torch.topk(total_loss,
-                                                     k,
-                                                     largest=False)
+    if k is not None:
+        k_lowest_total_losses, topk_indices = torch.topk(total_loss,
+                                                         k,
+                                                         largest=False)
+    else:
+        k_lowest_total_losses, topk_indices = torch.sort(total_loss)
 
     return k_lowest_total_losses, topk_indices
 
@@ -427,6 +430,51 @@ def regional_EI_diff_cohen_d(EI_matrix_high, EI_matrix_low):
 ############################################################
 # r_E related analysis
 ############################################################
+
+
+def boxplot_train_r_E(ds_name,
+                      target,
+                      trial_idx,
+                      seed_idx,
+                      group_idx,
+                      epoch_range,
+                      plot_outlier_r_E=False,
+                      save_fig_path=None):
+    """
+    This function will boxplot the r_E for each child at each ROI at each epoch
+    """
+    all_epochs_r_E = []
+    for epoch_idx in epoch_range:
+        saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
+                                     group_idx, epoch_idx)
+        _, top_k_indices = get_train_top_k(saved_dict, k=None)
+        r_E_for_valid_params = saved_dict['r_E_for_valid_params']
+
+        # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor
+        ROI_r_E_at_epoch = r_E_for_valid_params[:, top_k_indices]
+        if plot_outlier_r_E:
+            ROI_r_E_deviation_at_epoch = ROI_r_E_at_epoch - 3
+            r_E_at_epoch = torch.max(ROI_r_E_deviation_at_epoch, dim=0).values
+        else:
+            r_E_at_epoch = torch.mean(ROI_r_E_at_epoch, dim=0)
+
+        all_epochs_r_E.append(r_E_at_epoch.numpy())
+
+    if save_fig_path is None:
+        postfix = '_outlier' if plot_outlier_r_E else ''
+        save_fig_path = get_fig_file_path(
+            ds_name, target, 'train_r_E_boxplot', trial_idx, seed_idx,
+            f'r_E_of_group{group_idx}_boxplot{postfix}.png')
+
+    plt.figure()
+    plt.boxplot(all_epochs_r_E, labels=epoch_range)
+    plt.xlabel('Epochs')
+    plt.ylabel('r_E')
+    postfix = ' (outlier)' if plot_outlier_r_E else ''
+    plt.title(f'{target.replace("_", " ")} {group_idx} r_E{postfix}')
+    plt.savefig(save_fig_path)
+    plt.close()
+    print('Saved.')
 
 
 def export_train_r_E(ds_name,

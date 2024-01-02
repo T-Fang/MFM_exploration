@@ -14,7 +14,7 @@ from src.utils.export_utils import (  # noqa
     export_lowest_losses_among_seeds)
 from src.utils import tzeng_func
 from src.utils.analysis_utils import (  # noqa
-    boxplot_network_stats, get_run_path, get_fig_file_path,
+    boxplot_network_stats, boxplot_train_r_E, get_run_path, get_fig_file_path,
     plot_losses_for_diff_trials, plot_train_loss, visualize_stats,
     ttest_1samp_n_plot, regional_EI_age_slope, regional_EI_diff_cohen_d,
     plot_losses_for_diff_trials_all_groups, visualize_train_r_E)
@@ -667,19 +667,21 @@ def analyze_epoch(target, trial_idx, seed_idx, group_idx, epoch_idx):
 
 
 def analyze_group(target, trial_idx, seed_idx, group_idx):
-    plot_train_loss('PNC',
-                    target,
-                    trial_idx,
-                    seed_idx,
-                    group_idx,
-                    epoch_range=range(49))
-    plot_train_loss('PNC',
-                    target,
-                    trial_idx,
-                    seed_idx,
-                    group_idx,
-                    epoch_range=range(49),
-                    show_individual_loss='r_E_reg_loss')
+    # plot_train_loss('PNC',
+    #                 target,
+    #                 trial_idx,
+    #                 seed_idx,
+    #                 group_idx,
+    #                 epoch_range=range(49))
+    # plot_train_loss('PNC',
+    #                 target,
+    #                 trial_idx,
+    #                 seed_idx,
+    #                 group_idx,
+    #                 epoch_range=range(49),
+    #                 show_individual_loss='r_E_reg_loss')
+    boxplot_train_r_E('PNC', target, trial_idx, seed_idx, group_idx,
+                      [0, 9, 19, 29, 39, 49], True)
 
 
 def analyze_run(target, trial_idx, seed_idx):
@@ -773,12 +775,12 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # Group-level analysis
-    # for target in ALL_TARGETS:
-    #     for trial_idx in [3, 6]:
-    #         for seed_idx in range(1, 3):
-    #             # for group_idx in range(1, NUM_GROUPS[target] + 1):
-    #             for group_idx in range(1, 11):
-    #                 analyze_group(target, trial_idx, seed_idx, group_idx)
+    for target in ALL_TARGETS:
+        for trial_idx in [3, 6]:
+            for seed_idx in range(1, 2):
+                # for group_idx in range(1, NUM_GROUPS[target] + 1):
+                for group_idx in range(1, 2):
+                    analyze_group(target, trial_idx, seed_idx, group_idx)
 
     # Run-level analysis
     # for target in ALL_TARGETS:
@@ -792,8 +794,8 @@ if __name__ == "__main__":
     #         analyze_trial(target, trial_idx)
 
     # Target-level analysis
-    for target in ALL_TARGETS:
-        analyze_target(target)
+    # for target in ALL_TARGETS:
+    #     analyze_target(target)
 
     # Debugging
     # plot_pred_loss()
