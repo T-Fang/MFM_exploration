@@ -482,6 +482,7 @@ def boxplot_train_r_E(ds_name,
                       seed_idx,
                       group_idx,
                       epoch_range,
+                      top_k=None,
                       plot_outlier_r_E=False,
                       save_fig_path=None):
     """
@@ -491,14 +492,15 @@ def boxplot_train_r_E(ds_name,
     for epoch_idx in epoch_range:
         saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
                                      group_idx, epoch_idx)
-        _, top_k_indices = get_train_top_k(saved_dict, k=None)
+        _, top_k_indices = get_train_top_k(saved_dict, k=top_k)
         r_E_for_valid_params = saved_dict['r_E_for_valid_params']
 
         # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor
         ROI_r_E_at_epoch = r_E_for_valid_params[:, top_k_indices]
         if plot_outlier_r_E:
             ROI_r_E_deviation_at_epoch = ROI_r_E_at_epoch - 3
-            r_E_at_epoch = torch.max(ROI_r_E_deviation_at_epoch, dim=0).values
+            r_E_at_epoch = torch.max(torch.abs(ROI_r_E_deviation_at_epoch),
+                                     dim=0).values
         else:
             r_E_at_epoch = torch.mean(ROI_r_E_at_epoch, dim=0)
 
@@ -506,6 +508,8 @@ def boxplot_train_r_E(ds_name,
 
     if save_fig_path is None:
         postfix = '_outlier' if plot_outlier_r_E else ''
+        if top_k is not None:
+            postfix += f'_top{top_k}'
         save_fig_path = get_fig_file_path(
             ds_name, target, 'train_r_E_boxplot', trial_idx, seed_idx,
             f'r_E_of_group{group_idx}_boxplot{postfix}.png')
@@ -513,7 +517,10 @@ def boxplot_train_r_E(ds_name,
     plt.figure()
     plt.boxplot(all_epochs_r_E, labels=epoch_range)
     plt.xlabel('Epochs')
-    plt.ylabel('r_E')
+    if plot_outlier_r_E:
+        plt.ylabel('|r_E - 3|')
+    else:
+        plt.ylabel('r_E')
     postfix = ' r_E (outlier)' if plot_outlier_r_E else ' mean r_E'
     plt.title(f'{target.replace("_", " ")} {group_idx}{postfix}')
     plt.savefig(save_fig_path)

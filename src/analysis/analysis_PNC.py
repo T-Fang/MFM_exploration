@@ -681,8 +681,13 @@ def analyze_group(target, trial_idx, seed_idx, group_idx):
     #                 group_idx,
     #                 epoch_range=range(49),
     #                 show_individual_loss='r_E_reg_loss')
-    boxplot_train_r_E('PNC', target, trial_idx, seed_idx, group_idx,
-                      [0, 9, 19, 29, 39, 49], True)
+    boxplot_train_r_E('PNC',
+                      target,
+                      trial_idx,
+                      seed_idx,
+                      group_idx, [0, 9, 19, 29, 39, 49],
+                      top_k=10,
+                      plot_outlier_r_E=True)
 
 
 def analyze_run(target, trial_idx, seed_idx):
@@ -714,9 +719,9 @@ def analyze_target(target):
     Analyze the target-level results.
     """
     GROUP_IDX = 1
-    boxplot_val_r_E_for_diff_trials('PNC',
-                                    target, [3, 6], ['rE reg', 'free rE'],
-                                    range(1, 3), GROUP_IDX, range(50))
+    # boxplot_val_r_E_for_diff_trials('PNC',
+    #                                 target, [3, 6], ['rE reg', 'free rE'],
+    #                                 range(1, 3), GROUP_IDX, range(50))
 
     # plot_losses_for_diff_trials_all_groups(
     #     'PNC', target, [0, 1, 4, 3, 6],
@@ -780,12 +785,12 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # Group-level analysis
-    # for target in ALL_TARGETS:
-    #     for trial_idx in [3, 6]:
-    #         for seed_idx in range(1, 2):
-    #             # for group_idx in range(1, NUM_GROUPS[target] + 1):
-    #             for group_idx in range(1, 2):
-    #                 analyze_group(target, trial_idx, seed_idx, group_idx)
+    for target in ALL_TARGETS:
+        for trial_idx in [3, 6]:
+            for seed_idx in range(1, 2):
+                # for group_idx in range(1, NUM_GROUPS[target] + 1):
+                for group_idx in range(1, 2):
+                    analyze_group(target, trial_idx, seed_idx, group_idx)
 
     # Run-level analysis
     # for target in ALL_TARGETS:
@@ -799,8 +804,8 @@ if __name__ == "__main__":
     #         analyze_trial(target, trial_idx)
 
     # Target-level analysis
-    for target in ALL_TARGETS:
-        analyze_target(target)
+    # for target in ALL_TARGETS:
+    #     analyze_target(target)
 
     # Debugging
     # plot_pred_loss()
