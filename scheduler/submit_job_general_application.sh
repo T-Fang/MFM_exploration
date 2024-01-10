@@ -35,8 +35,8 @@ for target in "${target_list[@]}"; do
         if [ ${mode} = 'train' ]; then
 
             # trial_list=($(seq 1 1 1))
-            trial_list=(4)
-            seed_list=($(seq 2 1 10))
+            # trial_list=(4)
+            # seed_list=($(seq 2 1 10))
             # seed_list=(1)
 
             # Make up log directories for different trials
