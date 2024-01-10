@@ -569,18 +569,19 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
     return 0
 
 
-# apply_large_group(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
-# apply_large_group(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
-# apply_large_group(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
-# apply_large_group(mode='val_best', trial_nbr=3, seed_nbr=2)
-# apply_large_group(mode='simulate_fc_fcd', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
-# apply_large_group(mode='simulate_fc_fcd_mat', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
+if __name__ == "__main__":
+    # apply_large_group(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
+    # apply_large_group(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
+    # apply_large_group(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
+    # apply_large_group(mode='val_best', trial_nbr=3, seed_nbr=2)
+    # apply_large_group(mode='simulate_fc_fcd', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
+    # apply_large_group(mode='simulate_fc_fcd_mat', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
 
-generate_dl_dataset_group(mode='test',
-                          group_nbr=sys.argv[1],
-                          trial_nbr=sys.argv[2],
-                          seed_nbr=sys.argv[3])
+    generate_dl_dataset_group(mode='test',
+                              group_nbr=sys.argv[1],
+                              trial_nbr=sys.argv[2],
+                              seed_nbr=sys.argv[3])
 
-# apply_large_group_Yan100(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
-# apply_large_group_Yan100(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
-# apply_large_group_Yan100(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
+    # apply_large_group_Yan100(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
+    # apply_large_group_Yan100(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
+    # apply_large_group_Yan100(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
