@@ -19,19 +19,19 @@ mode='train'
 # ['train', 'validation', 'test', 'simulate_fc_fcd', 'EI', 'val_train_param', 'simulate_fc']
 need_gpu=0
 
-logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
-
-mkdir -p ${logpath}
-
-echo $dataset_name $target $mode
+echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(3 6)
-seed_list=(1 2)
+trial_list=(9)
+seed_list=(1 2 3 4 5)
+
 for target in "${target_list[@]}"; do
     # For group
     if [ ${target} = 'only1_group' ]; then # No group_nbr need
 
+        logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
+
+        mkdir -p ${logpath}
         if [ ${mode} = 'train' ]; then
 
             # trial_list=($(seq 1 1 1))
@@ -107,6 +107,10 @@ for target in "${target_list[@]}"; do
     elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${target} = 'overall_acc_group_low' || ${target} = 'group_dl_dataset' ]]; then # Need to check final state manually.
 
         # * Mostly used part
+
+        logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
+
+        mkdir -p ${logpath}
 
         if [[ ${target} = 'age_group' ]]; then
             group_list=($(seq 1 1 29))
@@ -215,6 +219,9 @@ for target in "${target_list[@]}"; do
 
     elif [ ${target} = 'individual' ]; then
 
+        logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
+
+        mkdir -p ${logpath}
         if [ ${mode} = 'train' ]; then
             # sub_list=($(seq 401 1 885))
             sub_list=(402 406 413 414 416 422 424 430 433 434 437 450 455 473 474 477 485 498 505 507 508 510 522 530 532 533 547 552 558 566 567 568 570 573 575 576 580 582 584 587 591 598 601 603 612 626 631 632 634 637 639 643 646 648 649 652 657 658 662 670 674 675 679 682 690 696 697 698 699 701 705 707 712 713 718 723 724 727 733 736 737 742 750 751 753 754 755 756 760 762 764 769 772 773 775 777 778 780 788 792 793 797 798 799 803 808 809 811 812 815 817 823 828 831 832 835 840 843 848 849 850 852 855 858 861 868 869 877)

@@ -166,7 +166,7 @@ if(exist('min_thresh', 'var'))
     cbax = axes('Position', [0.29 0.5 0.1 0.02], 'visible', 'off');
     caxis(cbax, [min_thresh, max_thresh]);
     cb = colorbar('peer', cbax, 'horiz', 'Position', [0.29 0.5 0.1 0.02]);
-    cb.FontSize = 14; % Set the font size to your desired value
+    cb.FontSize = 30; % Set the font size to your desired value
 end
 
 end

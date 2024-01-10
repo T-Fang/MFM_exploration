@@ -699,11 +699,12 @@ def analyze_trial(target, trial_idx):
     """
     Analyze the trial-level results.
     """
+    # ! Remember to change the seed range if more seeds are used
     export_EI_from_param_with_lowest_loss_among_seeds(
-        'PNC', target, trial_idx, range(1, 3), range(1,
+        'PNC', target, trial_idx, range(1, 6), range(1,
                                                      NUM_GROUPS[target] + 1))
-    all_groups_EI_to_csv('PNC', NUM_GROUPS[target], target, trial_idx,
-                         '_best_among_all')
+    # all_groups_EI_to_csv('PNC', NUM_GROUPS[target], target, trial_idx,
+    #                      '_best_among_all')
     # export_lowest_losses_among_seeds('PNC', target, trial_idx, range(1, 3),
     #                                  range(1, NUM_GROUPS[target] + 1))
     EI_analysis(target, trial_idx, '_best_among_all')
@@ -785,12 +786,12 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # Group-level analysis
-    for target in ALL_TARGETS:
-        for trial_idx in [3, 6]:
-            for seed_idx in range(1, 2):
-                # for group_idx in range(1, NUM_GROUPS[target] + 1):
-                for group_idx in range(1, 2):
-                    analyze_group(target, trial_idx, seed_idx, group_idx)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in [3, 6]:
+    #         for seed_idx in range(1, 2):
+    #             # for group_idx in range(1, NUM_GROUPS[target] + 1):
+    #             for group_idx in range(1, 2):
+    #                 analyze_group(target, trial_idx, seed_idx, group_idx)
 
     # Run-level analysis
     # for target in ALL_TARGETS:
@@ -799,9 +800,9 @@ if __name__ == "__main__":
     #             analyze_run(target, trial_idx, seed_idx)
 
     # Trial-level analysis
-    # for target in ALL_TARGETS:
-    #     for trial_idx in range(1, 7):
-    #         analyze_trial(target, trial_idx)
+    for target in ALL_TARGETS:
+        for trial_idx in [9]:
+            analyze_trial(target, trial_idx)
 
     # Target-level analysis
     # for target in ALL_TARGETS:

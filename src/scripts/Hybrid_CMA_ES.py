@@ -363,9 +363,13 @@ class DLVersionCMAESForward:
             # Using mean FC to adjust range
             wei_max = 11 * torch.mean(self.fc_dl)
             # 11 from shaoshi, 10 for HCD aCompCor, 8 for HCA aCompCor, 40 for HCD GSR
-            wei_min = 2 * wei_max - 6
-            wei_min = min(max(wei_min, 0), 3.5)
             wei_max = min(max(wei_max, 3.2), 5)
+            # TODO: new wEI range with range restriction
+            wei_min = 2 * wei_max - 6  # Original
+            # wei_min = max(wei_max - 2.2,
+            #               2 * wei_max - 6)  # Restrict the wEI range to 2.2
+            # TODO: new wEI range with range restriction
+            wei_min = min(max(wei_min, 0), 3.5)
             print(f"wEI search range [{wei_min}, {wei_max}].")
         elif self.query_wei_range == 'PNC2':
             # For testing, enlarge the range by 1 for both
@@ -707,14 +711,6 @@ class DLVersionCMAESForward:
             print("Sampling failed!")
             return None
 
-        # TODO: Try without parameterizing sigma
-        # FIXED_SIGMA = 0.005
-        # # fixed_coeff = torch.tensor([FIXED_SIGMA, 0, 0])
-        # # fill the last [7:, :] of param_10_k with repeated fixed_coeff
-        # # param_10_k[7:, :] = fixed_coeff.unsqueeze(1).repeat(
-        # #     1, param_10_k.shape[1])
-        # parameter_k[2 * self.N + 1:, :] = FIXED_SIGMA
-        # TODO: Try without parameterizing sigma
         if k in self.dl_pfic_range:
             loss_k, index_k = self.mfm_model_loss_dl(parameter_k, k)
         elif k in self.euler_pfic_range:
@@ -946,6 +942,11 @@ class DLVersionCMAESForward:
         return m_kp1, sigma_kp1, cov_kp1, p_sigma_kp1, p_c_kp1
 
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
+        # TODO: Try without parameterizing sigma
+        mean[7] = 0.005
+        mean[8] = 0
+        mean[9] = 0
+        # TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
         total_count = 0
@@ -956,6 +957,11 @@ class DLVersionCMAESForward:
         while valid_count < self.param_sets:
             sampled_params[:, valid_count] = multivariate_normal.sample(
             )  # [10, param_sets]
+            # TODO: Try without parameterizing sigma
+            sampled_params[7, valid_count] = 0.005
+            sampled_params[8, valid_count] = 0
+            sampled_params[9, valid_count] = 0
+            # TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
             wEI = sampled_parameters[self.N:2 * self.N,

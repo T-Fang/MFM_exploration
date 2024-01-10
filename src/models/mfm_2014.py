@@ -304,8 +304,8 @@ class MfmModel2014:
         corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, fc_emp)
         corr_loss = 1 - corr
         ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
-        total_loss = corr_loss + L1_loss + ks_loss
         # TODO: Try without FCD KS loss
+        total_loss = corr_loss + L1_loss + ks_loss
         # total_loss = corr_loss + L1_loss
         # TODO: Try without FCD KS loss
         return total_loss, corr_loss, L1_loss, ks_loss
