@@ -15,7 +15,7 @@ from src.utils.export_utils import (  # noqa
 from src.utils import tzeng_func
 from src.utils.analysis_utils import (  # noqa
     boxplot_network_stats, boxplot_train_r_E, boxplot_val_r_E_for_diff_trials,
-    get_run_path, get_fig_file_path, plot_losses_for_diff_trials,
+    get_run_dir, get_fig_file_path, plot_losses_for_diff_trials,
     plot_train_loss, visualize_stats, ttest_1samp_n_plot,
     regional_EI_age_slope, regional_EI_diff_cohen_d,
     plot_losses_for_diff_trials_all_groups, visualize_train_r_E)
@@ -482,7 +482,7 @@ def compare_test_results_many_dirs_plot():
 
 
 def corr_mean_EI_vs_age(trial_idx, seed_idx):
-    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    EI_dir = get_run_dir('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
     save_fig_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
                                       trial_idx, seed_idx,
                                       'corr_mean_EI_vs_age.png')
@@ -504,7 +504,7 @@ def corr_mean_EI_vs_age(trial_idx, seed_idx):
 
 
 def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
-    EI_dir = get_run_path('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
+    EI_dir = get_run_dir('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
     if save_mat_path is None:
         save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
                                           trial_idx, seed_idx,
@@ -562,10 +562,10 @@ def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
 
 
 def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
-    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
-                               trial_idx, seed_idx)
-    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+    high_ei_dir = get_run_dir('PNC', 'overall_acc_group/high', 'EI_ratio',
                               trial_idx, seed_idx)
+    low_ei_dir = get_run_dir('PNC', 'overall_acc_group/low', 'EI_ratio',
+                             trial_idx, seed_idx)
     save_fig_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
                                       trial_idx, seed_idx,
                                       'mean_EI_diff_t_test.png')
@@ -594,10 +594,10 @@ def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
 
 
 def export_EI_ratio_diff_effect_size(trial_idx, seed_idx, save_mat_path=None):
-    high_ei_dir = get_run_path('PNC', 'overall_acc_group/high', 'EI_ratio',
-                               trial_idx, seed_idx)
-    low_ei_dir = get_run_path('PNC', 'overall_acc_group/low', 'EI_ratio',
+    high_ei_dir = get_run_dir('PNC', 'overall_acc_group/high', 'EI_ratio',
                               trial_idx, seed_idx)
+    low_ei_dir = get_run_dir('PNC', 'overall_acc_group/low', 'EI_ratio',
+                             trial_idx, seed_idx)
     if save_mat_path is None:
         save_mat_path = get_fig_file_path('PNC', 'overall_acc_group',
                                           'EI_ratio', trial_idx, seed_idx,
@@ -801,7 +801,7 @@ if __name__ == "__main__":
 
     # Trial-level analysis
     for target in ALL_TARGETS:
-        for trial_idx in [9]:
+        for trial_idx in [10]:
             analyze_trial(target, trial_idx)
 
     # Target-level analysis

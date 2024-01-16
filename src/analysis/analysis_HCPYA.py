@@ -2,13 +2,16 @@ import torch
 import scipy.io as sio
 # import scipy.stats as stats
 import os
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
+sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
+from src.utils.analysis_utils import scatter_r_E_vs_loss
 
 sub_109 = [
     862, 863, 864, 865, 866, 868, 869, 870, 871, 872, 873, 874, 875, 877, 879,
@@ -381,4 +384,6 @@ if __name__ == "__main__":
     # compare_test_results_plot()
     # compare_group_params_apply_to_individual()
     # compare_group_test_results()
-    plot_pred_loss()
+    # plot_pred_loss()
+    scatter_r_E_vs_loss('HCPYA', 'group_860_1029', 11, range(1, 101), None,
+                        [0])

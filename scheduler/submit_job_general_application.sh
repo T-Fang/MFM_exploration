@@ -14,16 +14,17 @@ dataset_name=PNC # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
 
 target_list=('age_group' 'overall_acc_group_high' 'overall_acc_group_low')
-# ['only1_group', 'age_group', 'overall_acc_group_high', 'overall_acc_group_low', 'group_dl_dataset', 'individual']
+# ('only1_group' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
-# ['train', 'validation', 'test', 'simulate_fc_fcd', 'EI', 'val_train_param', 'simulate_fc']
+# ('train' 'validation' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
 need_gpu=0
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(9)
+trial_list=(10)
 seed_list=(1 2 3 4 5)
+# seed_list=($(seq 1 1 100))
 
 for target in "${target_list[@]}"; do
     # For group

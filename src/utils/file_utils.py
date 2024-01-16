@@ -4,32 +4,33 @@ import torch
 from src.basic.constants import LOG_PATH
 
 
-def get_target_path(ds_name, target):
+def get_target_dir(ds_name, target):
     target_path = os.path.join(LOG_PATH, ds_name, target)
     if not os.path.exists(target_path):
         os.makedirs(target_path)
     return target_path
 
 
-def get_run_path(ds_name, target, mode, trial_idx, seed_idx):
-    run_path = os.path.join(get_target_path(ds_name, target), mode,
+def get_run_dir(ds_name, target, mode, trial_idx, seed_idx):
+    run_path = os.path.join(get_target_dir(ds_name, target), mode,
                             f'trial{trial_idx}', f'seed{seed_idx}')
     if not os.path.exists(run_path):
         os.makedirs(run_path)
     return run_path
 
 
-def get_group_path(ds_name, target, mode, trial_idx, seed_idx, group_idx):
-    run_path = os.path.join(
-        get_run_path(ds_name, target, mode, trial_idx, seed_idx),
-        f'group{group_idx}')
-    if not os.path.exists(run_path):
-        os.makedirs(run_path)
-    return run_path
+def get_group_dir(ds_name, target, mode, trial_idx, seed_idx, group_idx=None):
+    run_dir = get_run_dir(ds_name, target, mode, trial_idx, seed_idx)
+    if group_idx is None:
+        return run_dir
+    group_dir = os.path.join(run_dir, f'group{group_idx}')
+    if not os.path.exists(group_dir):
+        os.makedirs(group_dir)
+    return group_dir
 
 
 def get_fig_dir(ds_name, target, fig_type, trial_idx, seed_idx):
-    fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
+    fig_dir = os.path.join(get_target_dir(ds_name, target), 'figures',
                            fig_type, f'trial{trial_idx}', f'seed{seed_idx}')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
@@ -37,7 +38,7 @@ def get_fig_dir(ds_name, target, fig_type, trial_idx, seed_idx):
 
 
 def get_losses_fig_dir(ds_name, target):
-    losses_fig_dir = os.path.join(get_target_path(ds_name, target), 'figures',
+    losses_fig_dir = os.path.join(get_target_dir(ds_name, target), 'figures',
                                   'losses')
     if not os.path.exists(losses_fig_dir):
         os.makedirs(losses_fig_dir)
@@ -61,8 +62,8 @@ def load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
 
     * Note that we will only return the dictionary after applying the mask valid_param_list
     """
-    group_dir = get_group_path(ds_name, target, 'train', trial_idx, seed_idx,
-                               group_idx)
+    group_dir = get_group_dir(ds_name, target, 'train', trial_idx, seed_idx,
+                              group_idx)
     saved_dict = torch.load(os.path.join(group_dir,
                                          f'param_save_epoch{epoch_idx}.pth'),
                             map_location='cpu')
@@ -91,8 +92,8 @@ def load_all_val_dicts(ds_name, target, trial_idx, seed_range, group_idx,
     val_dicts = {}
     for seed_idx in seed_range:
         for epoch_idx in epoch_range:
-            val_group_dir = get_group_path(ds_name, target, 'validation',
-                                           trial_idx, seed_idx, group_idx)
+            val_group_dir = get_group_dir(ds_name, target, 'validation',
+                                          trial_idx, seed_idx, group_idx)
             val_dict_path = os.path.join(val_group_dir,
                                          f'best_param{epoch_idx}.pth')
             # check if the file exists

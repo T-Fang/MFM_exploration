@@ -6,7 +6,7 @@ from scipy import stats, io as sio
 import torch
 
 from src.basic.constants import MATLAB_SCRIPT_PATH
-from src.utils.file_utils import get_fig_file_path, get_losses_fig_dir, get_run_path, get_target_path, load_all_val_dicts, load_train_dict
+from src.utils.file_utils import get_fig_dir, get_fig_file_path, get_losses_fig_dir, get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict
 
 ############################################################
 # Visualization related
@@ -308,8 +308,8 @@ def plot_losses_for_diff_trials_all_groups(
         plt.figure()
         all_trials_losses = []
         for trial_idx in trial_range:
-            losses_file_dir = get_run_path(ds_name, target, 'test', trial_idx,
-                                           '_best_among_all')
+            losses_file_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                                          '_best_among_all')
             losses_dict = torch.load(os.path.join(losses_file_dir,
                                                   'lowest_losses.pth'),
                                      map_location='cpu')
@@ -395,7 +395,8 @@ def plot_train_loss(ds_name,
 def regional_EI_age_slope(n_roi, ages, regional_EIs):
 
     # regional_EIs = np.zeros((nbr_num, n_roi))    # ages = np.zeros((nbr_num))
-
+    # convert age in months to age in years
+    ages = ages / 12
     slope_arr = np.zeros((n_roi))
     pvalue_arr = np.zeros((n_roi))
     for i in range(n_roi):
@@ -446,8 +447,7 @@ def boxplot_val_r_E_for_diff_trials(ds_name,
     """
     if save_fig_path is None:
 
-        save_fig_dir = os.path.join(get_target_path(ds_name,
-                                                    target), 'figures',
+        save_fig_dir = os.path.join(get_target_dir(ds_name, target), 'figures',
                                     'val_r_E_for_diff_trials_boxplot')
         if not os.path.exists(save_fig_dir):
             os.makedirs(save_fig_dir)
@@ -560,3 +560,137 @@ def visualize_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
                      epoch_idx, save_mat_path)
     visualize_stats(save_mat_path, 'r_E',
                     save_mat_path.replace('.mat', '_surf_map.png'))
+
+
+def merge_train_dict_across_seed(ds_name,
+                                 target,
+                                 trial_idx,
+                                 seed_range,
+                                 group_idx,
+                                 epoch_range,
+                                 save_merged_dict=False):
+    """
+    Merge values for each key of the dictionaries across seeds and epoch
+    """
+    merged_dict = {}
+    for epoch_idx in epoch_range:
+        for seed_idx in seed_range:
+            saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
+                                         group_idx, epoch_idx)
+            for key in saved_dict.keys():
+                if key not in merged_dict.keys():
+                    merged_dict[key] = []
+                merged_dict[key].append(saved_dict[key])
+    for key in merged_dict.keys():
+        # check the dim of the torch tensor, if the dim is only 1, can concat along the 0th dim,
+        # if the dim is 2, need to concat along the 1st dim
+        dim = len(merged_dict[key][0].shape)
+        if dim == 1:
+            merged_dict[key] = torch.cat(merged_dict[key], dim=0)
+        elif dim == 2:
+            if key == 'FC_FCD_loss':
+                merged_dict[key] = torch.cat(merged_dict[key], dim=0)
+            else:
+                merged_dict[key] = torch.cat(merged_dict[key], dim=1)
+        else:
+            raise Exception(f'Invalid tensor dim {dim}')
+
+    if save_merged_dict:
+        # save to pth file at the trial directory
+        save_dir = get_run_dir(ds_name, target, 'train', trial_idx, '_merged')
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        save_path = os.path.join(save_dir, f'group{group_idx}_merged.pth')
+        torch.save(merged_dict, save_path)
+        print(f'Saved to {save_path}')
+    return merged_dict
+
+
+def scatter_r_E_vs_loss(ds_name, target, trial_idx, seed_range, group_idx,
+                        epoch_range):
+    merge_dict = merge_train_dict_across_seed(ds_name, target, trial_idx,
+                                              seed_range, group_idx,
+                                              epoch_range)
+    r_E_for_valid_params = merge_dict[
+        'r_E_for_valid_params']  # (num_of_ROI, num_of_parameters)
+    r_E_for_valid_params = torch.mean(r_E_for_valid_params,
+                                      dim=0)  # (num_of_parameters, )
+    FC_FCD_loss = merge_dict['FC_FCD_loss']  # (num_of_parameters, 3)
+    corr_loss = FC_FCD_loss[:, 0]
+    l1_loss = FC_FCD_loss[:, 1]
+    ks_loss = FC_FCD_loss[:, 2]
+    total_loss = corr_loss + l1_loss + ks_loss
+
+    fig_dir = get_fig_dir(ds_name, target, 'scatter_r_E_vs_loss', trial_idx,
+                          "_all")
+    plt.figure()
+    plt.scatter(r_E_for_valid_params, total_loss)
+    plt.xlabel('mean r_E')
+    plt.ylabel('total loss')
+    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs total loss')
+
+    # Add mean values as labels
+    x_mean = torch.mean(r_E_for_valid_params).item()
+    y_mean = torch.mean(total_loss).item()
+    plt.text(x_mean,
+             y_mean,
+             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
+             color='red')
+
+    plt.savefig(
+        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_total_loss.png'))
+    plt.close()
+
+    plt.figure()
+    plt.scatter(r_E_for_valid_params, corr_loss)
+    plt.xlabel('mean r_E')
+    plt.ylabel('corr loss')
+    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs corr loss')
+
+    # Add mean values as labels
+    x_mean = torch.mean(r_E_for_valid_params).item()
+    y_mean = torch.mean(corr_loss).item()
+    plt.text(x_mean,
+             y_mean,
+             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
+             color='red')
+
+    plt.savefig(
+        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_corr_loss.png'))
+    plt.close()
+
+    plt.figure()
+    plt.scatter(r_E_for_valid_params, l1_loss)
+    plt.xlabel('mean r_E')
+    plt.ylabel('l1 loss')
+    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs l1 loss')
+
+    # Add mean values as labels
+    x_mean = torch.mean(r_E_for_valid_params).item()
+    y_mean = torch.mean(l1_loss).item()
+    plt.text(x_mean,
+             y_mean,
+             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
+             color='red')
+
+    plt.savefig(
+        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_l1_loss.png'))
+    plt.close()
+
+    plt.figure()
+    plt.scatter(r_E_for_valid_params, ks_loss)
+    plt.xlabel('mean r_E')
+    plt.ylabel('ks loss')
+    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs ks loss')
+
+    # Add mean values as labels
+    x_mean = torch.mean(r_E_for_valid_params).item()
+    y_mean = torch.mean(ks_loss).item()
+    plt.text(x_mean,
+             y_mean,
+             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
+             color='red')
+
+    plt.savefig(
+        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_ks_loss.png'))
+    plt.close()

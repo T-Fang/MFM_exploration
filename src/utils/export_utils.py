@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from src.basic.constants import NUM_ROI
-from src.utils.file_utils import get_run_path
+from src.utils.file_utils import get_run_dir
 
 
 def all_groups_EI_to_csv(ds_name,
@@ -17,7 +17,7 @@ def all_groups_EI_to_csv(ds_name,
                          trial_idx,
                          seed_idx,
                          save_csv_path=None):
-    ei_dir = get_run_path(ds_name, target, 'EI_ratio', trial_idx, seed_idx)
+    ei_dir = get_run_dir(ds_name, target, 'EI_ratio', trial_idx, seed_idx)
     if save_csv_path is None:
         save_csv_path = os.path.join(ei_dir, 'all_EI_ratios.csv')
 
@@ -48,8 +48,8 @@ def get_seed_indices_with_lowest_loss(ds_name, target, trial_idx, seed_range,
 
         # get the seed idx with lowest loss
         for seed_idx in seed_range:
-            test_dir = get_run_path(ds_name, target, 'test', trial_idx,
-                                    seed_idx)
+            test_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                                   seed_idx)
             test_param_dict = torch.load(os.path.join(test_dir,
                                                       f'group{group_idx}',
                                                       'val_results.pth'),
@@ -63,8 +63,8 @@ def get_seed_indices_with_lowest_loss(ds_name, target, trial_idx, seed_range,
 
     # save seed_indices_with_lowest_loss as csv
     df = pd.DataFrame(best_seed_indices)
-    save_dir = get_run_path(ds_name, target, 'test', trial_idx,
-                            '_best_among_all')
+    save_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                           '_best_among_all')
     save_csv_path = os.path.join(save_dir, 'best_seed_indices.csv')
 
     print(f'Saving to {save_csv_path}...')
@@ -79,13 +79,13 @@ def export_EI_from_param_with_lowest_loss_among_seeds(ds_name, target,
                                                       group_range):
     best_seed_indices = get_seed_indices_with_lowest_loss(
         ds_name, target, trial_idx, seed_range, group_range)
-    save_EI_dir = get_run_path(ds_name, target, 'EI_ratio', trial_idx,
-                               '_best_among_all')
+    save_EI_dir = get_run_dir(ds_name, target, 'EI_ratio', trial_idx,
+                              '_best_among_all')
     for i, best_seed_idx in enumerate(best_seed_indices):
         group_idx = group_range[i]
         # find the EI ratio file and save to the 'seed_best_among_all' directory
-        ei_dir = get_run_path(ds_name, target, 'EI_ratio', trial_idx,
-                              best_seed_idx)
+        ei_dir = get_run_dir(ds_name, target, 'EI_ratio', trial_idx,
+                             best_seed_idx)
         ei_file = os.path.join(ei_dir, f'group{group_idx}.pth')
         shutil.copy(ei_file, save_EI_dir)
 
@@ -102,13 +102,13 @@ def export_lowest_losses_among_seeds(ds_name, target, trial_idx, seed_range,
     """
     best_seed_indices = get_seed_indices_with_lowest_loss(
         ds_name, target, trial_idx, seed_range, group_range)
-    save_dir = get_run_path(ds_name, target, 'test', trial_idx,
-                            '_best_among_all')
+    save_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                           '_best_among_all')
     lowest_losses_among_seeds = torch.zeros((len(group_range), 4))
     for i, best_seed_idx in enumerate(best_seed_indices):
         group_idx = group_range[i]
-        test_dir = get_run_path(ds_name, target, 'test', trial_idx,
-                                best_seed_idx)
+        test_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                               best_seed_idx)
         saved_dict = torch.load(os.path.join(test_dir, f'group{group_idx}',
                                              'val_results.pth'),
                                 map_location='cpu')

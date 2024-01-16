@@ -33,7 +33,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
     sc_indi = sc_indi['sc_roi_1029']
 
     parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029'
-    epochs = 100
+    epochs = 1
 
     # Always using train set myelin and RSFC gradient
     myelin = np.nanmean(myelin_indi[0:680], axis=0)
@@ -73,8 +73,8 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
                                     emp_fcd_cum=emp_fcd_cum,
                                     save_param_dir=save_param_dir,
                                     epochs=epochs,
-                                    dl_pfic_range=np.arange(0, 90),
-                                    euler_pfic_range=np.arange(90, 100),
+                                    dl_pfic_range=[],
+                                    euler_pfic_range=np.arange(0, 1),
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='Uniform',
@@ -394,7 +394,7 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
 
     config = configparser.ConfigParser()
     config.read(
-        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_hcpya_Yan100.ini'
+        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_hcpya.ini'
     )
 
     grouped_mats_dir = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/NeuralMass/DL_group_mats/grouped_mats_Yan100'
@@ -570,17 +570,20 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
 
 
 if __name__ == "__main__":
-    # apply_large_group(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
+    apply_large_group(mode='train',
+                      trial_nbr=sys.argv[1],
+                      seed_nbr=sys.argv[2],
+                      epoch=None)
     # apply_large_group(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
     # apply_large_group(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
     # apply_large_group(mode='val_best', trial_nbr=3, seed_nbr=2)
     # apply_large_group(mode='simulate_fc_fcd', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
     # apply_large_group(mode='simulate_fc_fcd_mat', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
 
-    generate_dl_dataset_group(mode='test',
-                              group_nbr=sys.argv[1],
-                              trial_nbr=sys.argv[2],
-                              seed_nbr=sys.argv[3])
+    # generate_dl_dataset_group(mode='test',
+    #                           group_nbr=sys.argv[1],
+    #                           trial_nbr=sys.argv[2],
+    #                           seed_nbr=sys.argv[3])
 
     # apply_large_group_Yan100(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
     # apply_large_group_Yan100(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])

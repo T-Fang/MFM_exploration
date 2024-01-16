@@ -1000,9 +1000,9 @@ class DLVersionCMAESForward:
 
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
         # TODO: Try without parameterizing sigma
-        # mean[7] = 0.005
-        # mean[8] = 0
-        # mean[9] = 0
+        mean[7] = 0.005
+        mean[8] = 0
+        mean[9] = 0
         # TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
@@ -1015,9 +1015,9 @@ class DLVersionCMAESForward:
             sampled_params[:, valid_count] = multivariate_normal.sample(
             )  # [10, param_sets]
             # TODO: Try without parameterizing sigma
-            # sampled_params[7, valid_count] = 0.005
-            # sampled_params[8, valid_count] = 0
-            # sampled_params[9, valid_count] = 0
+            sampled_params[7, valid_count] = 0.005
+            sampled_params[8, valid_count] = 0
+            sampled_params[9, valid_count] = 0
             # TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
@@ -1204,8 +1204,12 @@ class DLVersionCMAESValidator:
         parameter = d['parameter']
         parameter = parameter[:, valid_param_list_pre]
         if 'FC_FCD_loss' in d:
-            total_loss = torch.sum(d['FC_FCD_loss'],
-                                   dim=1)  # FC_FCD_loss is [param_sets, 3]
+            # TODO: Try without FCD KS loss
+            # FC_FCD_loss is [param_sets, 3]
+            total_loss = torch.sum(d['FC_FCD_loss'], dim=1)
+            # total_loss = torch.sum(d['FC_FCD_loss'][:, :2], dim=1)
+            # TODO: Try without FCD KS loss
+
             # TODO: Regularize firing rate
             # TODO: Try without any constraint on r_E
             # total_loss += d['r_E_reg_loss']  # r_E_reg_loss is [param_sets]
@@ -1254,7 +1258,7 @@ class DLVersionCMAESValidator:
             'ks_loss': ks_loss,
             'seed': seed
         }
-        # TODO: Regularize firing rate
+        # TODO: Save r_E
         if mfm_model.r_E and valid_M_mask.any():
             # save r_E_for_valid_params
             r_E_for_valid_params = r_E_ave[:, valid_M_mask]
@@ -1270,7 +1274,7 @@ class DLVersionCMAESValidator:
             # save_dict['r_E_reg_loss'] = r_E_reg_loss
             # TODO: Regularize firing rate
 
-        # TODO: Regularize firing rate
+        # TODO: Save r_E
         torch.save(
             save_dict,
             os.path.join(self.val_save_dir, f'best_param{epoch}' + '.pth'))
@@ -1479,7 +1483,10 @@ class DLVersionCMAESTester:
         if valid_val_dir_count == 0:
             print("No valid validated directories.")
             return 1
+        # TODO: Try without FCD KS loss
         val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:], dim=1)
+        # val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:3], dim=1)
+        # TODO: Try without FCD KS loss
         # Record all param_10 and loss
         val_total_loss, sorted_index = torch.sort(val_loss_sets[:, 0],
                                                   descending=False)
