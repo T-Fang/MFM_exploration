@@ -1,0 +1,123 @@
+annotation,description,tags,N (males),age (years),primary reference(s),secondary reference(s)
+"('abagen', 'genepc1', 'fsaverage', '10k')",PC1 of genes in the Allen Human Brain Atlas,genetics,6 (5),24-55,"Hawrylycz et al., 2012, Nature (doi:10.1038/nature11405)
+Markello et al., 2021, eLife (doi.org/10.7554/eLife.72129)",
+"('aghourian2017', 'feobv', 'MNI152', '1mm')",PET tracer binding (SUVR) to VAChT (acetylcholine transporter),receptors; PET,18 (5),66.8 +/- 6.8,"Aghourian et al., 2017, Mol Psychiatry (doi:10.1038/mp.2017.183)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('alarkurtti2015', 'raclopride', 'MNI152', '3mm')",PET tracer binding (BPnd) to D2 (dopamine receptor),receptors; PET,7 (7),24 +/- 2,"Alakurtti et al., 2015, J Cereb Blood Flow Metab (doi.org/10.1038/jcbfm.2015.53)",
+"('bedard2019', 'feobv', 'MNI152', '1mm')",PET tracer binding (SUVR) to VAChT (acetylcholine transporter),receptors; PET,5 (4),68.3 +/- 3.1,"Bedard et al., 2019, Sleep Med (doi.org/10.1016/j.sleep.2018.12.020)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('beliveau2017', 'az10419369', 'MNI152', '1mm')",PET tracer binding (Bmax) to 5-HT1b (serotonin receptor),receptors; PET,36 (24),27.8 +/- 6.9,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'az10419369', 'fsaverage', '164k')",PET tracer binding (Bmax) to 5-HT1b (serotonin receptor),receptors; PET,36 (24),27.8 +/- 6.9,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'cimbi36', 'MNI152', '1mm')",PET tracer binding (Bmax) to 5-HT2a (serotonin receptor),receptors; PET,29 (15),22.6 +/- 2.7,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'cimbi36', 'fsaverage', '164k')",PET tracer binding (Bmax) to 5-HT2a (serotonin receptor),receptors; PET,29 (15),22.6 +/- 2.7,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'cumi101', 'MNI152', '1mm')",PET tracer binding (Bmax) to 5-HT1a (serotonin receptor),receptors; PET,8 (3),28.4 +/- 8.8,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'cumi101', 'fsaverage', '164k')",PET tracer binding (Bmax) to 5-HT1a (serotonin receptor),receptors; PET,8 (3),28.4 +/- 8.8,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'dasb', 'MNI152', '1mm')",PET tracer binding (Bmax) to 5-HTT (serotonin transporter),receptors; PET,100 (29),25.1 +/- 5.8,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'dasb', 'fsaverage', '164k')",PET tracer binding (Bmax) to 5-HTT (serotonin transporter),receptors; PET,100 (29),25.1 +/- 5.8,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'sb207145', 'MNI152', '1mm')",PET tracer binding (Bmax) to 5-HT4 (serotonin receptor),receptors; PET,59 (41),25.9 +/- 5.3,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('beliveau2017', 'sb207145', 'fsaverage', '164k')",PET tracer binding (Bmax) to 5-HT4 (serotonin receptor),receptors; PET,59 (41),25.9 +/- 5.3,"Beliveau et al., 2017, J Neurosci (doi.org/10.1523/JNEUROSCI.2830-16.2016)",
+"('ding2010', 'mrb', 'MNI152', '1mm')",PET tracer binding (BPnd) to NET (norepinephrine transporter),receptors; PET,77 (50),33.4 +/- 9.17,"Ding et al., 2010, Synapse (doi.org/10.1002/syn.20696)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)","Li et al 2014 Neuroimage (doi.org/10.1016/j.neuroimage.2013.10.004)
+Sanchez-Rangel et al 2020 J Int Obesity (doi.org/10.1038/s41366-019-0471-4)
+Belfort-DeAguiar et al 2018 J Clin Endocrinol Metab (doi.org/10.1210/jc.2017-02717)"
+"('dubois2015', 'abp688', 'MNI152', '1mm')",PET tracer binding (BPnd) to mGluR5 (glutamate receptor),receptors; PET,28 (15),33.1 +/- 11.2,"Dubois et al., 2016, Eur J Nucl Med Mol Imaging (doi.org/10.1007/s00259-015-3167-6)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('dukart2018', 'flumazenil', 'MNI152', '3mm')",PET tracer binding (BPnd) to GABAa (gaba receptor),receptors; PET,6 (6),43 +/- 4,"Dukart et al., 2018, Sci Rep (doi.org/10.1038/s41598-018-22444-0)",
+"('dukart2018', 'fpcit', 'MNI152', '3mm')",SPECT tracer binding (SUVR) to DAT (dopamine transporter),receptors; PET,174 (109),61 +/- 11,"Dukart et al., 2018, Sci Rep (doi.org/10.1038/s41598-018-22444-0)",
+"('fazio2016', 'madam', 'MNI152', '3mm')",PET tracer binding (BPnd) to 5-HTT (serotonin transporter),receptors; PET,10 (8),51-67,"Fazio et al., 2016, Neuroimage (doi.org/10.1016/j.neuroimage.2016.03.019)",
+"('finnema2016', 'ucbj', 'MNI152', '1mm')","PET tracer binding (BPnd) to SV2A (synaptic vesicle glycoprotein 2A, a synapse marker)",PET,76 (45),48.9 +/- 18.4,"Finnema et al., 2018, J Cereb Blood Flow Metab (doi.org/10.1177/0271678X17724947)
+Naganawa et al., 2021 J Nucl Med (doi.org/10.2967/jnumed.120.249144)
+Hansen et al., 2022, Nat Commun (doi.org/10.1038/s41467-022-32420-y)","Chen et al 2021 J Cereb Blood Flow Metab (doi.org/10.1177/0271678X211004312)
+O’Dell et al 2021 Alzheimers Res Ther (doi.org/10.1186/s13195-020-00742-y)
+Smart et al 2021 J Cereb Blood Flow Metab (doi.org/10.1177/0271678X20946198)
+Weiss et al 2021 Clin Infect Dis (doi.org/10.1093/cid/ciab484)
+Radhakrishnan et al 2021 Mol Psychiatr (doi.org/10.1038/s41380-021-01184-0)
+D’Souza et al 2021 Mol Psychiatr (doi.org/10.1038/s41380-020-00891-4)
+Finnema et al 2020 Epilepsia (doi.org/10.1111/epi.16653)
+Bini et al 2020 EJNMMI Res (doi.org/10.1186/s13550-020-00670-w)
+Mecca et al 2020 Alzheimers Dement (doi.org/10.1002/alz.12097)
+Finnema et al 2019 Epilepsia (doi.org/10.1111/epi.14701)
+Holmes et al 2019 Nat Commun (doi.org/10.1038/s41467-019-09562-7)
+Chen et al 2018 JAMA Neurol (doi.org/10.1001/jamaneurol.2018.1836)"
+"('gallezot2010', 'p943', 'MNI152', '1mm')",PET tracer binding (BPnd) to 5-HT1b (serotonin receptor),receptors; PET,23 (15),28.7 +/- 7,"Gallezot et al., 2010, J Cereb Blood Flow Metab (doi.org/10.1038/jcbfm.2009.195)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)","Murrough et al. 2010 Psychopharm (doi.org/10.1007/s00213-010-1881-0)
+Murrough et al. 2011 Arch Gen Psychiatry (doi.org/10.1001/archgenpsychiatry.2011.91)
+Matuskey et al. 2014 Biol Psychiatry (doi.org/10.1016/j.biopsych.2013.11.022)
+Pittenger et al 2016 J Affect Disord (doi.org/10.1016/j.jad.2016.02.021)
+Saricicek et al 2015 Eur J Nucl Med Mol Imaging (doi.org/10.1007/s00259-014-2958-5)
+Baldassarri et al 2020 Synapse (doi.org/10.1002/syn.22159)"
+"('gallezot2017', 'gsk189254', 'MNI152', '1mm')",PET tracer binding (Vt) to H3 (histamine receptor),receptors; PET,8 (7),31.69 +- 8.95,"Gallezot et al., 2017, J Cereb Blood Flow Metab (doi.org/10.1177/0271678X16650697)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)","Ashworth et al., 2010, J Nucl Med (doi.org/10.2967/jnumed.109.071753)"
+"('hcps1200', 'megalpha', 'fsLR', '4k')",MEG alpha (8-12 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'megbeta', 'fsLR', '4k')",MEG beta (15-29 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'megdelta', 'fsLR', '4k')",MEG delta (2-4 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'meggamma1', 'fsLR', '4k')",MEG low gamma (30-59 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'meggamma2', 'fsLR', '4k')",MEG high gamma (60-90 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'megtheta', 'fsLR', '4k')",MEG theta (5-7 Hz) power distribution from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2022, Plos Biology (doi.org/10.1371/journal.pbio.3001735)
+Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)",
+"('hcps1200', 'megtimescale', 'fsLR', '4k')",MEG intrinsic timescale from the Human Connectome Project S1200 release,MEG; functional,33 (17),22-35,"Shafiei et al., 2023 bioRxiv (doi.org/10.1101/2023.01.23.525101)","Van Essen et al., 2013, Neuroimage (doi.org/10.1016/j.neuroimage.2013.05.041)"
+"('hcps1200', 'myelinmap', 'fsLR', '32k')",MRI T1w/T2w ratio from the Human Connectome Project S1200 release,MRI; structural,,22-35,"Glasser et al., 2016, Nature (doi.org/10.1038/nature18933)",
+"('hcps1200', 'thickness', 'fsLR', '32k')",MRI cortical thickness from the Human Connectome Project S1200 release,MRI; structural,,22-35,"Glasser et al., 2016, Nature (doi.org/10.1038/nature18933)",
+"('hesse2017', 'methylreboxetine', 'MNI152', '3mm')",PET tracer binding (BPnd) to NET (norepinephrine transporter),receptors; PET,10 (n/a),33.3 (mean),"Hesse et al., 2017, Eur J Nucl Med Mol Imaging (doi.org/10.1007/s00259-016-3590-3)",
+"('hill2010', 'devexp', 'fsLR', '164k')",Developmental cortical expansion,MRI; structural,,,"Hill et al., 2010, PNAS (doi.org/10.1073/pnas.1001229107)",
+"('hill2010', 'evoexp', 'fsLR', '164k')",Evolutionary cortical expansion,MRI; structural,,,"Hill et al., 2010, PNAS (doi.org/10.1073/pnas.1001229107)",
+"('hillmer2016', 'flubatine', 'MNI152', '1mm')",PET tracer binding (Vt) to a4b2 (acetylcholine receptor),receptors; PET,30 (20),33.50 +/- 10.71,"Hillmer et al., 2016, Neuroimage (doi.org/10.1016/j.neuroimage.2016.07.026)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)","Baldassarri et al., 2018, Nicotine Tob Res (doi.org/10.1093/ntr/ntx091)"
+"('jaworska2020', 'fallypride', 'MNI152', '1mm')",PET tracer binding (BPnd) to D2 (dopamine receptor),receptors; PET,49 (16),18.41 +/- 0.57,"Jaworska et al., 2020, Neuropsychopharm (doi.org/10.1038/s41386-020-0662-7)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('kaller2017', 'sch23390', 'MNI152', '3mm')",PET tracer binding (BPnd) to D1 (dopamine receptor),receptors; PET,13 (6),33 +/- 13,"Kaller et al., 2017, Eur J Nucl Med Mol Imaging (doi.org/10.1007/s00259-017-3645-0)",
+"('kantonen2020', 'carfentanil', 'MNI152', '3mm')",PET tracer binding (BPnd) to MOR (mu-opioid receptor),receptors; PET,204 (132),32.3 +/- 10.8,"Kantonen et al., 2020, Neuroimage (doi.org/10.1016/j.neuroimage.2020.116922)",
+"('laurikainen2018', 'fmpepd2', 'MNI152', '1mm')",PET tracer binding (Vt) to CB1 (cannabinoid receptor),receptors; PET,22 (11),27.5 +/- 8.05,"Laurikainen et al., 2019, Neuroimage (doi.org/10.1016/j.neuroimage.2018.10.013)",
+"('margulies2016', 'fcgradient01', 'fsLR', '32k')",Diffusion map embedding gradient 1 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient02', 'fsLR', '32k')",Diffusion map embedding gradient 2 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient03', 'fsLR', '32k')",Diffusion map embedding gradient 3 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient04', 'fsLR', '32k')",Diffusion map embedding gradient 4 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient05', 'fsLR', '32k')",Diffusion map embedding gradient 5 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient06', 'fsLR', '32k')",Diffusion map embedding gradient 6 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient07', 'fsLR', '32k')",Diffusion map embedding gradient 7 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient08', 'fsLR', '32k')",Diffusion map embedding gradient 8 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient09', 'fsLR', '32k')",Diffusion map embedding gradient 9 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('margulies2016', 'fcgradient10', 'fsLR', '32k')",Diffusion map embedding gradient 10 of group-averaged functional connectivity,functional; MRI; fMRI,820 (n/a),,"Margulies et al., 2016, PNAS (doi.org/10.1073/pnas.1608282113)",
+"('mueller2013', 'intersubjvar', 'fsLR', '164k')",Intersubject variability of resting-state functional connectivity.,functional; MRI; fMRI,25 (16),51.8 +/- 6.99,"Mueller et al., 2013, Neuron (doi.org/10.1016/j.neuron.2012.12.028)",
+"('naganawa2020', 'lsn3172176', 'MNI152', '1mm')",PET tracer binding (BPnd) to M1 (acetylcholine receptor),receptors; PET,24 (13),40.45 +/- 11.71,"Naganawa et al., 2020, J Nucl Med (doi.org/10.2967/jnumed.120.246967)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('neurosynth', 'cogpc1', 'MNI152', '2mm')",PC1 of Neurosynth terms in the Cognitive Atlas (123 terms total),functional; structural; meta-analysis; MRI; fMRI,,,"Yarkoni et al., 2011, Nat Methods (doi.org/10.1038/nmeth.1635)","Poldrack et al., 2011, Front Neuroinform (doi.org/10.3389/fninf.2011.00017)"
+"('norgaard2021', 'flumazenil', 'MNI152', '1mm')",PET and autoradiography informed GABAa benzodiazepine binding-site density (Bmax; gaba receptor),receptors; PET,16 (7),26.6 +/- 8,"Norgaard et al., 2021, Neuroimage (doi.org/10.1016/j.neuroimage.2021.117878)",
+"('norgaard2021', 'flumazenil', 'fsaverage', '164k')",PET and autoradiography informed GABAa benzodiazepine binding-site density (Bmax; gaba receptor),receptors; PET,16 (7),26.6 +/- 8,"Norgaard et al., 2021, Neuroimage (doi.org/10.1016/j.neuroimage.2021.117878)",
+"('normandin2015', 'omar', 'MNI152', '1mm')",PET tracer binding (Vt) to CB1 (cannabinoid receptor),receptors; PET,77 (49),30.01 +/- 8.87,"Normandin et al., 2015, J Cereb Blood Flow Metab (doi.org/10.1038/jcbfm.2015.46)","D’Souza et al., 2016, Biol Psychiatry Cogn Neurosci Neuroimaging (doi.org/10.1016/j.bpsc.2015.09.008)
+Ranganathan et al 2016 Biol Psychiatry (doi.org/10.1016/j.biopsych.2015.08.021)
+Neumeister et al 2012 Alcohol Clin Exp Res (doi.org/10.1111/j.1530-0277.2012.01815.x)"
+"('radnakrishnan2018', 'gsk215083', 'MNI152', '1mm')",PET tracer binding (BPnd) to 5-HT6 (serotonin receptor),receptors; PET,30 (30),36.6 +/- 9.04,"Radhakrishnan et al., 2018, J Nucl Med (doi.org/10.2967/jnumed.117.206516)","Radhakrishnan et al., 2020, Psychiatry Res Neuroimaging (doi.org/10.1016/j.pscychresns.2019.111007)"
+"('raichle', 'cbf', 'fsLR', '164k')",Cerebral blood flow,functional; MRI,33 (14),25.4 +/- 2.6,"Vaishnavi et al., 2010, PNAS (doi.org/10.1073/pnas.1010459107)",
+"('raichle', 'cbv', 'fsLR', '164k')",Cerebral blood volume,functional; MRI,33 (14),25.4 +/- 2.6,"Vaishnavi et al., 2010, PNAS (doi.org/10.1073/pnas.1010459107)",
+"('raichle', 'cmr02', 'fsLR', '164k')",Oxygen metabolism,functional; MRI,33 (14),25.4 +/- 2.6,"Vaishnavi et al., 2010, PNAS (doi.org/10.1073/pnas.1010459107)",
+"('raichle', 'cmrglc', 'fsLR', '164k')",Glucose metabolism,functional; MRI,33 (14),25.4 +/- 2.6,"Vaishnavi et al., 2010, PNAS (doi.org/10.1073/pnas.1010459107)",
+"('reardon2018', 'scalinghcp', 'civet', '41k')",Cortical areal scaling during development from the HCP dataset (S1200 release),structural; MRI,1113 (n/a),,"Reardon et al., 2018, Science (doi.org/10.1126/science.aar2578)",
+"('reardon2018', 'scalingnih', 'civet', '41k')",Cortical areal scaling during development from the NIH dataset,structural; MRI,1531 (n/a), 5-25,"Reardon et al., 2018, Science (doi.org/10.1126/science.aar2578)",
+"('reardon2018', 'scalingpnc', 'civet', '41k')",Cortical areal scaling during development from the PNC dataset,structural; MRI,1373 (n/a), 8-23,"Reardon et al., 2018, Science (doi.org/10.1126/science.aar2578)",
+"('rosaneto', 'abp688', 'MNI152', '1mm')",PET tracer binding (BPnd) to mGluR5 (glutamate receptor),receptors; PET,22 (12),67.9 +/- 9.6,"Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('sandiego2015', 'flb457', 'MNI152', '1mm')",PET tracer binding (BPnd) to D2 (dopamine receptor),receptors; PET,55 (26),32.45 +/- 9.69,"Sandiego et al., 2015, J Cereb Blood Flow Metab (doi.org/10.1038/jcbfm.2014.237)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)","Smith et al 2017 J Cereb Blood Flow Metab (doi.org/10.1177/0271678x17737693 )
+Zakiniaeiz et al 2019 Neuropsychopharm (doi.org/10.1038/s41386-019-0456-y)
+Slifstein et al 2015 JAMA Psychiatry (doi.org/10.1001/jamapsychiatry.2014.2414)
+Sandiego et al 2018 Neuropsychopharm (doi.org/10.1038/npp.2017.223)"
+"('sasaki2012', 'fepe2i', 'MNI152', '1mm')",PET tracer binding (BPnd) to DAT (dopamine transporter),receptors; PET,6 (6),31.06 +/- 7.7,"Sasaki et al., 2012, J Nucl Med (doi.org/10.2967/jnumed.111.101626)",
+"('satterthwaite2014', 'meancbf', 'MNI152', '1mm')",Cerebral blood flow,functional; ASL,922 (n/a), 8-22,"Satterthwaite et al., 2014, PNAS (doi.org/10.1073/pnas.1400178111)",
+"('savli2012', 'altanserin', 'MNI152', '3mm')",PET tracer binding (BPnd) to 5-HT2a (serotonin receptor),receptors; PET,19 (11),28.2 +/- 5.7,"Savli et al., 2012, Neuroimage (doi.org/10.1016/j.neuroimage.2012.07.001)",
+"('savli2012', 'dasb', 'MNI152', '3mm')",PET tracer binding (BPnd) to 5-HTT (serotonin transporter),receptors; PET,18 (12),30.5 +/- 9.5,"Savli et al., 2012, Neuroimage (doi.org/10.1016/j.neuroimage.2012.07.001)",
+"('savli2012', 'p943', 'MNI152', '3mm')",PET tracer binding (BPnd) to 5-HT1b (serotonin receptor),receptors; PET,23 (15),28.7 +/- 7,"Savli et al., 2012, Neuroimage (doi.org/10.1016/j.neuroimage.2012.07.001)",
+"('savli2012', 'way100635', 'MNI152', '3mm')",PET tracer binding (BPnd) to 5-HT1a (serotonin receptor),receptors; PET,35 (18),26.3 +/- 5.2,"Savli et al., 2012, Neuroimage (doi.org/10.1016/j.neuroimage.2012.07.001)",
+"('smart2019', 'abp688', 'MNI152', '1mm')",PET tracer binding (BPnd) to mGluR5 (glutamate receptor),receptors; PET,73 (25),19.9 +/- 3.04,"Smart et al., 2019, Eur J Nucl Med Mol Imaging (doi.org/10.1007/s00259-018-4252-4)
+Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('smith2017', 'flb457', 'MNI152', '1mm')",PET tracer binding (BPnd) to D2 (dopamine receptor),receptors; PET,37 (17),48.36 +/- 16.93,"Smith et al., 2017, J Cereb Blood Flow Metab (doi.org/10.1177/0271678X17737693)",
+"('sydnor2021', 'SAaxis', 'fsLR', '32k')",Sensory-association mean rank axis,,,,"Sydnor et al., 2021, Neuron (doi.org/10.1016/j.neuron.2021.06.016)",
+"('tuominen', 'feobv', 'MNI152', '2mm')",PET tracer binding (SUVR) to VAChT (acetylcholine transporter),receptors; PET,4 (3),37 +/- 10.2,"Hansen et al., 2021, bioRxiv (doi.org/10.1101/2021.10.28.466336)",
+"('turtonen2020', 'carfentanil', 'MNI152', '1mm')",PET tracer binding (BPnd) to MOR (mu-opioid receptor),receptors; PET,39 (19),39.38 +/- 5.05,"Turtonen et al., 2021, Biol Psychiatry Cogn Neurosci Neuroimaging (doi.org/10.1016/j.bpsc.2020.10.013v)",
+"('vijay2018', 'ly2795050', 'MNI152', '2mm')",PET tracer binding (Vt) to KOR (kappa-opioid receptor),receptors; PET,28 (19),33.5 +/- 11.3,"Vijay et al., 2018, Neuropsychopharmacology (https://doi.org/10.1038/s41386-018-0199-1)",
+"('xu2020', 'FChomology', 'fsLR', '32k')",Cross-species functional homology,functional; MRI,,,"Xu et al., 2020, Neuroimage (doi.org/10.1016/j.neuroimage.2020.117346)",
+"('xu2020', 'evoexp', 'fsLR', '32k')",Evolutionary cortical expansion,structural; MRI,,,"Xu et al., 2020, Neuroimage (doi.org/10.1016/j.neuroimage.2020.117346)",
