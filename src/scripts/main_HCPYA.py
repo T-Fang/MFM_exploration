@@ -10,6 +10,7 @@ sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
+from src.basic.constants import CONFIG_DIR, LOG_DIR
 
 
 def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
@@ -33,7 +34,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
     sc_indi = sc_indi['sc_roi_1029']
 
     parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_860_1029'
-    epochs = 1
+    epochs = 4
 
     # Always using train set myelin and RSFC gradient
     myelin = np.nanmean(myelin_indi[0:680], axis=0)
@@ -74,7 +75,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
                                     save_param_dir=save_param_dir,
                                     epochs=epochs,
                                     dl_pfic_range=[],
-                                    euler_pfic_range=np.arange(0, 1),
+                                    euler_pfic_range=np.arange(0, 4),
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='Uniform',
@@ -393,11 +394,9 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
     seed_nbr = int(seed_nbr)
 
     config = configparser.ConfigParser()
-    config.read(
-        '/home/tzeng/storage/Python/MFMApplication/configs/general/config_hcpya.ini'
-    )
+    config.read(os.path.join(CONFIG_DIR, 'model', 'config_hcpya.ini'))
 
-    grouped_mats_dir = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/NeuralMass/DL_group_mats/grouped_mats_Yan100'
+    grouped_mats_dir = '/home/ftian/storage/projects/MFM_exploration/data/DL_group_mats/Desikan'
     grouped_mats_path = os.path.join(grouped_mats_dir, f'{mode}.mat')
     grouped_mats = spio.loadmat(grouped_mats_path)
 
@@ -409,11 +408,11 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
     sc_mat = torch.as_tensor(sc_mat[group_nbr])
     fc_emp = np.array(grouped_mats['fc_groups'])
     fc_emp = torch.as_tensor(fc_emp[group_nbr])
-    emp_fcd_cum = np.array(grouped_mats['fcd_cdf_groups'])
+    emp_fcd_cum = np.array(grouped_mats['fcd_groups'])
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[group_nbr])
     emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)  # [bins, 1]
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/DL_dataset/Yan100'
+    parent_dir = os.path.join(LOG_DIR, 'HCPYA', 'DL_dataset', 'Desikan')
     epochs = 100
 
     save_param_dir = os.path.join(
@@ -431,7 +430,7 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
                                 euler_pfic_range=np.arange(0, 100),
                                 dl_rfic_range=[],
                                 euler_rfic_range=[],
-                                query_wei_range='PNC',
+                                query_wei_range='Uniform',
                                 opportunities=10,
                                 next_epoch=0,
                                 seed=seed)
@@ -580,10 +579,10 @@ if __name__ == "__main__":
     # apply_large_group(mode='simulate_fc_fcd', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
     # apply_large_group(mode='simulate_fc_fcd_mat', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
 
-    # generate_dl_dataset_group(mode='test',
-    #                           group_nbr=sys.argv[1],
-    #                           trial_nbr=sys.argv[2],
-    #                           seed_nbr=sys.argv[3])
+    # generate_dl_dataset_group(mode=sys.argv[1],
+    #                           group_nbr=sys.argv[2],
+    #                           trial_nbr=sys.argv[3],
+    #                           seed_nbr=sys.argv[4])
 
     # apply_large_group_Yan100(mode='train', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=None)
     # apply_large_group_Yan100(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])

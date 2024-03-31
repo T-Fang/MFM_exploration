@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from scipy import stats, io as sio
 import torch
 
-from src.basic.constants import MATLAB_SCRIPT_PATH
+from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
 from src.utils.file_utils import get_fig_dir, get_fig_file_path, get_losses_fig_dir, get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict
 
 ############################################################
@@ -23,7 +23,7 @@ def visualize_stats(mat_file_path, stats_name, fig_file_path):
     print(f"Visualizing {stats_name} from {mat_file_path}...")
 
     command = [
-        (f"cd {MATLAB_SCRIPT_PATH}; "
+        (f"cd {MATLAB_SCRIPT_DIR}; "
          f"matlab -nodisplay -nosplash -nodesktop -r "
          f"\"load('{mat_file_path}', '{stats_name}'); "
          f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
@@ -51,7 +51,7 @@ def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
     print(f"Boxplotting {stats_name} from {mat_file_path}...")
 
     command = [(
-        f"cd {MATLAB_SCRIPT_PATH}; "
+        f"cd {MATLAB_SCRIPT_DIR}; "
         f"matlab -nodisplay -nosplash -nodesktop -r "
         f"\"load('{mat_file_path}', '{stats_name}'); "
         f"yeo7_network_boxplot({stats_name}, '{stats_name.replace('_', ' ')}', '{fig_file_path}'); "
@@ -606,91 +606,102 @@ def merge_train_dict_across_seed(ds_name,
     return merged_dict
 
 
-def scatter_r_E_vs_loss(ds_name, target, trial_idx, seed_range, group_idx,
-                        epoch_range):
+def plot_scatter(x, y, xlabel, ylabel, title, fig_file_path):
+    plt.figure()
+    plt.scatter(x, y)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+
+    # Add mean values as labels
+    x_mean = torch.mean(x).item()
+    y_mean = torch.mean(y).item()
+    plt.text(x_mean,
+             y_mean,
+             f'Mean: ({x_mean:.3f}, {y_mean:.3f})',
+             color='red')
+
+    plt.savefig(fig_file_path)
+    plt.close()
+
+
+def scatter_loss_vs_r_E(ds_name,
+                        target,
+                        trial_idx,
+                        seed_range,
+                        group_idx,
+                        epoch_range,
+                        r_E_range=[float('-inf'), float('inf')],
+                        total_loss_range=[float('-inf'),
+                                          float('inf')],
+                        plot_param_ranges=True):
     merge_dict = merge_train_dict_across_seed(ds_name, target, trial_idx,
                                               seed_range, group_idx,
                                               epoch_range)
-    r_E_for_valid_params = merge_dict[
-        'r_E_for_valid_params']  # (num_of_ROI, num_of_parameters)
-    r_E_for_valid_params = torch.mean(r_E_for_valid_params,
-                                      dim=0)  # (num_of_parameters, )
-    FC_FCD_loss = merge_dict['FC_FCD_loss']  # (num_of_parameters, 3)
-    corr_loss = FC_FCD_loss[:, 0]
-    l1_loss = FC_FCD_loss[:, 1]
-    ks_loss = FC_FCD_loss[:, 2]
-    total_loss = corr_loss + l1_loss + ks_loss
+    r_E_for_valid_params = merge_dict['r_E_for_valid_params']
+    mean_r_E = torch.mean(r_E_for_valid_params, dim=0)
+    FC_FCD_loss = merge_dict['FC_FCD_loss']
+    total_loss = torch.sum(FC_FCD_loss, dim=1)
 
-    fig_dir = get_fig_dir(ds_name, target, 'scatter_r_E_vs_loss', trial_idx,
+    # Filter parameters based on r_E_range and total_loss_range
+    valid_indices = np.logical_and.reduce(
+        (mean_r_E >= r_E_range[0], mean_r_E <= r_E_range[1], total_loss
+         >= total_loss_range[0], total_loss <= total_loss_range[1]))
+    mean_r_E = mean_r_E[valid_indices]
+    loss_dict = {}
+    loss_dict['total'] = total_loss[valid_indices]
+    FC_FCD_loss = FC_FCD_loss[valid_indices]
+    loss_dict['corr'] = FC_FCD_loss[:, 0]
+    loss_dict['l1'] = FC_FCD_loss[:, 1]
+    loss_dict['ks'] = FC_FCD_loss[:, 2]
+
+    fig_dir = get_fig_dir(ds_name, target, 'scatter_loss_vs_r_E', trial_idx,
                           "_all")
-    plt.figure()
-    plt.scatter(r_E_for_valid_params, total_loss)
-    plt.xlabel('mean r_E')
-    plt.ylabel('total loss')
-    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs total loss')
 
-    # Add mean values as labels
-    x_mean = torch.mean(r_E_for_valid_params).item()
-    y_mean = torch.mean(total_loss).item()
-    plt.text(x_mean,
-             y_mean,
-             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
-             color='red')
+    group_idx_str = "" if group_idx is None else f"{group_idx}"
+    target_str = target.replace("_", " ")
+    title_postfix = f' ({np.count_nonzero(valid_indices)} param vectors)'
+    fig_file_postfix = f'_loss_vs_r_E_for_group{group_idx}.png' if group_idx is not None else '_loss_vs_r_E.png'
+    if len(epoch_range) == 1:
+        fig_file_postfix = fig_file_postfix.replace(
+            '.png', f'_epoch{epoch_range[0]}.png')
+    if r_E_range != [float('-inf'), float('inf')]:
+        fig_file_postfix = fig_file_postfix.replace('.png',
+                                                    '_with_r_E_range.png')
+    if total_loss_range != [float('-inf'), float('inf')]:
+        fig_file_postfix = fig_file_postfix.replace(
+            '.png', '_with_total_loss_range.png')
 
-    plt.savefig(
-        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_total_loss.png'))
-    plt.close()
+    def scatter_helper(cost_type):
+        plot_scatter(
+            mean_r_E, loss_dict[cost_type], 'mean r_E', f'{cost_type} loss',
+            f'{target_str} {group_idx_str} {cost_type} loss vs r_E {title_postfix}',
+            os.path.join(fig_dir, f'{cost_type}{fig_file_postfix}'))
 
-    plt.figure()
-    plt.scatter(r_E_for_valid_params, corr_loss)
-    plt.xlabel('mean r_E')
-    plt.ylabel('corr loss')
-    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs corr loss')
+    scatter_helper('total')
+    scatter_helper('corr')
+    scatter_helper('l1')
+    scatter_helper('ks')
 
-    # Add mean values as labels
-    x_mean = torch.mean(r_E_for_valid_params).item()
-    y_mean = torch.mean(corr_loss).item()
-    plt.text(x_mean,
-             y_mean,
-             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
-             color='red')
+    if plot_param_ranges:
+        param_vectors = merge_dict[
+            'parameter']  # [3 * N + 1, num_of_param_vectors]
+        param_vectors = param_vectors[:, valid_indices]
+        wEE = param_vectors[0:NUM_ROI, :].flatten()
+        wEI = param_vectors[NUM_ROI:2 * NUM_ROI, :].flatten()
+        G = param_vectors[2 * NUM_ROI, :]
+        sigma_times_1000 = param_vectors[2 * NUM_ROI + 1:, :].flatten() * 1000
 
-    plt.savefig(
-        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_corr_loss.png'))
-    plt.close()
-
-    plt.figure()
-    plt.scatter(r_E_for_valid_params, l1_loss)
-    plt.xlabel('mean r_E')
-    plt.ylabel('l1 loss')
-    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs l1 loss')
-
-    # Add mean values as labels
-    x_mean = torch.mean(r_E_for_valid_params).item()
-    y_mean = torch.mean(l1_loss).item()
-    plt.text(x_mean,
-             y_mean,
-             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
-             color='red')
-
-    plt.savefig(
-        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_l1_loss.png'))
-    plt.close()
-
-    plt.figure()
-    plt.scatter(r_E_for_valid_params, ks_loss)
-    plt.xlabel('mean r_E')
-    plt.ylabel('ks loss')
-    plt.title(f'{target.replace("_", " ")} {group_idx} r_E vs ks loss')
-
-    # Add mean values as labels
-    x_mean = torch.mean(r_E_for_valid_params).item()
-    y_mean = torch.mean(ks_loss).item()
-    plt.text(x_mean,
-             y_mean,
-             f'Mean: ({x_mean:.2f}, {y_mean:.2f})',
-             color='red')
-
-    plt.savefig(
-        os.path.join(fig_dir, f'r_E_of_group{group_idx}_vs_ks_loss.png'))
-    plt.close()
+        # box plot the parameter ranges
+        plt.figure()
+        plt.boxplot([wEE, wEI, G, sigma_times_1000],
+                    labels=['wEE', 'wEI', 'G', 'sigma*1000'])
+        plt.title(
+            f'{target_str} {group_idx_str} sampled parameter ranges {title_postfix}'
+        )
+        plt.ylim(-0.5, 10.5)  # Set the y-axis limits
+        plt.savefig(
+            os.path.join(
+                fig_dir,
+                f'param_ranges{fig_file_postfix.replace("_loss_vs_r_E", "")}'))
+        plt.close()

@@ -13,6 +13,7 @@ from Hybrid_CMA_ES_classes import DLVersionCMAESForward, DLVersionCMAESValidator
 from tzeng_func_torch import parameterize_myelin_rsfc
 import tzeng_func
 import CBIG_func
+from src.utils.file_utils import merge_mat_files
 
 sys.path.append('/home/tzeng/storage/Python/MFMmodel')
 from mfm_model_2014_general import MfmModel2014
@@ -430,6 +431,19 @@ def simulate_results_loss_analysis():
     # for i in range(10):
     #     fcd_losses[i] = MfmModel2014.KS_cost(fcd_pdf_sim[i], emp_fcd_cum)
     # print(fcd_losses)
+
+
+def merge_desikan_group_mat():
+    save_mat_dir = '/home/ftian/storage/projects/MFM_exploration/data/DL_group_mats/Desikan'
+    source_mat_dir = '/mnt/isilon/CSC1/Yeolab/Users/tzeng/Matlab/HCPS1200/matfiles/NeuralMass/DL_group_mats/grouped_mats_Desikan'
+    for mode in ['train', 'val', 'test']:
+        mat_file_list = ['fc', 'fcd', 'myelin', 'rsfc', 'sc']
+        mat_file_path_list = [
+            os.path.join(source_mat_dir, f'{f}_{mode}.mat')
+            for f in mat_file_list
+        ]
+        merge_mat_files(mat_file_path_list,
+                        os.path.join(save_mat_dir, f'{mode}.mat'))
 
 
 if __name__ == "__main__":

@@ -10,21 +10,21 @@ proj_dir="/home/ftian/storage/projects/MFM_exploration"
 scripts_dir="${proj_dir}/src/scripts"
 conda_env=MFM_tzeng
 
-dataset_name=PNC # ['HCPYA', 'PNC']
+dataset_name=HCPYA # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
 
-target_list=('age_group' 'overall_acc_group_high' 'overall_acc_group_low')
+target_list=('only1_group')
 # ('only1_group' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
-# ('train' 'validation' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
+# ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
 need_gpu=0
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(10)
-seed_list=(1 2 3 4 5)
-# seed_list=($(seq 1 1 100))
+trial_list=(13)
+# seed_list=(1)
+seed_list=($(seq 2 1 1000))
 
 for target in "${target_list[@]}"; do
     # For group
@@ -49,7 +49,7 @@ for target in "${target_list[@]}"; do
                     logerror="se${seed_nbr}_error.log"
                     log_out="se${seed_nbr}_out.log"
                     cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                    $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 30:00:00 -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 3:00:00 -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                 done
             done
 
@@ -104,10 +104,43 @@ for target in "${target_list[@]}"; do
             done
 
         fi
+    elif [ ${target} = 'group_dl_dataset' ]; then
 
-    elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${target} = 'overall_acc_group_low' || ${target} = 'group_dl_dataset' ]]; then # Need to check final state manually.
+        logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
 
-        # * Mostly used part
+        mkdir -p ${logpath}
+
+        if [[ ${mode} = 'train' ]]; then
+            group_list=($(seq 0 1 63))
+        elif [[ ${mode} = 'val' ]]; then
+            group_list=($(seq 0 1 13))
+        elif [[ ${mode} = 'test' ]]; then
+            group_list=($(seq 0 1 12))
+        fi
+
+        # Make up log directories for different trials
+        for trial_nbr in "${trial_list[@]}"; do
+            logdir="${logpath}/trial${trial_nbr}"
+            mkdir -p ${logdir}
+
+            for group_nbr in "${group_list[@]}"; do
+                for seed_nbr in "${seed_list[@]}"; do
+                    logerror="g${group_nbr}se${seed_nbr}_error.log"
+                    log_out="g${group_nbr}se${seed_nbr}_out.log"
+                    if [ ${need_gpu} = 1 ]; then
+                        cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $mode $group_nbr $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 10:00:00 -mem 4G -ngpus 1 -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    elif [ ${need_gpu} = 0 ]; then
+                        cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $mode $group_nbr $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 45:00:00 -mem 4G -name "se${seed_nbr}g${group_nbr}t${trial_nbr}" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    fi
+                done
+            done
+        done
+
+    elif [[ ${target} = 'age_group' || ${target} = 'overall_acc_group_high' || ${target} = 'overall_acc_group_low' ]]; then # Need to check final state manually.
+
+        # * Mostly used part for the PNC dataset
 
         logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
 

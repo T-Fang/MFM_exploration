@@ -719,7 +719,7 @@ def analyze_target(target):
     """
     Analyze the target-level results.
     """
-    GROUP_IDX = 1
+    GROUP_IDX = 1  # noqa
     # boxplot_val_r_E_for_diff_trials('PNC',
     #                                 target, [3, 6], ['rE reg', 'free rE'],
     #                                 range(1, 3), GROUP_IDX, range(50))

@@ -762,8 +762,18 @@ class DLVersionCMAESForward:
         return 0
 
     def _train_one_epoch_pFIC(self, k, m_k, sigma_k, cov_k, p_sigma_k, p_c_k):
-        param_10_k, parameter_k = self._sample_valid_parameters_pFIC(
-            m_k, sigma_k**2 * cov_k, self.search_range)
+
+        # TODO: Try uniform sampling at the first iteration
+        if k == 0:  # The first epoch
+            param_10_k, parameter_k = self._sample_uniform_parameters()
+        else:
+            param_10_k, parameter_k = self._sample_valid_parameters_pFIC(
+                m_k, sigma_k**2 * cov_k, self.search_range)
+
+        # Original sampling
+        # param_10_k, parameter_k = self._sample_valid_parameters_pFIC(
+        #     m_k, sigma_k**2 * cov_k, self.search_range)
+        # TODO: Try uniform sampling at the first iteration
         if param_10_k is None or parameter_k is None:
             print("Sampling failed!")
             return None
@@ -779,6 +789,11 @@ class DLVersionCMAESForward:
             print("Iteration ends.")
             return None
         select_params = param_10_k[:, index_k]
+
+        # TODO: Try uniform sampling at the first iteration
+        if k == 0:  # The first epoch
+            m_k = torch.mean(select_params, dim=1)
+        # TODO: Try uniform sampling at the first iteration
 
         m_kp1, sigma_kp1, cov_kp1, p_sigma_kp1, p_c_kp1 = self._update_CMA_ES_pFIC(
             select_params, loss_k, m_k, sigma_k, cov_k, p_sigma_k, p_c_k, k)
@@ -998,11 +1013,42 @@ class DLVersionCMAESForward:
             (torch.linalg.norm(p_sigma_kp1) / expected_value - 1))
         return m_kp1, sigma_kp1, cov_kp1, p_sigma_kp1, p_c_kp1
 
+    # TODO: Try uniform sampling at the first iteration
+    def _sample_uniform_parameters(self):
+        """
+        Sample parameters from uniform distribution
+        :return:
+            sampled_params: [10, param_sets]
+            sampled_parameters: [3*N+1, param_sets]
+        """
+        N = self.N
+        search_range = self.search_range
+
+        sampled_params = torch.zeros(self.param_dim, self.param_sets)
+        sampled_parameters = torch.zeros(
+            self.parameter_dim, self.param_sets)  # [3*N+1, param_sets]
+        for i in range(self.param_sets):
+            sampled_parameters[:, i] = torch.rand(self.parameter_dim) * (
+                search_range[:, 1] -
+                search_range[:, 0]) + search_range[:, 0]  # [3*N+1]
+            sampled_params[0:3, i] = torch.matmul(self.pinv_concat_mat,
+                                                  sampled_parameters[0:N, i])
+            sampled_params[3:6,
+                           i] = torch.matmul(self.pinv_concat_mat,
+                                             sampled_parameters[N:2 * N, i])
+            sampled_params[6, i] = sampled_parameters[2 * N, i]
+            sampled_params[7:,
+                           i] = torch.matmul(self.pinv_concat_mat,
+                                             sampled_parameters[2 * N + 1:, i])
+        return sampled_params, sampled_parameters
+
+    # TODO: Try uniform sampling at the first iteration
+
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
         # TODO: Try without parameterizing sigma
-        mean[7] = 0.005
-        mean[8] = 0
-        mean[9] = 0
+        # mean[7] = 0.005
+        # mean[8] = 0
+        # mean[9] = 0
         # TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
@@ -1015,9 +1061,9 @@ class DLVersionCMAESForward:
             sampled_params[:, valid_count] = multivariate_normal.sample(
             )  # [10, param_sets]
             # TODO: Try without parameterizing sigma
-            sampled_params[7, valid_count] = 0.005
-            sampled_params[8, valid_count] = 0
-            sampled_params[9, valid_count] = 0
+            # sampled_params[7, valid_count] = 0.005
+            # sampled_params[8, valid_count] = 0
+            # sampled_params[9, valid_count] = 0
             # TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()

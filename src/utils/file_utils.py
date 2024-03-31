@@ -1,11 +1,12 @@
 import os
 import torch
+import scipy.io as sio
 
-from src.basic.constants import LOG_PATH
+from src.basic.constants import LOG_DIR
 
 
 def get_target_dir(ds_name, target):
-    target_path = os.path.join(LOG_PATH, ds_name, target)
+    target_path = os.path.join(LOG_DIR, ds_name, target)
     if not os.path.exists(target_path):
         os.makedirs(target_path)
     return target_path
@@ -64,9 +65,19 @@ def load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
     """
     group_dir = get_group_dir(ds_name, target, 'train', trial_idx, seed_idx,
                               group_idx)
-    saved_dict = torch.load(os.path.join(group_dir,
-                                         f'param_save_epoch{epoch_idx}.pth'),
-                            map_location='cpu')
+    # Check if the file exists
+    dict_path = os.path.join(group_dir, f'param_save_epoch{epoch_idx}.pth')
+    if not os.path.exists(dict_path):
+        # TODO: Temporary fix for the case when the file does not exist
+        while epoch_idx >= 0:
+            epoch_idx -= 1
+            dict_path = os.path.join(group_dir,
+                                     f'param_save_epoch{epoch_idx}.pth')
+            if os.path.exists(dict_path):
+                break
+        # return None
+
+    saved_dict = torch.load(dict_path, map_location='cpu')
 
     # we only consider valid params using the valid_param_list mask
     valid_param_list = saved_dict['valid_param_list']
@@ -113,3 +124,13 @@ def load_all_val_dicts(ds_name, target, trial_idx, seed_range, group_idx,
                     val_dicts[key][seed_idx - 1, epoch_idx] = val_dict[key]
 
     return val_dicts
+
+
+def merge_mat_files(mat_file_path_list, output_file_path):
+    """
+    Merge multiple mat files into one mat file
+    """
+    mat_dict = {}
+    for mat_file_path in mat_file_path_list:
+        mat_dict.update(sio.loadmat(mat_file_path))
+    sio.savemat(output_file_path, mat_dict)

@@ -1,0 +1,9 @@
+python (conda create -n MFM_exploration python=3.11 -y)
+pytorch (conda install pytorch=2.1 torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y)
+- On Mac: conda install pytorch torchvision torchaudio -c pytorch -y
+pytorch lightning, torchmetrics, optuna, and tensorboard (conda install lightning=2.1 torchmetrics optuna tensorboard -c conda-forge -y)
+- install plotly (conda install plotly -y) and kaleido (conda install -c conda-forge python-kaleido) if need to visualize optuna study
+jupyter, scipy and seaborn(conda install jupyter scipy seaborn -y)
+if seaborn not installed
+- pandas (conda install pandas -y)
+- matplotlib (conda install matplotlib -y)

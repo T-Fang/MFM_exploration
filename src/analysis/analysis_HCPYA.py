@@ -11,7 +11,7 @@ from sklearn.linear_model import LinearRegression
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import scatter_r_E_vs_loss
+from src.utils.analysis_utils import scatter_loss_vs_r_E  # noqa
 
 sub_109 = [
     862, 863, 864, 865, 866, 868, 869, 870, 871, 872, 873, 874, 875, 877, 879,
@@ -385,5 +385,17 @@ if __name__ == "__main__":
     # compare_group_params_apply_to_individual()
     # compare_group_test_results()
     # plot_pred_loss()
-    scatter_r_E_vs_loss('HCPYA', 'group_860_1029', 11, range(1, 101), None,
-                        [0])
+
+    for epoch in [3]:
+        for r_E_range in [[float('-inf'), float('inf')], [1, 5]]:
+            for total_loss_range in [[float('-inf'), float('inf')], [0, 1]]:
+                # if r_E_range == [float('-inf'), float('inf')] and total_loss_range == [float('-inf'), float('inf')]:
+                #     continue
+                scatter_loss_vs_r_E('HCPYA',
+                                    'group_860_1029',
+                                    13,
+                                    range(1, 1001),
+                                    None, [epoch],
+                                    r_E_range=r_E_range,
+                                    total_loss_range=total_loss_range,
+                                    plot_param_ranges=True)
