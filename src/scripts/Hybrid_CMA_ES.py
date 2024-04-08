@@ -6,8 +6,11 @@ import os
 
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
+from src.basic.constants import DESIKAN_NEUROMAPS_DIR
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
+from src.utils.neuromaps_utils import get_concat_matrix
+from src.utils.init_utils import set_torch_default
 
 
 def csv2tensor(csv_path):
@@ -93,12 +96,12 @@ def select_best_parameter_from_savedict(save_dict):
     index_min = save_dict['valid_param_list'][index_in_valid]
     if 'parameter' in save_dict:
         best_parameter = save_dict['parameter'][:, index_min]
-    elif 'param_10' in save_dict:
+    elif 'param_coef' in save_dict:
         best_parameter = parameterize_myelin_rsfc(
-            save_dict['param_10'][:, index_min])
+            save_dict['param_coef'][:, index_min])
     else:
         raise Exception(
-            "Error in parameter saving. Key 'parameter' and 'param_10' both not exists."
+            "Error in parameter saving. Key 'parameter' and 'param_coef' both not exists."
         )
 
     return best_parameter
@@ -180,20 +183,27 @@ def train_help_function(config,
                         query_wei_range,
                         opportunities,
                         next_epoch,
-                        seed=None):
-    mfm_trainer = DLVersionCMAESForward(config=config,
-                                        myelin=myelin,
-                                        RSFC_gradient=RSFC_gradient,
-                                        sc_mat=sc_mat,
-                                        fc_emp=fc_emp,
-                                        emp_fcd_cum=emp_fcd_cum,
-                                        save_param_dir=save_param_dir,
-                                        epochs=epochs,
-                                        dl_pfic_range=dl_pfic_range,
-                                        euler_pfic_range=euler_pfic_range,
-                                        dl_rfic_range=dl_rfic_range,
-                                        euler_rfic_range=euler_rfic_range,
-                                        query_wei_range=query_wei_range)
+                        seed=None,
+                        other_parameterization=None):
+    # TODO: comment out codes if we want to use the original parameterization
+    other_parameterization = get_concat_matrix(
+        DESIKAN_NEUROMAPS_DIR, num_of_PCs=2)  # shape: (N, num_of_PCs + 2)
+    # TODO: comment out codes if we want to use the original parameterization
+    mfm_trainer = DLVersionCMAESForward(
+        config=config,
+        myelin=myelin,
+        RSFC_gradient=RSFC_gradient,
+        sc_mat=sc_mat,
+        fc_emp=fc_emp,
+        emp_fcd_cum=emp_fcd_cum,
+        save_param_dir=save_param_dir,
+        epochs=epochs,
+        dl_pfic_range=dl_pfic_range,
+        euler_pfic_range=euler_pfic_range,
+        dl_rfic_range=dl_rfic_range,
+        euler_rfic_range=euler_rfic_range,
+        query_wei_range=query_wei_range,
+        other_parameterization=other_parameterization)
     opportunities = opportunities
     next_epoch = next_epoch
     for i in range(opportunities):
@@ -219,10 +229,21 @@ def train_help_function(config,
 
 class DLVersionCMAESForward:
 
-    def __init__(self, config, myelin, RSFC_gradient, sc_mat, fc_emp,
-                 emp_fcd_cum, save_param_dir, epochs, dl_pfic_range,
-                 euler_pfic_range, dl_rfic_range, euler_rfic_range,
-                 query_wei_range):
+    def __init__(self,
+                 config,
+                 myelin: torch.Tensor,
+                 RSFC_gradient: torch.Tensor,
+                 sc_mat: torch.Tensor,
+                 fc_emp: torch.Tensor,
+                 emp_fcd_cum: torch.Tensor,
+                 save_param_dir,
+                 epochs,
+                 dl_pfic_range,
+                 euler_pfic_range,
+                 dl_rfic_range,
+                 euler_rfic_range,
+                 query_wei_range,
+                 other_parameterization=None):
         """Initialize Hybrid CMA-ES trainer
 
         Args:
@@ -234,31 +255,35 @@ class DLVersionCMAESForward:
             emp_fcd_cum (tensor): [bins, 1], has been normalized (largest is 1)
             save_param_dir (str): the parameters saving directory
             epochs (int): total epochs
-
+            other_parameterization (np.ndarray): if we want to use another parameterization,
+                we will feed in the new concat matrix of shape (N, p) here,
+                where p is the number of parameterization variables
         """
+        self.device, self.dtype = set_torch_default()
 
-        if torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.DoubleTensor')
-            self.device = 'cuda'
-            os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-            print(torch.cuda.get_device_name())
-            myelin = myelin.cuda()
-            RSFC_gradient = RSFC_gradient.cuda()
-            sc_mat = sc_mat.cuda()
-            fc_emp = fc_emp.cuda()
-            emp_fcd_cum = emp_fcd_cum.cuda()
-        else:
-            torch.set_default_tensor_type('torch.DoubleTensor')
-            self.device = 'cpu'
+        myelin = myelin.to(self.device)
+        RSFC_gradient = RSFC_gradient.to(self.device)
+        sc_mat = sc_mat.to(self.device)
+        fc_emp = fc_emp.to(self.device)
+        emp_fcd_cum = emp_fcd_cum.to(self.device)
 
         self.config = config
 
         self.N = myelin.shape[0]
         self.myelin = myelin  # [N, 1]
         self.RSFC_gradient = RSFC_gradient  # [N, 1]
-        self.concat_mat = torch.hstack(
-            (torch.ones_like(myelin), myelin, RSFC_gradient))  # [N, 3]
-        self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)  # [3, N]
+
+        # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
+        self.other_parameterization = other_parameterization
+        if other_parameterization is None:
+            self.concat_mat = torch.hstack(
+                (torch.ones_like(myelin), myelin, RSFC_gradient))  # (N, 3)
+            self.p = 3
+        else:
+            self.concat_mat = other_parameterization  # (N, p), where p = num_of_PCs + 2
+            self.p = other_parameterization.shape[1]
+        self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
+        # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
 
         sc_mask = torch.triu(torch.ones(self.N, self.N, dtype=torch.bool),
                              1)  # Upper triangle
@@ -292,7 +317,8 @@ class DLVersionCMAESForward:
         self.min_select_param_sets = int(
             simulating_parameters['min_select_param_sets']
         )  # If cannot get ${select_param_sets} parameters valid, the minimum number of valid parameters. Or CMA-ES will break.
-        self.param_dim = 10  # The dimension of the parameters in our parameterization
+        # TODO: change to 2 * self.p + 1, if we want to totally remove parameterization for sigma
+        self.param_dim = 3 * self.p + 1  # The dimension of the parameters in our parameterization
         self.param_dup = int(
             simulating_parameters['param_dup']
         )  # duplicate for 3 times for each parameter in Euler integration
@@ -338,8 +364,7 @@ class DLVersionCMAESForward:
                 raise NotImplementedError
             self.classify_model_pFIC.load_state_dict(
                 torch.load(classify_model_save_path,
-                           map_location=torch.device(
-                               self.device))['model_state_dict'])
+                           map_location=self.device)['model_state_dict'])
             print('Successfully loaded.')
 
             print('Load predict model...')
@@ -351,8 +376,7 @@ class DLVersionCMAESForward:
                 raise NotImplementedError
             self.predict_model_pFIC.load_state_dict(
                 torch.load(predict_model_save_path,
-                           map_location=torch.device(
-                               self.device))['model_state_dict'])
+                           map_location=self.device)['model_state_dict'])
             print('Successfully loaded.')
 
         if len(self.dl_rfic_range) > 0:
@@ -365,14 +389,24 @@ class DLVersionCMAESForward:
             f'Successfully init pMFM deep learning version CMA-ES forward trainer. The results will be saved in {self.save_param_dir}'
         )
 
-    def get_parameters(self, param_10):
+    def get_parameters(self, param_coef):
         """
-        From the 10 parameterization parameters to get the 3N+1 parameters
-        :param param_10: [10, param_sets]
+        From the parameterization coefficients to get the 3N+1 parameters
+        :param param_coef: [3 * self.p + 1, param_sets]
         :return: parameters for 2014 Deco Model [3N+1, param_sets]
         """
-        return parameterize_myelin_rsfc(self.myelin, self.RSFC_gradient,
-                                        param_10)
+        w_EE = torch.matmul(self.concat_mat,
+                            param_coef[0:self.p])  # shape: (N, param_sets)
+        w_EI = torch.matmul(self.concat_mat,
+                            param_coef[self.p:2 *
+                                       self.p])  # shape: (N, param_sets)
+        G = param_coef[2 * self.p].unsqueeze(0)  # shape: (param_sets, )
+        sigma = torch.matmul(self.concat_mat,
+                             param_coef[2 * self.p +
+                                        1:])  # shape: (N, param_sets)
+
+        return torch.cat((w_EE, w_EI, G, sigma),
+                         dim=0)  # shape: (3N+1, param_sets)
 
     def get_wei_range(self):
         if self.query_wei_range == 'Uniform':
@@ -412,7 +446,7 @@ class DLVersionCMAESForward:
         """
         Using deep learning model to predict the total loss of MFM model
         :param parameter: [3*N+1, M]
-        :param param_10: 10 parameterization parameters, just for saving.
+        :param param_coef: 3 * self.p + parameterization parameters, just for saving.
         :param epoch: current epoch, just for naming the save file.
         :return: loss [select_param_sets(10),]; index [select_param_sets,]
         """
@@ -646,9 +680,10 @@ class DLVersionCMAESForward:
             if not os.path.exists(previous_final_state_path):
                 raise Exception("Previous final state path doesn't exist.")
             final_dict = torch.load(previous_final_state_path,
-                                    map_location=torch.device(self.device))
+                                    map_location=self.device)
             seed = final_dict['seed']
-            random_state = final_dict['random_state']
+            random_state = final_dict['random_state'].to(
+                torch.ByteTensor(device=torch.device('cpu')))
             m_k = final_dict['m']
             sigma_k = final_dict['sigma']
             cov_k = final_dict['cov']
@@ -671,9 +706,10 @@ class DLVersionCMAESForward:
                     raise Exception("Previous final state path doesn't exist.")
             print(f"Load final dict from {previous_final_state_path}...")
             final_dict = torch.load(previous_final_state_path,
-                                    map_location=torch.device(self.device))
+                                    map_location=self.device)
             seed = final_dict['seed']
-            random_state = final_dict['random_state']
+            random_state = final_dict['random_state'].to(
+                torch.ByteTensor(device=torch.device('cpu')))
             rand_ge = torch.manual_seed(seed)
             rand_ge.set_state(random_state)
             # seed = np.random.randint(0, 1000000000000)
@@ -764,17 +800,17 @@ class DLVersionCMAESForward:
     def _train_one_epoch_pFIC(self, k, m_k, sigma_k, cov_k, p_sigma_k, p_c_k):
 
         # TODO: Try uniform sampling at the first iteration
-        if k == 0:  # The first epoch
-            param_10_k, parameter_k = self._sample_uniform_parameters()
-        else:
-            param_10_k, parameter_k = self._sample_valid_parameters_pFIC(
-                m_k, sigma_k**2 * cov_k, self.search_range)
+        # if k == 0:  # The first epoch
+        #     param_coef_k, parameter_k = self._sample_uniform_parameters()
+        # else:
+        #     param_coef_k, parameter_k = self._sample_valid_parameters_pFIC(
+        #         m_k, sigma_k**2 * cov_k, self.search_range)
 
         # Original sampling
-        # param_10_k, parameter_k = self._sample_valid_parameters_pFIC(
-        #     m_k, sigma_k**2 * cov_k, self.search_range)
+        param_coef_k, parameter_k = self._sample_valid_parameters_pFIC(
+            m_k, sigma_k**2 * cov_k, self.search_range)
         # TODO: Try uniform sampling at the first iteration
-        if param_10_k is None or parameter_k is None:
+        if param_coef_k is None or parameter_k is None:
             print("Sampling failed!")
             return None
 
@@ -788,7 +824,7 @@ class DLVersionCMAESForward:
         if loss_k is None:
             print("Iteration ends.")
             return None
-        select_params = param_10_k[:, index_k]
+        select_params = param_coef_k[:, index_k]
 
         # TODO: Try uniform sampling at the first iteration
         if k == 0:  # The first epoch
@@ -840,24 +876,24 @@ class DLVersionCMAESForward:
 
         # Init m_0 for CMA-ES, just by the experience of my seniors
         m_0 = torch.zeros(self.param_dim)
-        m_0[0:3] = start_point_wEE
+        m_0[0:self.p] = start_point_wEE
         # m_0[1] = start_point_wEE[1] / 2
-        m_0[3:6] = start_point_wEI
-        # m_0[4] = start_point_wEI[1] / 2
-        m_0[6] = init_parameters[2 * N]  # G
-        m_0[7:] = start_point_sigma
+        m_0[self.p:2 * self.p] = start_point_wEI
+        # m_0[self.p + 1] = start_point_wEI[1] / 2
+        m_0[2 * self.p] = init_parameters[2 * N]  # G
+        m_0[2 * self.p + 1:] = start_point_sigma
 
         sigma_0 = 0.2
         p_sigma_0 = torch.zeros(self.param_dim, 1)
         p_c_0 = torch.zeros(self.param_dim, 1)
         V_ini = torch.eye(self.param_dim)
         Lambda_ini = torch.ones(self.param_dim)
-        # Lambda_ini[0:3] = start_point_wEE[0] / 2
-        # Lambda_ini[3:6] = start_point_wEI[0] / 2
-        Lambda_ini[0:3] = start_point_wEE[0]
-        Lambda_ini[3:6] = start_point_wEI[0]
-        Lambda_ini[6] = 0.4
-        Lambda_ini[7:] = 0.0005
+        # Lambda_ini[0:self.p] = start_point_wEE[0] / 2
+        # Lambda_ini[self.p:2 * self.p] = start_point_wEI[0] / 2
+        Lambda_ini[0:self.p] = start_point_wEE[0]
+        Lambda_ini[self.p:2 * self.p] = start_point_wEI[0]
+        Lambda_ini[2 * self.p] = 0.4
+        Lambda_ini[2 * self.p + 1:] = 0.0005
         cov_0 = torch.matmul(V_ini,
                              torch.matmul(torch.diag(Lambda_ini**2), V_ini.T))
 
@@ -1018,7 +1054,7 @@ class DLVersionCMAESForward:
         """
         Sample parameters from uniform distribution
         :return:
-            sampled_params: [10, param_sets]
+            sampled_params: [3 * self.p + 1, param_sets]
             sampled_parameters: [3*N+1, param_sets]
         """
         N = self.N
@@ -1031,13 +1067,14 @@ class DLVersionCMAESForward:
             sampled_parameters[:, i] = torch.rand(self.parameter_dim) * (
                 search_range[:, 1] -
                 search_range[:, 0]) + search_range[:, 0]  # [3*N+1]
-            sampled_params[0:3, i] = torch.matmul(self.pinv_concat_mat,
-                                                  sampled_parameters[0:N, i])
-            sampled_params[3:6,
+            sampled_params[0:self.p,
+                           i] = torch.matmul(self.pinv_concat_mat,
+                                             sampled_parameters[0:N, i])
+            sampled_params[self.p:2 * self.p,
                            i] = torch.matmul(self.pinv_concat_mat,
                                              sampled_parameters[N:2 * N, i])
-            sampled_params[6, i] = sampled_parameters[2 * N, i]
-            sampled_params[7:,
+            sampled_params[2 * self.p, i] = sampled_parameters[2 * N, i]
+            sampled_params[2 * self.p + 1:,
                            i] = torch.matmul(self.pinv_concat_mat,
                                              sampled_parameters[2 * N + 1:, i])
         return sampled_params, sampled_parameters
@@ -1046,9 +1083,8 @@ class DLVersionCMAESForward:
 
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
         # TODO: Try without parameterizing sigma
-        # mean[7] = 0.005
-        # mean[8] = 0
-        # mean[9] = 0
+        mean[2 * self.p + 1] = 0.005
+        mean[2 * self.p + 2:] = 0
         # TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
@@ -1059,21 +1095,29 @@ class DLVersionCMAESForward:
             self.parameter_dim, self.param_sets)  # [3*N+1, param_sets]
         while valid_count < self.param_sets:
             sampled_params[:, valid_count] = multivariate_normal.sample(
-            )  # [10, param_sets]
+            )  # [3 * self.p + 1, param_sets]
             # TODO: Try without parameterizing sigma
-            # sampled_params[7, valid_count] = 0.005
-            # sampled_params[8, valid_count] = 0
-            # sampled_params[9, valid_count] = 0
+            sampled_params[2 * self.p + 1, valid_count] = 0.005
+            sampled_params[2 * self.p + 2:, valid_count] = 0
             # TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
-            wEI = sampled_parameters[self.N:2 * self.N,
-                                     valid_count].unsqueeze(1)
-            wEI_myelin_corr = torch.squeeze(CBIG_corr(wEI, self.myelin))
-            wEI_rsfc_corr = torch.squeeze(CBIG_corr(wEI, self.RSFC_gradient))
-            if (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
-                    or (sampled_parameters[:, valid_count] > search_range[:, 1]).any() or (wEI_myelin_corr > 0) or (wEI_rsfc_corr < 0):
-                valid_count -= 1
+
+            if self.other_parameterization is None:
+                if (sampled_parameters[:, valid_count] < search_range[:, 0]
+                    ).any() or (sampled_parameters[:, valid_count]
+                                > search_range[:, 1]).any():
+                    valid_count -= 1
+            else:
+                wEI = sampled_parameters[self.N:2 * self.N,
+                                         valid_count].unsqueeze(1)
+                wEI_myelin_corr = torch.squeeze(CBIG_corr(wEI, self.myelin))
+                wEI_rsfc_corr = torch.squeeze(
+                    CBIG_corr(wEI, self.RSFC_gradient))
+                if (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
+                        or (sampled_parameters[:, valid_count] > search_range[:, 1]).any() or (wEI_myelin_corr > 0) or (wEI_rsfc_corr < 0):
+                    valid_count -= 1
+
             valid_count += 1
             total_count += 1
             if total_count >= total_threshold:
@@ -1119,12 +1163,7 @@ class DLVersionCMAESValidator:
 
     def __init__(self, config, save_param_dir, val_save_dir):
 
-        if torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.DoubleTensor')
-            self.device = 'cuda'
-        else:
-            torch.set_default_tensor_type('torch.DoubleTensor')
-            self.device = 'cpu'
+        self.device, self.dtype = set_torch_default()
 
         self.config = config
 
@@ -1163,14 +1202,14 @@ class DLVersionCMAESValidator:
         seed = np.random.randint(0, 1000000000000)
         torch.manual_seed(seed)
 
-        param_10_path = os.path.join(self.save_param_dir,
-                                     f'param_save_epoch{epoch}.pth')
-        if not os.path.exists(param_10_path):
+        param_coef_path = os.path.join(self.save_param_dir,
+                                       f'param_save_epoch{epoch}.pth')
+        if not os.path.exists(param_coef_path):
             raise Exception("Path doesn't exist.")
-        d = torch.load(param_10_path)
-        param_10 = d['param_10']
+        d = torch.load(param_coef_path)
+        param_coef = d['param_coef']
         valid_param_list_dl = d['valid_param_list']
-        parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, param_10)
+        parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, param_coef)
         parameter_repeat = parameter.repeat(
             1, self.param_dup)  # [3*N+1, param_sets * param_dup]
         mfm_model = MfmModel2014(parameter_repeat, sc_euler, dt=self.dt)
@@ -1244,7 +1283,7 @@ class DLVersionCMAESValidator:
                                       f'param_save_epoch{epoch}.pth')
         if not os.path.exists(parameter_path):
             raise Exception("Path doesn't exist.")
-        d = torch.load(parameter_path, map_location=torch.device(self.device))
+        d = torch.load(parameter_path, map_location=self.device)
 
         valid_param_list_pre = d['valid_param_list']
         parameter = d['parameter']
@@ -1333,14 +1372,7 @@ class DLVersionCMAESValidator:
 class DLVersionCMAESTester:
 
     def __init__(self, config, val_dirs, test_dir, trained_epochs):
-
-        if torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.DoubleTensor')
-            self.device = 'cuda'
-        else:
-            torch.set_default_tensor_type('torch.DoubleTensor')
-            self.device = 'cpu'
-
+        self.device, self.dtype = set_torch_default()
         self.config = config
 
         # Dataset parameters
@@ -1385,7 +1417,7 @@ class DLVersionCMAESTester:
         torch.manual_seed(seed)
 
         parameter_sets = torch.zeros(self.parameters_dim, self.val_dirs_len *
-                                     self.trained_epochs)  # [10, 500]
+                                     self.trained_epochs)  # [N, 500]
         val_loss_sets = torch.ones(self.val_dirs_len * self.trained_epochs) * 3
         valid_val_dir_count = 0
         valid_val_epoch_count = 0
@@ -1402,8 +1434,7 @@ class DLVersionCMAESTester:
                     print(f"{param_val_path} doesn't exist.")
                     continue
                 valid_val_epoch_count += 1
-                d = torch.load(param_val_path,
-                               map_location=torch.device(self.device))
+                d = torch.load(param_val_path, map_location=self.device)
                 parameter_sets[:, val_dir_i * self.trained_epochs +
                                epoch] = torch.squeeze(d['parameter'])
                 val_loss_sets[
@@ -1415,7 +1446,7 @@ class DLVersionCMAESTester:
         if valid_val_epoch_count == 0:
             print("No valid epoch.")
             return 1
-        # Record all param_10 and loss
+        # Record all param_coef and loss
         val_losses, sorted_index = torch.sort(val_loss_sets, descending=False)
         val_losses = val_losses[:self.param_sets]
         sorted_index = sorted_index[:self.param_sets]
@@ -1506,8 +1537,7 @@ class DLVersionCMAESTester:
                 if not os.path.exists(param_val_path):
                     print(f"{param_val_path} doesn't exist.")
                     continue
-                d = torch.load(param_val_path,
-                               map_location=torch.device(self.device))
+                d = torch.load(param_val_path, map_location=self.device)
                 parameter_sets[:, val_dir_i * self.trained_epochs +
                                epoch] = torch.squeeze(d['parameter'])
                 val_loss_sets[val_dir_i * self.trained_epochs + epoch,
@@ -1533,7 +1563,7 @@ class DLVersionCMAESTester:
         val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:], dim=1)
         # val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:3], dim=1)
         # TODO: Try without FCD KS loss
-        # Record all param_10 and loss
+        # Record all param_coef and loss
         val_total_loss, sorted_index = torch.sort(val_loss_sets[:, 0],
                                                   descending=False)
         val_total_loss = val_total_loss[:self.param_sets]
@@ -1645,7 +1675,7 @@ def simulate_fc_fcd(config,
 
     print('Start saving results...')
     # save_dict = {'fc': fc_this_param, 'fcd': fcd_mat_this_param, 'corr_loss': corr_loss,
-    #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_10': param_10,    'parameter': parameter}
+    #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_coef': param_coef,    'parameter': parameter}
     save_dict = {
         'valid_param_list': valid_param_list,
         'fc': fc_sim,
@@ -1732,7 +1762,7 @@ def simulate_fc_fcd_mat(config,
 
     print('Start saving results...')
     # save_dict = {'fc': fc_this_param, 'fcd': fcd_mat_this_param, 'corr_loss': corr_loss,
-    #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_10': param_10,    'parameter': parameter}
+    #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_coef': param_coef,    'parameter': parameter}
     save_dict = {
         'valid_param_list': valid_param_list,
         'fc': fc_sim,

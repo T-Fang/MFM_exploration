@@ -6,6 +6,7 @@ import configparser
 import scipy.io as spio
 from scipy.optimize import fsolve
 from tqdm import tqdm
+from src.utils.init_utils import set_torch_default
 
 
 def torch_corr_3D(vec_3d):
@@ -40,12 +41,7 @@ class MfmModel2014:
         :param sc_mat: N*N structural connectivity matrix, should be sc_euler
         :param dt: time interval
         """
-        if torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.DoubleTensor')
-            self.tensor_type = torch.cuda.DoubleTensor
-        else:
-            torch.set_default_tensor_type('torch.DoubleTensor')
-            self.tensor_type = torch.DoubleTensor
+        self.device, self.tensor_type = set_torch_default()
 
         # Model Adaptation
         self.is_w_IE_fixed = True
@@ -363,11 +359,11 @@ class MfmModel2014:
         # TODO: experiment with different L1 cost
 
         # L1 version 1: abs(mean)
-        L1_cost = torch.abs(
-            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        # L1_cost = torch.abs(
+        #     torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
-        # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
+        L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
         # TODO: experiment with different L1 cost
         # L2 or MSE
@@ -410,10 +406,7 @@ class MfmModel2014:
         :return: FCD matrix [M, window_num, window_num]. window_num = t_len - window_size + 1
                 FCD histogram: [10000, M]
         """
-        if torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.DoubleTensor')
-        else:
-            torch.set_default_tensor_type('torch.DoubleTensor')
+        set_torch_default()
         # start_time = time.time()
         N = bold.shape[0]
         M = bold.shape[1]

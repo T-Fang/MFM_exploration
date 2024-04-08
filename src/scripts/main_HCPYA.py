@@ -13,6 +13,185 @@ from src.utils import tzeng_func
 from src.basic.constants import CONFIG_DIR, LOG_DIR
 
 
+def get_group_stats(range_start: int, range_end: int):
+
+    individual_mats_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029'
+    myelin_indi = spio.loadmat(
+        os.path.join(individual_mats_path, 'myelin_roi_1029.mat'))
+    myelin_indi = myelin_indi['myelin_roi_1029']
+    rsfc_indi = spio.loadmat(
+        os.path.join(individual_mats_path, 'rsfc_roi_1029.mat'))
+    rsfc_indi = rsfc_indi['rsfc_roi_1029']
+    sc_indi = spio.loadmat(
+        os.path.join(individual_mats_path, 'sc_roi_1029.mat'))
+    sc_indi = sc_indi['sc_roi_1029']
+
+    myelin = np.nanmean(myelin_indi[range_start:range_end], axis=0)
+    myelin = torch.as_tensor(myelin).unsqueeze(1)
+    rsfc_gradient = np.nanmean(rsfc_indi[range_start:range_end], axis=0)
+    rsfc_gradient = torch.as_tensor(rsfc_gradient).unsqueeze(1)
+
+    sc_mat = tzeng_func.tzeng_group_SC_matrices(sc_indi[range_start:range_end])
+    sc_mat = torch.as_tensor(sc_mat)
+    sc_euler = sc_mat / torch.max(sc_mat) * 0.02
+    fc_1029 = spio.loadmat(
+        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
+    )
+    fc_1029 = fc_1029['fc_roi_1029']
+    fc_emp = np.array(fc_1029[range_start:range_end])
+    fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
+    fc_emp = torch.as_tensor(fc_emp)
+    fcd_1029 = spio.loadmat(
+        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
+    )
+    fcd_1029 = fcd_1029['fcd_cum_1029']
+    emp_fcd_cum = torch.as_tensor(fcd_1029[range_start:range_end].astype(
+        np.float64))
+    emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
+    emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
+
+    group_stats = {
+        'myelin': myelin,
+        'rsfc_gradient': rsfc_gradient,
+        'sc_mat': sc_mat,
+        'sc_euler': sc_euler,
+        'fc_emp': fc_emp,
+        'emp_fcd_cum': emp_fcd_cum
+    }
+
+    return group_stats
+
+
+def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
+    config = configparser.ConfigParser()
+    config.read(
+        '/home/ftian/storage/projects/MFM_exploration/configs/model/config_hcpya.ini'
+    )
+
+    trial_nbr = int(trial_nbr)
+    seed_nbr = int(seed_nbr)
+
+    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/all_participants'
+    epochs = 100
+
+    if mode == 'train':
+        group_stats = get_group_stats(0, 343)
+
+        save_param_dir = os.path.join(
+            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
+        seed = None
+        state = train_help_function(config=config,
+                                    myelin=group_stats['myelin'],
+                                    RSFC_gradient=group_stats['rsfc_gradient'],
+                                    sc_mat=group_stats['sc_mat'],
+                                    fc_emp=group_stats['fc_emp'],
+                                    emp_fcd_cum=group_stats['emp_fcd_cum'],
+                                    save_param_dir=save_param_dir,
+                                    epochs=epochs,
+                                    dl_pfic_range=[],
+                                    euler_pfic_range=np.arange(0, 100),
+                                    dl_rfic_range=[],
+                                    euler_rfic_range=[],
+                                    query_wei_range='Uniform',
+                                    opportunities=10,
+                                    next_epoch=0,
+                                    seed=seed)
+        print("Exit state: ", state)
+
+    elif mode == 'validation':
+        group_stats = get_group_stats(343, 686)
+
+        save_param_dir = os.path.join(
+            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
+        val_dir = os.path.join(parent_dir,
+                               f'validation/trial{trial_nbr}/seed{seed_nbr}')
+        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
+                                                val_dir)
+        if epoch is None:
+            for ep in range(0, epochs):
+                mfm_validator.val_best_parameters(group_stats['sc_euler'],
+                                                  group_stats['fc_emp'],
+                                                  group_stats['emp_fcd_cum'],
+                                                  ep)
+        else:
+            epoch = int(epoch)
+            mfm_validator.val_best_parameters(group_stats['sc_euler'],
+                                              group_stats['fc_emp'],
+                                              group_stats['emp_fcd_cum'],
+                                              epoch)
+
+    elif mode == 'test':
+        group_stats = get_group_stats(686, 1029)
+
+        # val_dirs = [os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}') for i in np.arange(1, seed_nbr + 1)]
+        val_dirs = [
+            os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}')
+            for i in [seed_nbr]
+        ]
+        print("Validation dirs: ", val_dirs)
+        test_dir = os.path.join(parent_dir,
+                                f'test/trial{trial_nbr}/seed{seed_nbr}')
+        mfm_tester = DLVersionCMAESTester(config,
+                                          val_dirs,
+                                          test_dir,
+                                          trained_epochs=epochs)
+        mfm_tester.test(group_stats['sc_euler'], group_stats['fc_emp'],
+                        group_stats['emp_fcd_cum'])
+
+    elif mode == 'val_best':
+        val_dirs = [
+            os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}')
+            for i in [seed_nbr]
+        ]
+        val_best_dir = os.path.join(
+            parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}')
+        mfm_tester = DLVersionCMAESTester(config,
+                                          val_dirs,
+                                          val_best_dir,
+                                          trained_epochs=epochs)
+        mfm_tester.select_best_from_val()
+
+    elif mode == 'simulate_fc_fcd':
+        group_stats = get_group_stats(686, 1029)
+
+        val_best_results_path = os.path.join(
+            parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}',
+            'val_results.pth')
+        val_results = torch.load(val_best_results_path)
+        parameter = val_results['parameter']  # [205, param_sets]
+        sim_results_dir = os.path.join(
+            parent_dir, f'simulate/trial{trial_nbr}/seed{seed_nbr}')
+        if not os.path.exists(sim_results_dir):
+            os.makedirs(sim_results_dir)
+        sim_results_path = os.path.join(sim_results_dir, 'sim_results.pth')
+        simulate_fc_fcd(config,
+                        save_path=sim_results_path,
+                        parameter=parameter,
+                        param_dup=3,
+                        sc_euler=group_stats['sc_euler'])
+
+    elif mode == 'simulate_fc_fcd_mat':
+        group_stats = get_group_stats(0, 343)
+
+        parameter_path = os.path.join(
+            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}',
+            'param_save_epoch99.pth')
+        parameter = torch.load(parameter_path)['parameter'][:, :10]
+        sim_results_dir = os.path.join(
+            parent_dir, f'simulate/trial{trial_nbr}/seed{seed_nbr}')
+        if not os.path.exists(sim_results_dir):
+            os.makedirs(sim_results_dir)
+        sim_results_path = os.path.join(sim_results_dir,
+                                        'sim_results_mats.pth')
+        simulate_fc_fcd_mat(config,
+                            sim_results_path,
+                            parameter,
+                            param_dup=3,
+                            sc_euler=group_stats['sc_euler'])
+
+    return 0
+
+
 def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
     config = configparser.ConfigParser()
     config.read(
@@ -569,10 +748,15 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
 
 
 if __name__ == "__main__":
-    apply_large_group(mode='train',
-                      trial_nbr=sys.argv[1],
-                      seed_nbr=sys.argv[2],
-                      epoch=None)
+    apply_on_all_participants(mode='train',
+                              trial_nbr=sys.argv[1],
+                              seed_nbr=sys.argv[2],
+                              epoch=None)
+
+    # apply_large_group(mode='train',
+    #                   trial_nbr=sys.argv[1],
+    #                   seed_nbr=sys.argv[2],
+    #                   epoch=None)
     # apply_large_group(mode='validation', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2], epoch=sys.argv[3])
     # apply_large_group(mode='test', trial_nbr=sys.argv[1], seed_nbr=sys.argv[2])
     # apply_large_group(mode='val_best', trial_nbr=3, seed_nbr=2)

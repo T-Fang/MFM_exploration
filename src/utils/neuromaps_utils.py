@@ -2,8 +2,10 @@ import os
 import pandas as pd
 import numpy as np
 from pca import pca
+import torch
 
-from src.basic.constants import NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED
+from src.basic.constants import NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED, DESIKAN_NEUROMAPS_DIR
+from src.utils.init_utils import get_device
 
 
 ##################################################
@@ -46,7 +48,8 @@ def get_mapping_labels(source_space: str, resolution: str) -> np.ndarray:
 
 
 def convert_to_desikan(data: np.ndarray,
-                       mapping_labels: np.ndarray) -> np.ndarray:
+                       mapping_labels: np.ndarray,
+                       save_file_path: str | None = None) -> np.ndarray:
     """
     Convert the neuro map to Desikan-Killiany atlas.
 
@@ -61,6 +64,8 @@ def convert_to_desikan(data: np.ndarray,
     sum_in_ROI = np.zeros((NUM_DESIKAN_ROI + 1, ))
     count_in_ROI = np.zeros((NUM_DESIKAN_ROI + 1, ))
     for i, label in enumerate(mapping_labels):
+        if data[i] == 0:
+            continue
         sum_in_ROI[label] += data[i]
         count_in_ROI[label] += 1
 
@@ -68,6 +73,10 @@ def convert_to_desikan(data: np.ndarray,
     converted_data = np.delete(converted_data, IGNORED_DESIKAN_ROI_ZERO_BASED)
     np.nan_to_num(converted_data, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
     assert converted_data.shape[0] == NUM_ROI
+    if save_file_path is not None:
+        pd.DataFrame(converted_data).to_csv(save_file_path,
+                                            header=False,
+                                            index=False)
     return converted_data
 
 
@@ -157,3 +166,28 @@ def get_mean_of_neuromaps_under(dir: str,
         pd.DataFrame(all_maps).to_csv(all_maps_path, header=False, index=False)
 
     return mean_map
+
+
+##################################################
+# Use PCs and mean of neuromaps to parameterize wEE and wEI
+##################################################
+
+
+def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR, num_of_PCs: str = 2):
+    """
+    Get the concatenated matrix formed by PCs and mean of neuromaps.
+    We will parameterize wEE and wEI using the mean of neuromaps and the first few PCs along with a bias term.
+
+    Return:
+        The concatenated matrix of shape (N, p), where N is the num of ROIs and p is the num of PCs + 2
+    """
+    one_array = np.ones(68)
+    mean_map = pd.read_csv(os.path.join(dir, 'mean_map.csv'),
+                           header=None).values.flatten()
+    concat_matrix = [one_array, mean_map]
+    for i in range(1, num_of_PCs + 1):
+        PC = pd.read_csv(os.path.join(dir, f'pc{i}.csv'),
+                         header=None).values.flatten()
+        concat_matrix.append(PC)
+    return torch.as_tensor(np.stack(concat_matrix,
+                                    axis=1)).to(device=get_device())

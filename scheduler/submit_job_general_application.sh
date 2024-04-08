@@ -8,7 +8,7 @@
 # 4. Ensure your file path of 'final_state' is correct.
 proj_dir="/home/ftian/storage/projects/MFM_exploration"
 scripts_dir="${proj_dir}/src/scripts"
-conda_env=MFM_tzeng
+conda_env=MFM_exploration
 
 dataset_name=HCPYA # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
@@ -17,14 +17,15 @@ target_list=('only1_group')
 # ('only1_group' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-need_gpu=0
+ncpus=4
+need_gpu=1
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(13)
-# seed_list=(1)
-seed_list=($(seq 2 1 1000))
+trial_list=(21)
+seed_list=(1)
+# seed_list=($(seq 2 1 1000))
 
 for target in "${target_list[@]}"; do
     # For group
@@ -48,8 +49,13 @@ for target in "${target_list[@]}"; do
                 for seed_nbr in "${seed_list[@]}"; do
                     logerror="se${seed_nbr}_error.log"
                     log_out="se${seed_nbr}_out.log"
-                    cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                    $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 3:00:00 -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    if [ ${need_gpu} = 1 ]; then
+                        cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 15:00:00 -ncpus $ncpus -ngpus 1 -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    elif [ ${need_gpu} = 0 ]; then
+                        cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 50:00:00 -ncpus $ncpus -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    fi
                 done
             done
 

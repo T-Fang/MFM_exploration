@@ -1,18 +1,21 @@
 import torch
 
 
-def parameterize_myelin_rsfc(myelin, rsfc_gradient, param_10):
+def parameterize_myelin_rsfc(myelin, rsfc_gradient, param_coef):
     """
     From the 10 parameterization parameters to get the 205 parameters
     :param myelin: [N, 1]
     :param rsfc_gradient: [N, 1]
-    :param param_10: [10, param_sets]
+    :param param_coef: [3p + 1, param_sets], where p is the number of parameterization variables
     :return: parameters for 2014 Deco Model [3N+1, param_sets]
     """
-    w_EE = param_10[0] + param_10[1] * myelin + param_10[2] * rsfc_gradient
-    w_EI = param_10[3] + param_10[4] * myelin + param_10[5] * rsfc_gradient
-    G = param_10[6]
-    sigma = param_10[7] + param_10[8] * myelin + param_10[9] * rsfc_gradient
+    w_EE = param_coef[
+        0] + param_coef[1] * myelin + param_coef[2] * rsfc_gradient
+    w_EI = param_coef[
+        3] + param_coef[4] * myelin + param_coef[5] * rsfc_gradient
+    G = param_coef[6]
+    sigma = param_coef[
+        7] + param_coef[8] * myelin + param_coef[9] * rsfc_gradient
     return torch.vstack((w_EE, w_EI, G, sigma))
 
 
