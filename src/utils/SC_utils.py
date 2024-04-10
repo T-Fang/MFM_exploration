@@ -1,7 +1,6 @@
 import os
-from sysconfig import get_path
 import torch
-from src.basic.constants import SPLIT_NAMES, NUM_GROUP_IN_SPLIT, PATH_TO_PROJECT
+from src.basic.constants import SPLIT_NAMES, NUM_GROUP_IN_SPLIT, PROJECT_DIR
 from pandas import DataFrame, Series
 import numpy as np
 import pandas as pd
@@ -11,7 +10,8 @@ import matplotlib.pyplot as plt
 
 def get_path_to_group(split_name, group_index):
     group_index = str(group_index)
-    path_to_pMFM_input = os.path.join(PATH_TO_PROJECT, 'dataset_generation/input_to_pMFM/')
+    path_to_pMFM_input = os.path.join(PROJECT_DIR,
+                                      'dataset_generation/input_to_pMFM/')
     path_to_group = os.path.join(path_to_pMFM_input, split_name, group_index)
     return path_to_group
 
@@ -91,8 +91,47 @@ def show_heatmap(matrix, filename=None):
         plt.imshow(plt.imread(filename))
 
 
-def show_corr_between_all_SCs(filename=f'{PATH_TO_PROJECT}reports/figures/corr_between_all_SCs.png'):
+def show_corr_between_all_SCs(
+        filename=f'{PROJECT_DIR}reports/figures/corr_between_all_SCs.png'):
     SCs = get_all_group_SC()
     corr_matrix = corr_between_matrices(SCs)
     np.savetxt('./corr_between_all_SCs.csv', corr_matrix, delimiter=',')
     show_heatmap(corr_matrix, filename=filename)
+
+
+def group_SC_matrices(sc_mats):
+    """group SC matrices like that in matlab. Neglect 'nan' entries.
+        Those entries with lower than half sc_mats > 0 will be set to 0.
+        Scale the final SC by log function. Set the diagonal to be 0.
+
+    Args:
+        sc_mats (np.array): [n_mats, n_roi, n_roi]
+
+    Returns:
+        grouped_sc (np.array): the group average of the input sc_mats. [n_roi, n_roi]
+    """
+    n_mats = sc_mats.shape[0]
+    n_roi = sc_mats.shape[1]
+    grouped_sc = np.zeros((n_roi, n_roi))
+
+    for i in range(n_roi):
+        for j in range(n_roi):
+
+            if i == j:  # if i == j, grouped_sc[i, j] = 0;
+                continue
+
+            count_non_zero = 0  # To count the number of non_zero
+            sum_temp = 0
+            for mat_i in range(n_mats):  # For each SC matrix
+                if np.isnan(sc_mats[mat_i, i, j]):
+                    continue
+
+                if sc_mats[mat_i, i, j] != 0:
+                    count_non_zero += 1
+                    sum_temp += sc_mats[mat_i, i, j]
+            # End for mat_i
+            # Only when there are over half of the SC[i, j] are not zero
+            if count_non_zero >= 0.5 * n_mats:
+                grouped_sc[i, j] = np.log(sum_temp / count_non_zero)
+
+    return grouped_sc

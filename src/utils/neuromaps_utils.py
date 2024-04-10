@@ -2,10 +2,14 @@ import os
 import pandas as pd
 import numpy as np
 from pca import pca
+from matplotlib import pyplot as plt
 import torch
 
-from src.basic.constants import NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED, DESIKAN_NEUROMAPS_DIR
+from src.basic.constants import NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED, \
+    DESIKAN_NEUROMAPS_DIR, FIGURES_DIR, DEFAULT_DTYPE
 from src.utils.init_utils import get_device
+from src.utils.analysis_utils import visualize_stats, concat_n_images
+from src.utils.file_utils import convert_to_numpy
 
 
 ##################################################
@@ -173,7 +177,10 @@ def get_mean_of_neuromaps_under(dir: str,
 ##################################################
 
 
-def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR, num_of_PCs: str = 2):
+def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
+                      num_of_PCs: str = 3,
+                      use_mean_map=False,
+                      use_unit_vector=True):
     """
     Get the concatenated matrix formed by PCs and mean of neuromaps.
     We will parameterize wEE and wEI using the mean of neuromaps and the first few PCs along with a bias term.
@@ -182,12 +189,98 @@ def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR, num_of_PCs: str = 2):
         The concatenated matrix of shape (N, p), where N is the num of ROIs and p is the num of PCs + 2
     """
     one_array = np.ones(68)
-    mean_map = pd.read_csv(os.path.join(dir, 'mean_map.csv'),
-                           header=None).values.flatten()
-    concat_matrix = [one_array, mean_map]
+    if use_mean_map:
+        mean_map = pd.read_csv(os.path.join(dir, 'mean_map.csv'),
+                               header=None).values.flatten()
+        concat_matrix = [one_array, mean_map]
+    else:
+        concat_matrix = [one_array]
+
     for i in range(1, num_of_PCs + 1):
         PC = pd.read_csv(os.path.join(dir, f'pc{i}.csv'),
                          header=None).values.flatten()
+        if use_unit_vector:
+            PC = PC / np.linalg.norm(PC)
         concat_matrix.append(PC)
-    return torch.as_tensor(np.stack(concat_matrix,
-                                    axis=1)).to(device=get_device())
+    return torch.as_tensor(np.stack(
+        concat_matrix, axis=1)).to(DEFAULT_DTYPE).to(device=get_device())
+
+
+def reconstruct(num_of_PCs,
+                target_stat,
+                target_name,
+                visualize_recon=False,
+                use_mean_map=False):
+    X = get_concat_matrix(num_of_PCs=num_of_PCs)
+    N = X.shape[0]
+
+    print(f'Reconstructing {target_name}:')
+    coef, sum_of_se, _, _ = np.linalg.lstsq(X, target_stat, rcond=None)
+    mse = sum_of_se / N
+    mse_scalar = mse.item()  # Convert mse to a scalar value
+    print(f'MSE: {mse_scalar}')
+
+    # Generate a plot with regression line,
+    # as well as the correlation between the target_stat and the projections onto the regression line
+    _, ax = plt.subplots()
+    projections = X @ coef
+    correlation = np.corrcoef(projections.flatten(), target_stat.flatten())[0,
+                                                                            1]
+
+    ax.scatter(projections, target_stat)
+    ax.plot([0, 1], [0, 1], transform=ax.transAxes, ls="--", c="red")
+    ax.set_xlabel('projections onto the regression line')
+    ax.set_ylabel(target_name)
+    ax.set_title(
+        f'{target_name} vs. projections (used {num_of_PCs} PCs, use_mean_map={use_mean_map})\nMSE={mse_scalar:.4f}, r={correlation:.4f}'
+    )
+    plt.show()
+
+    recon_res = {
+        'coef': coef,
+        'mse': mse_scalar,
+        'projections': projections,
+        'target_stat': target_stat,
+        'correlation': correlation,
+        'num_of_PCs': num_of_PCs
+    }
+
+    if visualize_recon:
+        visualize_reconstruction(recon_res, target_name)
+
+    return recon_res
+
+
+def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
+    fig_dir = os.path.join(FIGURES_DIR, 'neuromaps')
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+    visualize_stats(recon_res['target_stat'], target_name,
+                    os.path.join(fig_dir, f"{target_name}_surf_map.png"))
+    suffix = f"_using_{recon_res['num_of_PCs']}_PCs"
+    if not use_mean_map:
+        suffix += "_without_mean_map"
+
+    visualize_stats(
+        recon_res['projections'], 'projections',
+        os.path.join(fig_dir,
+                     f"{target_name}_projections_surf_map{suffix}.png"))
+
+    residuals = convert_to_numpy(recon_res['target_stat']) - convert_to_numpy(
+        recon_res['projections'])
+
+    visualize_stats(
+        residuals, 'residuals',
+        os.path.join(
+            fig_dir,
+            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png"))
+
+    # Then merge the 3 png images into one png image by laying out this way: target_stat, projection, residual
+    concat_n_images([
+        os.path.join(fig_dir, f"{target_name}_surf_map.png"),
+        os.path.join(fig_dir,
+                     f"{target_name}_projections_surf_map{suffix}.png"),
+        os.path.join(
+            fig_dir,
+            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png")
+    ], os.path.join(fig_dir, f"{target_name}_reconstruction{suffix}.png"))

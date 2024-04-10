@@ -3,3 +3,4 @@ notebooks/debug.ipynb
 tmp/
 *.annot
 data/
+reports/figures/neuromaps/

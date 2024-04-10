@@ -6,38 +6,73 @@ from scipy import stats, io as sio
 import torch
 
 from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
-from src.utils.file_utils import get_fig_dir, get_fig_file_path, get_losses_fig_dir, get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict
+from src.utils.file_utils import convert_to_mat, get_fig_dir, get_fig_file_path, get_losses_fig_dir, \
+    get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict
 
 ############################################################
 # Visualization related
 ############################################################
 
 
-def visualize_stats(mat_file_path, stats_name, fig_file_path):
+def concat_images(imga, imgb):
+    """
+    Combines two color image ndarrays side-by-side.
+    """
+    ha, wa = imga.shape[:2]
+    hb, wb = imgb.shape[:2]
+    max_height = np.max([ha, hb])
+    total_width = wa + wb
+    new_img = np.zeros(shape=(max_height, total_width, 3))
+    new_img[:ha, :wa] = imga
+    new_img[:hb, wa:wa + wb] = imgb
+    return new_img
+
+
+def concat_n_images(image_path_list, save_file_path=None):
+    """
+    Combines N color images from a list of image paths.
+    """
+    output = None
+    for i, img_path in enumerate(image_path_list):
+        img = plt.imread(img_path)[:, :, :3]
+        if i == 0:
+            output = img
+        else:
+            output = concat_images(output, img)
+    if save_file_path is not None:
+        plt.imsave(save_file_path, output)
+    return output
+
+
+def visualize_stats(stats, stats_name, fig_file_path):
     """
     First, cd into MATLAB_SCRIPT_PATH.
     Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
     Finally, run the visualize_parameter_desikan_fslr function to visualize the stats.
     """
 
+    mat_file_path = convert_to_mat(stats, stats_name)
+
     print(f"Visualizing {stats_name} from {mat_file_path}...")
 
     command = [
-        (f"cd {MATLAB_SCRIPT_DIR}; "
-         f"matlab -nodisplay -nosplash -nodesktop -r "
-         f"\"load('{mat_file_path}', '{stats_name}'); "
-         f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
-         f"exit;\"")
+        f"cd {MATLAB_SCRIPT_DIR}; "
+        f"matlab -nodisplay -nosplash -nodesktop -r "
+        f"\"try, load('{mat_file_path}', '{stats_name}'); "
+        f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
+        f"catch ME, disp(ME.message), exit(1), end, exit;\""
     ]
 
     result = subprocess.run(command,
                             shell=True,
                             capture_output=True,
                             text=True)
-    print(result.stdout)
-    print(result.stderr)
-
-    print(f'Visualization saved to {fig_file_path}')
+    if result.returncode != 0:
+        print(result.stderr)
+        raise Exception("Matlab encountered an error or terminated.")
+    else:
+        print(result.stdout)
+        print(f'Visualization saved to {fig_file_path}')
 
 
 def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):

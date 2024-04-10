@@ -40,6 +40,7 @@ def all_groups_EI_to_csv(ds_name,
 
 def get_seed_indices_with_lowest_loss(ds_name, target, trial_idx, seed_range,
                                       group_range):
+    # For PNC dataset
     best_seed_indices = []
 
     for group_idx in group_range:

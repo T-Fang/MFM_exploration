@@ -1,5 +1,6 @@
 import os
 import platform
+import torch
 
 # File Paths
 CURRENT_OS = platform.system()
@@ -11,6 +12,9 @@ UTILS_DIR = os.path.join(SRC_DIR, 'utils')
 MATLAB_SCRIPT_DIR = os.path.join(UTILS_DIR, 'matlab')
 CONFIG_DIR = os.path.join(PROJECT_DIR, 'configs')
 DATA_DIR = os.path.join(PROJECT_DIR, 'data')
+TMP_DIR = os.path.join(PROJECT_DIR, 'tmp')
+REPORTS_DIR = os.path.join(PROJECT_DIR, 'reports')
+FIGURES_DIR = os.path.join(REPORTS_DIR, 'figures')
 
 # NEUROMAPS related
 NEUROMAPS_SRC_DIR = os.path.join(ANALYSIS_DIR, 'neuromaps')
@@ -26,3 +30,10 @@ IGNORED_DESIKAN_ROI_ZERO_BASED = [0, 4, 36, 40]
 # Dataset related
 NUM_GROUPS_PNC_AGE = 29
 NUM_GROUPS_PNC_COGNITION = 14
+
+# Deep Learning Dataset related
+NUM_GROUP_IN_SPLIT = {'train': 57, 'validation': 14, 'test': 17}
+SPLIT_NAMES = ['train', 'validation', 'test']
+
+# torch related
+DEFAULT_DTYPE = torch.float32

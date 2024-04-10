@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.distributions as td
 import os
+import datetime
 
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
@@ -187,7 +188,7 @@ def train_help_function(config,
                         other_parameterization=None):
     # TODO: comment out codes if we want to use the original parameterization
     other_parameterization = get_concat_matrix(
-        DESIKAN_NEUROMAPS_DIR, num_of_PCs=2)  # shape: (N, num_of_PCs + 2)
+        DESIKAN_NEUROMAPS_DIR, num_of_PCs=3)  # shape: (N, num_of_PCs + 1)
     # TODO: comment out codes if we want to use the original parameterization
     mfm_trainer = DLVersionCMAESForward(
         config=config,
@@ -280,7 +281,7 @@ class DLVersionCMAESForward:
                 (torch.ones_like(myelin), myelin, RSFC_gradient))  # (N, 3)
             self.p = 3
         else:
-            self.concat_mat = other_parameterization  # (N, p), where p = num_of_PCs + 2
+            self.concat_mat = other_parameterization  # (N, p), where p = num_of_PCs + 1
             self.p = other_parameterization.shape[1]
         self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
         # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
@@ -893,7 +894,7 @@ class DLVersionCMAESForward:
         Lambda_ini[0:self.p] = start_point_wEE[0]
         Lambda_ini[self.p:2 * self.p] = start_point_wEI[0]
         Lambda_ini[2 * self.p] = 0.4
-        Lambda_ini[2 * self.p + 1:] = 0.0005
+        # Lambda_ini[2 * self.p + 1:] = 0.0005
         cov_0 = torch.matmul(V_ini,
                              torch.matmul(torch.diag(Lambda_ini**2), V_ini.T))
 
@@ -1103,7 +1104,7 @@ class DLVersionCMAESForward:
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
 
-            if self.other_parameterization is None:
+            if self.other_parameterization is not None:
                 if (sampled_parameters[:, valid_count] < search_range[:, 0]
                     ).any() or (sampled_parameters[:, valid_count]
                                 > search_range[:, 1]).any():
@@ -1311,6 +1312,9 @@ class DLVersionCMAESValidator:
                                  parameter_repeat,
                                  sc_euler,
                                  dt=self.dt)
+
+        print(datetime.datetime.now(), 'start simulation'.upper())
+
         bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
@@ -1329,13 +1333,14 @@ class DLVersionCMAESValidator:
                                              dim=1).unsqueeze(1)  # [10000, 1]
 
         if fc_this_param is None:
-            print("This chosen parameter fails Euler.")
+            print(datetime.datetime.now(),
+                  "This chosen parameter fails Euler.")
             return 1
 
         _, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
             fc_this_param.unsqueeze(0), fcd_hist_this_param, fc_emp,
             emp_fcd_cum)  # [1]
-        print('Start saving results...')
+        print(datetime.datetime.now(), 'Start saving results...')
         save_dict = {
             'parameter': parameter,
             'corr_loss': corr_loss,
@@ -1365,7 +1370,7 @@ class DLVersionCMAESValidator:
             os.path.join(self.val_save_dir, f'best_param{epoch}' + '.pth'))
         print("Successfully saved.")
 
-        print(" -- Done validating -- ")
+        print(datetime.datetime.now(), " -- Done validating -- ")
         return 0
 
 

@@ -5,61 +5,25 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+import datetime
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
+from src.utils.init_utils import set_torch_default, get_input_args_for_pool  # noqa: F401
 from src.basic.constants import CONFIG_DIR, LOG_DIR
+from src.utils.file_utils import get_group_stats
+from multiprocessing import Pool, set_start_method  # noqa: F401
 
 
-def get_group_stats(range_start: int, range_end: int):
-
-    individual_mats_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029'
-    myelin_indi = spio.loadmat(
-        os.path.join(individual_mats_path, 'myelin_roi_1029.mat'))
-    myelin_indi = myelin_indi['myelin_roi_1029']
-    rsfc_indi = spio.loadmat(
-        os.path.join(individual_mats_path, 'rsfc_roi_1029.mat'))
-    rsfc_indi = rsfc_indi['rsfc_roi_1029']
-    sc_indi = spio.loadmat(
-        os.path.join(individual_mats_path, 'sc_roi_1029.mat'))
-    sc_indi = sc_indi['sc_roi_1029']
-
-    myelin = np.nanmean(myelin_indi[range_start:range_end], axis=0)
-    myelin = torch.as_tensor(myelin).unsqueeze(1)
-    rsfc_gradient = np.nanmean(rsfc_indi[range_start:range_end], axis=0)
-    rsfc_gradient = torch.as_tensor(rsfc_gradient).unsqueeze(1)
-
-    sc_mat = tzeng_func.tzeng_group_SC_matrices(sc_indi[range_start:range_end])
-    sc_mat = torch.as_tensor(sc_mat)
-    sc_euler = sc_mat / torch.max(sc_mat) * 0.02
-    fc_1029 = spio.loadmat(
-        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
-    )
-    fc_1029 = fc_1029['fc_roi_1029']
-    fc_emp = np.array(fc_1029[range_start:range_end])
-    fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-    fc_emp = torch.as_tensor(fc_emp)
-    fcd_1029 = spio.loadmat(
-        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
-    )
-    fcd_1029 = fcd_1029['fcd_cum_1029']
-    emp_fcd_cum = torch.as_tensor(fcd_1029[range_start:range_end].astype(
-        np.float64))
-    emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
-    emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
-
-    group_stats = {
-        'myelin': myelin,
-        'rsfc_gradient': rsfc_gradient,
-        'sc_mat': sc_mat,
-        'sc_euler': sc_euler,
-        'fc_emp': fc_emp,
-        'emp_fcd_cum': emp_fcd_cum
-    }
-
-    return group_stats
+def validate_for_epoch(epoch, group_stats, config, save_param_dir, val_dir):
+    print(datetime.datetime.now(),
+          f': start validation for epoch {epoch}'.upper())
+    mfm_validator = DLVersionCMAESValidator(config, save_param_dir, val_dir)
+    mfm_validator.val_best_parameters(group_stats['sc_euler'],
+                                      group_stats['fc_emp'],
+                                      group_stats['emp_fcd_cum'], epoch)
 
 
 def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
@@ -99,26 +63,35 @@ def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
         print("Exit state: ", state)
 
     elif mode == 'validation':
-        group_stats = get_group_stats(343, 686)
-
+        # For each training epoch, get the child (param vector) with the lowest training loss.
+        # Then, validate the child on the validation set, and save the result to the val_dir.
         save_param_dir = os.path.join(
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
         val_dir = os.path.join(parent_dir,
                                f'validation/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
         if epoch is None:
-            for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(group_stats['sc_euler'],
-                                                  group_stats['fc_emp'],
-                                                  group_stats['emp_fcd_cum'],
-                                                  ep)
+            group_stats = get_group_stats(343, 686)
+
+            # for ep in range(0, epochs):
+            #     validate_for_epoch(ep, config, save_param_dir, val_dir)
+
+            if torch.cuda.is_available():
+                set_start_method("spawn")
+                pool = Pool()
+                pool.starmap(
+                    validate_for_epoch,
+                    get_input_args_for_pool(range(0, epochs), group_stats,
+                                            config, save_param_dir, val_dir))
+                pool.close()
+                pool.join()
+            else:
+                for ep in range(0, epochs):
+                    validate_for_epoch(ep, group_stats, config, save_param_dir,
+                                       val_dir)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(group_stats['sc_euler'],
-                                              group_stats['fc_emp'],
-                                              group_stats['emp_fcd_cum'],
-                                              epoch)
+            validate_for_epoch(epoch, group_stats, config, save_param_dir,
+                               val_dir)
 
     elif mode == 'test':
         group_stats = get_group_stats(686, 1029)
@@ -139,10 +112,12 @@ def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
                         group_stats['emp_fcd_cum'])
 
     elif mode == 'val_best':
+        # get the top 10 param vectors with the lowest validation loss
+        # from val_dirs and save the result in the val_best_dir
         val_dirs = [
             os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}')
             for i in [seed_nbr]
-        ]
+        ]  # ! Modify to include all seeds
         val_best_dir = os.path.join(
             parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}')
         mfm_tester = DLVersionCMAESTester(config,
@@ -222,35 +197,18 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
     rsfc_gradient = torch.as_tensor(rsfc_gradient).unsqueeze(1)
 
     if mode == 'train':
-        subrange = [860, 917]
-        sc_mat = tzeng_func.tzeng_group_SC_matrices(
-            sc_indi[subrange[0]:subrange[1]])
-        sc_mat = torch.as_tensor(sc_mat)
-        fc_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
-        )
-        fc_1029 = fc_1029['fc_roi_1029']
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
-        fcd_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
-        )
-        fcd_1029 = fcd_1029['fcd_cum_1029']
-        emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
-            np.float64))
-        emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
-        emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
+        group_stats = get_group_stats(860, 917)
 
         save_param_dir = os.path.join(
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
         seed = None
+
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
-                                    emp_fcd_cum=emp_fcd_cum,
+                                    sc_mat=group_stats['sc_mat'],
+                                    fc_emp=group_stats['fc_emp'],
+                                    emp_fcd_cum=group_stats['emp_fcd_cum'],
                                     save_param_dir=save_param_dir,
                                     epochs=epochs,
                                     dl_pfic_range=[],
@@ -264,26 +222,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         print("Exit state: ", state)
 
     elif mode == 'validation':
-        subrange = [917, 973]
-        sc_mat = tzeng_func.tzeng_group_SC_matrices(
-            sc_indi[subrange[0]:subrange[1]])
-        sc_mat = torch.as_tensor(sc_mat)
-        sc_euler = sc_mat / torch.max(sc_mat) * 0.02
-        fc_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
-        )
-        fc_1029 = fc_1029['fc_roi_1029']
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
-        fcd_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
-        )
-        fcd_1029 = fcd_1029['fcd_cum_1029']
-        emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
-            np.float64))
-        emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
-        emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
+        group_stats = get_group_stats(917, 973)
 
         save_param_dir = os.path.join(
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
@@ -293,34 +232,19 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
                                                 val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
-                                                  emp_fcd_cum, ep)
+                mfm_validator.val_best_parameters(group_stats['sc_euler'],
+                                                  group_stats['fc_emp'],
+                                                  group_stats['emp_fcd_cum'],
+                                                  ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(group_stats['sc_euler'],
+                                              group_stats['fc_emp'],
+                                              group_stats['emp_fcd_cum'],
                                               epoch)
 
     elif mode == 'test':
-        subrange = [973, 1029]
-        sc_mat = tzeng_func.tzeng_group_SC_matrices(
-            sc_indi[subrange[0]:subrange[1]])
-        sc_mat = torch.as_tensor(sc_mat)
-        sc_euler = sc_mat / torch.max(sc_mat) * 0.02
-        fc_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
-        )
-        fc_1029 = fc_1029['fc_roi_1029']
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
-        fcd_1029 = spio.loadmat(
-            '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
-        )
-        fcd_1029 = fcd_1029['fcd_cum_1029']
-        emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
-            np.float64))
-        emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
-        emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
+        group_stats = get_group_stats(973, 1029)
 
         # val_dirs = [os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}') for i in np.arange(1, seed_nbr + 1)]
         val_dirs = [
@@ -334,7 +258,8 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
                                           val_dirs,
                                           test_dir,
                                           trained_epochs=epochs)
-        mfm_tester.test(sc_euler, fc_emp, emp_fcd_cum)
+        mfm_tester.test(group_stats['sc_euler'], group_stats['fc_emp'],
+                        group_stats['emp_fcd_cum'])
 
     elif mode == 'val_best':
         val_dirs = [
@@ -748,10 +673,33 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
 
 
 if __name__ == "__main__":
+    print(datetime.datetime.now(), ': main program start'.upper(), flush=True)
+
+    set_torch_default()
+    if torch.cuda.is_available():
+        print("Current GPU: ",
+              torch.cuda.get_device_name(torch.cuda.current_device()))
+
     apply_on_all_participants(mode='train',
                               trial_nbr=sys.argv[1],
                               seed_nbr=sys.argv[2],
                               epoch=None)
+    # save_dir = os.path.join(LOG_DIR, 'HCPYA', 'all_participants')
+    # if os.path.exists(
+    #         os.path.join(save_dir, 'train', f'trial{sys.argv[1]}',
+    #                      f'seed{sys.argv[2]}', 'param_save_epoch99.pth')):
+    #     apply_on_all_participants(mode='validation',
+    #                               trial_nbr=sys.argv[1],
+    #                               seed_nbr=sys.argv[2],
+    #                               epoch=99)
+    #     apply_on_all_participants(mode='val_best',
+    #                               trial_nbr=sys.argv[1],
+    #                               seed_nbr=sys.argv[2],
+    #                               epoch=None)
+    #     apply_on_all_participants(mode='simulate_fc_fcd',
+    #                               trial_nbr=sys.argv[1],
+    #                               seed_nbr=sys.argv[2],
+    #                               epoch=None)
 
     # apply_large_group(mode='train',
     #                   trial_nbr=sys.argv[1],

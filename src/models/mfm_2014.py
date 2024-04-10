@@ -1,12 +1,14 @@
 import math
 import torch
 import numpy as np
+import datetime
 import time
 import configparser
 import scipy.io as spio
 from scipy.optimize import fsolve
 from tqdm import tqdm
 from src.utils.init_utils import set_torch_default
+from src.basic.constants import DEFAULT_DTYPE
 
 
 def torch_corr_3D(vec_3d):
@@ -141,15 +143,13 @@ class MfmModel2014:
 
         S_I_ave = self.tau_I * (self.a_I * I_I_ave - self.b_I) / (
             1 - np.exp(-self.d_I * (self.a_I * I_I_ave - self.b_I)))
-        S_I_ave = torch.as_tensor(S_I_ave)
+        S_I_ave = torch.as_tensor(S_I_ave).to(DEFAULT_DTYPE)
         self.w_IE = (
             self.W_E * self.I_0 + self.w_EE * self.J_NMDA * self.S_E_ave +
             self.G * self.J_NMDA * torch.matmul(
                 self.sc_euler, self.S_E_ave * torch.ones(self.N, self.M)) -
             I_E_ave) / S_I_ave
         # w_IE: [N, M]
-
-        print("Successfully init MFM 2014 model!")
 
     def CBIG_2014_mfm_simulation(self,
                                  simulate_time,
@@ -196,8 +196,7 @@ class MfmModel2014:
         # v_noise_ini = torch.randn((N, M, warm_up_t, 2))
 
         bold_time_start = time.time()
-        print("Start BOLD calculating...")
-
+        print(datetime.datetime.now(), ": Start BOLD calculating...")
         if use_tqdm:
             warm_loop = tqdm(range(warm_up_t), position=0, leave=True)
             main_loop = tqdm(range(t_len), position=0, leave=True)
@@ -213,7 +212,8 @@ class MfmModel2014:
             S_I = S_I + dSI_dt * dt + self.sigma * torch.randn(
                 N, M) * math.sqrt(dt)
         # warm_loop.close()
-        # print("\nEnd warming up and start main body...")
+        print(datetime.datetime.now(),
+              ": End warming up and start main body...")
 
         S_E_ave = torch.zeros(N, M)
         S_I_ave = torch.zeros(N, M)
