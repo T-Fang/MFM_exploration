@@ -15,7 +15,7 @@ from src.utils.export_utils import (  # noqa
 from src.utils import tzeng_func
 from src.utils.analysis_utils import (  # noqa
     boxplot_network_stats, boxplot_train_r_E, boxplot_val_r_E_for_diff_trials,
-    get_run_dir, get_fig_file_path, plot_losses_for_diff_trials,
+    get_run_dir, get_fig_path_in_logs, plot_losses_for_diff_trials,
     plot_train_loss, visualize_stats, ttest_1samp_n_plot,
     regional_EI_age_slope, regional_EI_diff_cohen_d,
     plot_losses_for_diff_trials_all_groups, visualize_train_r_E)
@@ -483,9 +483,9 @@ def compare_test_results_many_dirs_plot():
 
 def corr_mean_EI_vs_age(trial_idx, seed_idx):
     EI_dir = get_run_dir('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
-    save_fig_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'corr_mean_EI_vs_age.png')
+    save_fig_path = get_fig_path_in_logs('PNC', 'age_group', 'EI_ratio',
+                                         trial_idx, seed_idx,
+                                         'corr_mean_EI_vs_age.png')
     EI_ave_list = []
     age_list = []
     for group_nbr in range(1, NUM_GROUPS_PNC_AGE + 1):
@@ -506,9 +506,9 @@ def corr_mean_EI_vs_age(trial_idx, seed_idx):
 def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
     EI_dir = get_run_dir('PNC', 'age_group', 'EI_ratio', trial_idx, seed_idx)
     if save_mat_path is None:
-        save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                          trial_idx, seed_idx,
-                                          'regional_EI_vs_age_slope.mat')
+        save_mat_path = get_fig_path_in_logs('PNC', 'age_group', 'EI_ratio',
+                                             trial_idx, seed_idx,
+                                             'regional_EI_vs_age_slope.mat')
     regional_EIs = np.zeros((NUM_GROUPS_PNC_AGE, NUM_ROI))
     ages = np.zeros(NUM_GROUPS_PNC_AGE)
     count = 0
@@ -545,9 +545,9 @@ def export_regional_EI_vs_age_slope(trial_idx, seed_idx, save_mat_path=None):
 
 
 def visualize_regional_EI_vs_age_slope(trial_idx, seed_idx):
-    save_mat_path = get_fig_file_path('PNC', 'age_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'regional_EI_vs_age_slope.mat')
+    save_mat_path = get_fig_path_in_logs('PNC', 'age_group', 'EI_ratio',
+                                         trial_idx, seed_idx,
+                                         'regional_EI_vs_age_slope.mat')
     export_regional_EI_vs_age_slope(trial_idx,
                                     seed_idx,
                                     save_mat_path=save_mat_path)
@@ -566,9 +566,9 @@ def plot_mean_EI_diff_t_test(trial_idx, seed_idx):
                               trial_idx, seed_idx)
     low_ei_dir = get_run_dir('PNC', 'overall_acc_group/low', 'EI_ratio',
                              trial_idx, seed_idx)
-    save_fig_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'mean_EI_diff_t_test.png')
+    save_fig_path = get_fig_path_in_logs('PNC', 'overall_acc_group',
+                                         'EI_ratio', trial_idx, seed_idx,
+                                         'mean_EI_diff_t_test.png')
     high_list = []
     low_list = []
     for group_idx in range(1, NUM_GROUPS_PNC_COGNITION + 1):
@@ -599,9 +599,9 @@ def export_EI_ratio_diff_effect_size(trial_idx, seed_idx, save_mat_path=None):
     low_ei_dir = get_run_dir('PNC', 'overall_acc_group/low', 'EI_ratio',
                              trial_idx, seed_idx)
     if save_mat_path is None:
-        save_mat_path = get_fig_file_path('PNC', 'overall_acc_group',
-                                          'EI_ratio', trial_idx, seed_idx,
-                                          'EI_ratio_diff_effect_size.mat')
+        save_mat_path = get_fig_path_in_logs('PNC', 'overall_acc_group',
+                                             'EI_ratio', trial_idx, seed_idx,
+                                             'EI_ratio_diff_effect_size.mat')
 
     EI_matrix_high = np.zeros((NUM_GROUPS_PNC_COGNITION, NUM_ROI))
     EI_matrix_low = np.zeros((NUM_GROUPS_PNC_COGNITION, NUM_ROI))
@@ -625,9 +625,9 @@ def export_EI_ratio_diff_effect_size(trial_idx, seed_idx, save_mat_path=None):
 
 
 def visualize_EI_ratio_diff_effect_size(trial_idx, seed_idx):
-    save_mat_path = get_fig_file_path('PNC', 'overall_acc_group', 'EI_ratio',
-                                      trial_idx, seed_idx,
-                                      'EI_ratio_diff_effect_size.mat')
+    save_mat_path = get_fig_path_in_logs('PNC', 'overall_acc_group',
+                                         'EI_ratio', trial_idx, seed_idx,
+                                         'EI_ratio_diff_effect_size.mat')
     export_EI_ratio_diff_effect_size(trial_idx,
                                      seed_idx,
                                      save_mat_path=save_mat_path)
@@ -776,7 +776,7 @@ if __name__ == "__main__":
     ALL_TARGETS = [
         'age_group', 'overall_acc_group/high', 'overall_acc_group/low'
     ]
-    # Epoch-level analysis
+    # * Epoch-level analysis
     # for target in ALL_TARGETS:
     #     for trial_idx in [3, 6]:
     #         for seed_idx in [1]:
@@ -785,7 +785,7 @@ if __name__ == "__main__":
     #                     analyze_epoch(target, trial_idx, seed_idx, group_idx,
     #                                   epoch_idx)
 
-    # Group-level analysis
+    # * Group-level analysis
     # for target in ALL_TARGETS:
     #     for trial_idx in [3, 6]:
     #         for seed_idx in range(1, 2):
@@ -793,22 +793,22 @@ if __name__ == "__main__":
     #             for group_idx in range(1, 2):
     #                 analyze_group(target, trial_idx, seed_idx, group_idx)
 
-    # Run-level analysis
+    # * Run-level analysis
     # for target in ALL_TARGETS:
     #     for trial_idx in range(3, 4):
     #         for seed_idx in range(1, 3):
     #             analyze_run(target, trial_idx, seed_idx)
 
-    # Trial-level analysis
+    # * Trial-level analysis
     for target in ALL_TARGETS:
         for trial_idx in [10]:
             analyze_trial(target, trial_idx)
 
-    # Target-level analysis
+    # * Target-level analysis
     # for target in ALL_TARGETS:
     #     analyze_target(target)
 
-    # Debugging
+    # * Debugging
     # plot_pred_loss()
     # corr_mean_EI_vs_age(1, 1)
     # visualize_regional_EI_vs_age_slope(1, 1)

@@ -114,11 +114,11 @@ def EI_inves():
         subject_id = subjects_age[sub_nbr, 0]
 
         EI_path = f'/home/ftian/storage/projects/MFM_exploration/logs/PNC/Individual/EI_ratio/sub{sub_nbr}.pth'
-        fc_emp = pd.read_csv(
+        emp_fc = pd.read_csv(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
             header=None,
             index_col=False)
-        fc_emp = torch.as_tensor(np.array(fc_emp))
+        emp_fc = torch.as_tensor(np.array(emp_fc))
         emp_fcd_cum = sio.loadmat(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
         )
@@ -126,7 +126,7 @@ def EI_inves():
             np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-        fc_emp_list[i] = fc_emp[fc_mask]
+        fc_emp_list[i] = emp_fc[fc_mask]
         emp_fcd_list[i] = torch.squeeze(emp_fcd_cum)
 
     # Corr and KS
@@ -163,11 +163,11 @@ def EI_inves_2():
         sub_nbr = sub_list_1[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        fc_emp = pd.read_csv(
+        emp_fc = pd.read_csv(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
             header=None,
             index_col=False)
-        fc_emp = torch.as_tensor(np.array(fc_emp))
+        emp_fc = torch.as_tensor(np.array(emp_fc))
         emp_fcd_cum = sio.loadmat(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
         )
@@ -175,7 +175,7 @@ def EI_inves_2():
             np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-        fc_emp_list_1[i] = fc_emp[fc_mask]
+        fc_emp_list_1[i] = emp_fc[fc_mask]
         emp_fcd_list_1[i] = torch.squeeze(emp_fcd_cum)
 
     sub_list_2 = np.load(
@@ -190,11 +190,11 @@ def EI_inves_2():
         sub_nbr = sub_list_2[i]
         subject_id = subjects_age[sub_nbr, 0]
 
-        fc_emp = pd.read_csv(
+        emp_fc = pd.read_csv(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
             header=None,
             index_col=False)
-        fc_emp = torch.as_tensor(np.array(fc_emp))
+        emp_fc = torch.as_tensor(np.array(emp_fc))
         emp_fcd_cum = sio.loadmat(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FCD/sub-{subject_id}.mat'
         )
@@ -202,7 +202,7 @@ def EI_inves_2():
             np.float64)).T
         emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
 
-        fc_emp_list_2[i] = fc_emp[fc_mask]
+        fc_emp_list_2[i] = emp_fc[fc_mask]
         emp_fcd_list_2[i] = torch.squeeze(emp_fcd_cum)
 
     # Corr and KS
@@ -371,9 +371,9 @@ def EI_ratio_individual():
                                          f'param_save_epoch{epoch}.pth')
             d = torch.load(param_10_path)
 
-            valid_param_list_pre = d['valid_param_list']
+            valid_param_indices_pre = d['valid_param_indices']
             param_10 = d['param_10']
-            param_10 = param_10[:, valid_param_list_pre]
+            param_10 = param_10[:, valid_param_indices_pre]
             total_loss = d['corr_loss'] + d['L1_loss'] + d['ks_loss']  # [xxx]
             best_param_ind = torch.argmin(total_loss)
             param_10 = param_10[:, best_param_ind]  # [10]
@@ -692,14 +692,14 @@ def generate_emp_fc_mat():
 
     for i in range(len(id_list)):
         subject_id = id_list[i]
-        fc_emp = pd.read_csv(
+        emp_fc = pd.read_csv(
             f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_surface/FC/sub-{subject_id}.csv',
             header=None,
             index_col=False)
-        fc_emp = np.array(fc_emp)
-        fc_emps[:, i] = fc_emp[fc_mask]
+        emp_fc = np.array(emp_fc)
+        fc_emps[:, i] = emp_fc[fc_mask]
     sio.savemat(
-        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/fc_emp.mat',
+        '/home/tzeng/storage/Matlab/PNC/predictive/KRR/normal/emp_fc.mat',
         {'empfc': fc_emps})
     print("Saved.")
 
@@ -806,11 +806,11 @@ def mean_fc_profile_vs_age():
     valid_count = 0
     for group_nbr in range(1, 30):
         group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}'
-        fc_emp = np.array(
+        emp_fc = np.array(
             pd.read_csv(os.path.join(group_mats_path, f'FC_train.csv'),
                         header=None,
                         index_col=False))
-        fc_list[valid_count] = np.mean(fc_emp, axis=1)
+        fc_list[valid_count] = np.mean(emp_fc, axis=1)
 
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
         age = np.array(pd.read_csv(age_path, header=None, index_col=False))

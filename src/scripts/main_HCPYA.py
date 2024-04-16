@@ -8,50 +8,42 @@ import sys
 import datetime
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
+from src.scripts.Hybrid_CMA_ES import ModelHandler, CMAESValidator, CMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
 from src.utils.init_utils import set_torch_default, get_input_args_for_pool  # noqa: F401
 from src.basic.constants import CONFIG_DIR, LOG_DIR
-from src.utils.file_utils import get_group_stats
+from src.utils.file_utils import get_HCPYA_group_stats, get_sim_fig_path, get_run_dir, get_target_dir
 from multiprocessing import Pool, set_start_method  # noqa: F401
 
-
-def validate_for_epoch(epoch, group_stats, config, save_param_dir, val_dir):
-    print(datetime.datetime.now(),
-          f': start validation for epoch {epoch}'.upper())
-    mfm_validator = DLVersionCMAESValidator(config, save_param_dir, val_dir)
-    mfm_validator.val_best_parameters(group_stats['sc_euler'],
-                                      group_stats['fc_emp'],
-                                      group_stats['emp_fcd_cum'], epoch)
+DS_NAME = 'HCPYA'
 
 
-def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
+def apply_on_all_participants(phase, trial_idx, seed_idx):
     config = configparser.ConfigParser()
     config.read(
         '/home/ftian/storage/projects/MFM_exploration/configs/model/config_hcpya.ini'
     )
 
-    trial_nbr = int(trial_nbr)
-    seed_nbr = int(seed_nbr)
+    trial_idx = int(trial_idx)
+    seed_idx = int(seed_idx)
 
-    parent_dir = '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/all_participants'
-    epochs = 100
-
-    if mode == 'train':
-        group_stats = get_group_stats(0, 343)
-
-        save_param_dir = os.path.join(
-            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
+    num_epochs = 100
+    TARGET = 'all_participants'
+    parent_dir = get_target_dir(DS_NAME, TARGET)
+    if phase == 'train':
+        group_stats = get_HCPYA_group_stats(0, 343)
+        train_save_dir = get_run_dir(DS_NAME, TARGET, 'train', trial_idx,
+                                     seed_idx)
         seed = None
         state = train_help_function(config=config,
                                     myelin=group_stats['myelin'],
                                     RSFC_gradient=group_stats['rsfc_gradient'],
-                                    sc_mat=group_stats['sc_mat'],
-                                    fc_emp=group_stats['fc_emp'],
+                                    sc_euler=group_stats['sc_euler'],
+                                    emp_fc=group_stats['emp_fc'],
                                     emp_fcd_cum=group_stats['emp_fcd_cum'],
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=train_save_dir,
+                                    num_epochs=num_epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 100),
                                     dl_rfic_range=[],
@@ -62,80 +54,101 @@ def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
                                     seed=seed)
         print("Exit state: ", state)
 
-    elif mode == 'validation':
+    elif phase == 'validation':
         # For each training epoch, get the child (param vector) with the lowest training loss.
         # Then, validate the child on the validation set, and save the result to the val_dir.
-        save_param_dir = os.path.join(
-            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
-        val_dir = os.path.join(parent_dir,
-                               f'validation/trial{trial_nbr}/seed{seed_nbr}')
-        if epoch is None:
-            group_stats = get_group_stats(343, 686)
+        train_save_dir = get_run_dir(DS_NAME, TARGET, 'train', trial_idx,
+                                     seed_idx)
+        val_save_dir = get_run_dir(DS_NAME, TARGET, 'val', trial_idx, seed_idx)
+        group_stats = get_HCPYA_group_stats(343, 686)
+        mfm_trainer = CMAESValidator(config, train_save_dir, val_save_dir,
+                                     group_stats['sc_euler'],
+                                     group_stats['emp_fc'],
+                                     group_stats['emp_fcd_cum'], num_epochs)
+        # mfm_validator.get_best_train_params()
+        mfm_trainer.validate()
 
-            # for ep in range(0, epochs):
-            #     validate_for_epoch(ep, config, save_param_dir, val_dir)
+    elif phase == 'test':
+        group_stats = get_HCPYA_group_stats(686, 1029)
 
-            if torch.cuda.is_available():
-                set_start_method("spawn")
-                pool = Pool()
-                pool.starmap(
-                    validate_for_epoch,
-                    get_input_args_for_pool(range(0, epochs), group_stats,
-                                            config, save_param_dir, val_dir))
-                pool.close()
-                pool.join()
-            else:
-                for ep in range(0, epochs):
-                    validate_for_epoch(ep, group_stats, config, save_param_dir,
-                                       val_dir)
-        else:
-            epoch = int(epoch)
-            validate_for_epoch(epoch, group_stats, config, save_param_dir,
-                               val_dir)
-
-    elif mode == 'test':
-        group_stats = get_group_stats(686, 1029)
-
-        # val_dirs = [os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}') for i in np.arange(1, seed_nbr + 1)]
-        val_dirs = [
-            os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}')
-            for i in [seed_nbr]
+        USE_ALL_SEEDS = False
+        seed_indices = np.arange(1, seed_idx +
+                                 1) if USE_ALL_SEEDS else [seed_idx]
+        val_save_dirs = [
+            get_run_dir(DS_NAME, TARGET, 'val', trial_idx, seed_idx)
+            for seed_idx in seed_indices
         ]
-        print("Validation dirs: ", val_dirs)
-        test_dir = os.path.join(parent_dir,
-                                f'test/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
-        mfm_tester.test(group_stats['sc_euler'], group_stats['fc_emp'],
-                        group_stats['emp_fcd_cum'])
 
-    elif mode == 'val_best':
+        print("Validation dirs: ", val_save_dirs)
+
+        test_save_dir = get_run_dir(DS_NAME, TARGET, 'test', trial_idx,
+                                    seed_idx)
+
+        mfm_tester = CMAESTester(config,
+                                 val_save_dirs,
+                                 test_save_dir,
+                                 group_stats['sc_euler'],
+                                 group_stats['emp_fc'],
+                                 group_stats['emp_fcd_cum'],
+                                 train_num_epochs=num_epochs)
+        mfm_tester.test()
+
+    elif phase == 'best_from_train':
+        # Mainly for simulating the best param with lowest train loss
+        PHASE = 'train'
+        sim_res_file_path = get_sim_fig_path(
+            DS_NAME, TARGET, PHASE, trial_idx, seed_idx,
+            f'sim_results_on_{PHASE}_set.pth')
+
+        best_from_train_dir = get_run_dir(DS_NAME, TARGET, 'val', trial_idx,
+                                          seed_idx)
+        best_from_train_path = os.path.join(best_from_train_dir,
+                                            'best_from_train.pth')
+        group_stats = get_HCPYA_group_stats(0, 343)
+
+        mfm_trainer = ModelHandler(config=config,
+                                   phase=PHASE,
+                                   sc_euler=group_stats['sc_euler'],
+                                   emp_fc=group_stats['emp_fc'],
+                                   emp_fcd_cum=group_stats['emp_fcd_cum'])
+
+        mfm_trainer.sim_first_param_multi_times(best_from_train_path,
+                                                sim_res_file_path,
+                                                10,
+                                                get_FCD_matrix=True,
+                                                get_bold=True,
+                                                seed=None)
+
+    elif phase == 'val_best':
         # get the top 10 param vectors with the lowest validation loss
         # from val_dirs and save the result in the val_best_dir
-        val_dirs = [
-            os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}')
-            for i in [seed_nbr]
-        ]  # ! Modify to include all seeds
-        val_best_dir = os.path.join(
-            parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          val_best_dir,
-                                          trained_epochs=epochs)
+
+        USE_ALL_SEEDS = False
+        seed_indices = np.arange(1, seed_idx +
+                                 1) if USE_ALL_SEEDS else [seed_idx]
+        val_save_dirs = [
+            get_run_dir(DS_NAME, TARGET, 'validation', trial_idx, seed_idx)
+            for seed_idx in seed_indices
+        ]
+
+        val_best_dir = get_run_dir(DS_NAME, TARGET, 'val_best', trial_idx,
+                                   seed_idx)
+        mfm_tester = CMAESTester(config,
+                                 val_save_dirs,
+                                 val_best_dir,
+                                 train_num_epochs=num_epochs)
         mfm_tester.select_best_from_val()
 
-    elif mode == 'simulate_fc_fcd':
-        group_stats = get_group_stats(686, 1029)
+    elif phase == 'simulate_fc_fcd':
+        group_stats = get_HCPYA_group_stats(686, 1029)
 
         val_best_results_path = os.path.join(
-            parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}',
+            parent_dir, f'val_best/trial{trial_idx}/seed{seed_idx}',
             'val_results.pth')
         val_results = torch.load(val_best_results_path)
         parameter = val_results['parameter']  # [205, param_sets]
         sim_results_dir = os.path.join(
-            parent_dir, f'simulate/trial{trial_nbr}/seed{seed_nbr}')
+            parent_dir, f'simulate/trial{trial_idx}/seed{seed_idx}')
         if not os.path.exists(sim_results_dir):
             os.makedirs(sim_results_dir)
         sim_results_path = os.path.join(sim_results_dir, 'sim_results.pth')
@@ -145,15 +158,15 @@ def apply_on_all_participants(mode, trial_nbr, seed_nbr, epoch=None):
                         param_dup=3,
                         sc_euler=group_stats['sc_euler'])
 
-    elif mode == 'simulate_fc_fcd_mat':
-        group_stats = get_group_stats(0, 343)
+    elif phase == 'simulate_fc_fcd_mat':
+        group_stats = get_HCPYA_group_stats(0, 343)
 
         parameter_path = os.path.join(
-            parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}',
+            parent_dir, f'train/trial{trial_idx}/seed{seed_idx}',
             'param_save_epoch99.pth')
         parameter = torch.load(parameter_path)['parameter'][:, :10]
         sim_results_dir = os.path.join(
-            parent_dir, f'simulate/trial{trial_nbr}/seed{seed_nbr}')
+            parent_dir, f'simulate/trial{trial_idx}/seed{seed_idx}')
         if not os.path.exists(sim_results_dir):
             os.makedirs(sim_results_dir)
         sim_results_path = os.path.join(sim_results_dir,
@@ -197,7 +210,7 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
     rsfc_gradient = torch.as_tensor(rsfc_gradient).unsqueeze(1)
 
     if mode == 'train':
-        group_stats = get_group_stats(860, 917)
+        group_stats = get_HCPYA_group_stats(860, 917)
 
         save_param_dir = os.path.join(
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
@@ -206,11 +219,11 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=group_stats['sc_mat'],
-                                    fc_emp=group_stats['fc_emp'],
+                                    sc_euler=group_stats['sc_mat'],
+                                    emp_fc=group_stats['emp_fc'],
                                     emp_fcd_cum=group_stats['emp_fcd_cum'],
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 4),
                                     dl_rfic_range=[],
@@ -222,29 +235,28 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         print("Exit state: ", state)
 
     elif mode == 'validation':
-        group_stats = get_group_stats(917, 973)
+        group_stats = get_HCPYA_group_stats(917, 973)
 
         save_param_dir = os.path.join(
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
         val_dir = os.path.join(parent_dir,
                                f'validation/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
                 mfm_validator.val_best_parameters(group_stats['sc_euler'],
-                                                  group_stats['fc_emp'],
+                                                  group_stats['emp_fc'],
                                                   group_stats['emp_fcd_cum'],
                                                   ep)
         else:
             epoch = int(epoch)
             mfm_validator.val_best_parameters(group_stats['sc_euler'],
-                                              group_stats['fc_emp'],
+                                              group_stats['emp_fc'],
                                               group_stats['emp_fcd_cum'],
                                               epoch)
 
     elif mode == 'test':
-        group_stats = get_group_stats(973, 1029)
+        group_stats = get_HCPYA_group_stats(973, 1029)
 
         # val_dirs = [os.path.join(parent_dir, f'validation/trial{trial_nbr}/seed{i}') for i in np.arange(1, seed_nbr + 1)]
         val_dirs = [
@@ -254,12 +266,12 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         print("Validation dirs: ", val_dirs)
         test_dir = os.path.join(parent_dir,
                                 f'test/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
-        mfm_tester.test(group_stats['sc_euler'], group_stats['fc_emp'],
-                        group_stats['emp_fcd_cum'])
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
+        mfm_tester.test_old(group_stats['sc_euler'], group_stats['emp_fc'],
+                            group_stats['emp_fcd_cum'])
 
     elif mode == 'val_best':
         val_dirs = [
@@ -268,10 +280,10 @@ def apply_large_group(mode, trial_nbr, seed_nbr, epoch=None):
         ]
         val_best_dir = os.path.join(
             parent_dir, f'val_best/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          val_best_dir,
-                                          trained_epochs=epochs)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 val_best_dir,
+                                 train_num_epochs=epochs)
         mfm_tester.select_best_from_val()
 
     elif mode == 'simulate_fc_fcd':
@@ -393,10 +405,10 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
     epochs = 100
 
     if mode == 'train':
-        # fc_emp = fc_runs['fc_REST1_LR']
-        fc_emp = np.array([fc_runs['fc_REST1_LR'], fc_runs['fc_REST1_RL']])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
+        # emp_fc = fc_runs['fc_REST1_LR']
+        emp_fc = np.array([fc_runs['fc_REST1_LR'], fc_runs['fc_REST1_RL']])
+        emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+        emp_fc = torch.as_tensor(emp_fc)
         # emp_fcd_cum = fcd_runs['fcd_cdf_1']
         emp_fcd_cum = fcd_runs['fcd_cdf_REST1_LR'] + fcd_runs[
             'fcd_cdf_REST1_RL']
@@ -409,11 +421,11 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 100),
                                     dl_rfic_range=[],
@@ -428,8 +440,8 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
     #     # rsfc_gradient = rsfc_runs['REST1_LR']
     #     # rsfc_gradient = torch.as_tensor(rsfc_gradient)
     #     rsfc_gradient = torch.as_tensor(rsfc_indi[sub_nbr]).unsqueeze(1)
-    #     fc_emp = fc_runs['fc_REST1_LR']
-    #     fc_emp = torch.as_tensor(fc_emp)
+    #     emp_fc = fc_runs['fc_REST1_LR']
+    #     emp_fc = torch.as_tensor(emp_fc)
     #     emp_fcd_cum = fcd_runs['fcd_cdf_1']
     #     emp_fcd_cum = torch.as_tensor(emp_fcd_cum.astype(np.float64))
     #     emp_fcd_cum = emp_fcd_cum / emp_fcd_cum[-1, 0]
@@ -439,12 +451,12 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
     #     save_param_dir = os.path.join(parent_dir, f'train/trial{trial_nbr}/split{split_nbr}/sub{sub_nbr}')
     #     val_train_param_dir = os.path.join(parent_dir, f'val_train_param/trial{trial_nbr}/split{split_nbr}/sub{sub_nbr}')
     #     mfm_validator = DLVersionCMAESValidator(save_param_dir, val_train_param_dir, dataset_name=dataset_name)
-    #     mfm_validator.val_by_euler(myelin, rsfc_gradient, sc_euler, fc_emp, emp_fcd_cum, epoch)
+    #     mfm_validator.val_by_euler(myelin, rsfc_gradient, sc_euler, emp_fc, emp_fcd_cum, epoch)
 
     elif mode == 'validation':
-        # fc_emp = fc_runs['fc_REST1_RL']
-        fc_emp = fc_runs['fc_REST2_LR']
-        fc_emp = torch.as_tensor(fc_emp)
+        # emp_fc = fc_runs['fc_REST1_RL']
+        emp_fc = fc_runs['fc_REST2_LR']
+        emp_fc = torch.as_tensor(emp_fc)
         # emp_fcd_cum = fcd_runs['fcd_cdf_2']
         emp_fcd_cum = fcd_runs['fcd_cdf_REST2_LR']
         emp_fcd_cum = torch.as_tensor(emp_fcd_cum.astype(np.float64))
@@ -454,22 +466,21 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
         val_dir = os.path.join(parent_dir,
                                f'validation/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
-        '''fc_emp = np.array([fc_runs['fc_REST2_LR'], fc_runs['fc_REST2_RL']])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)'''
-        fc_emp = fc_runs['fc_REST2_RL']
-        fc_emp = torch.as_tensor(fc_emp)
+        '''emp_fc = np.array([fc_runs['fc_REST2_LR'], fc_runs['fc_REST2_RL']])
+        emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)'''
+        emp_fc = fc_runs['fc_REST2_RL']
+        emp_fc = torch.as_tensor(emp_fc)
         # emp_fcd_cum = (fcd_runs['fcd_cdf_3'] + fcd_runs['fcd_cdf_4'])
         emp_fcd_cum = fcd_runs['fcd_cdf_REST2_RL']
         emp_fcd_cum = torch.as_tensor(emp_fcd_cum.astype(np.float64))
@@ -481,11 +492,11 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr, epoch=None):
         ]
         test_dir = os.path.join(parent_dir,
                                 f'test/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
-        mfm_tester.test(sc_euler, fc_emp, emp_fcd_cum)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
+        mfm_tester.test_old(sc_euler, emp_fc, emp_fcd_cum)
 
     return 0
 
@@ -510,8 +521,8 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
     rsfc_gradient = torch.as_tensor(rsfc_gradient[group_nbr]).unsqueeze(1)
     sc_mat = np.array(grouped_mats['sc_groups'])
     sc_mat = torch.as_tensor(sc_mat[group_nbr])
-    fc_emp = np.array(grouped_mats['fc_groups'])
-    fc_emp = torch.as_tensor(fc_emp[group_nbr])
+    emp_fc = np.array(grouped_mats['fc_groups'])
+    emp_fc = torch.as_tensor(emp_fc[group_nbr])
     emp_fcd_cum = np.array(grouped_mats['fcd_groups'])
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[group_nbr])
     emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)  # [bins, 1]
@@ -525,11 +536,11 @@ def generate_dl_dataset_group(mode, group_nbr, trial_nbr, seed_nbr):
     state = train_help_function(config=config,
                                 myelin=myelin,
                                 RSFC_gradient=rsfc_gradient,
-                                sc_mat=sc_mat,
-                                fc_emp=fc_emp,
+                                sc_euler=sc_mat,
+                                emp_fc=emp_fc,
                                 emp_fcd_cum=emp_fcd_cum,
-                                save_param_dir=save_param_dir,
-                                epochs=epochs,
+                                train_save_dir=save_param_dir,
+                                num_epochs=epochs,
                                 dl_pfic_range=[],
                                 euler_pfic_range=np.arange(0, 100),
                                 dl_rfic_range=[],
@@ -584,9 +595,9 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
         sc_mat = tzeng_func.tzeng_group_SC_matrices(
             sc_indi[subrange[0]:subrange[1]])
         sc_mat = torch.as_tensor(sc_mat)
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
+        emp_fc = np.array(fc_1029[subrange[0]:subrange[1]])
+        emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+        emp_fc = torch.as_tensor(emp_fc)
         emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
             np.float64))
         emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
@@ -598,11 +609,11 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=np.arange(0, 100),
                                     euler_pfic_range=[],
                                     dl_rfic_range=[],
@@ -619,9 +630,9 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
             sc_indi[subrange[0]:subrange[1]])
         sc_mat = torch.as_tensor(sc_mat)
         sc_euler = sc_mat / torch.max(sc_mat) * 0.02
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
+        emp_fc = np.array(fc_1029[subrange[0]:subrange[1]])
+        emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+        emp_fc = torch.as_tensor(emp_fc)
         emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
             np.float64))
         emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
@@ -631,15 +642,14 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
             parent_dir, f'train/trial{trial_nbr}/seed{seed_nbr}')
         val_dir = os.path.join(parent_dir,
                                f'validation/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
@@ -648,9 +658,9 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
             sc_indi[subrange[0]:subrange[1]])
         sc_mat = torch.as_tensor(sc_mat)
         sc_euler = sc_mat / torch.max(sc_mat) * 0.02
-        fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-        fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-        fc_emp = torch.as_tensor(fc_emp)
+        emp_fc = np.array(fc_1029[subrange[0]:subrange[1]])
+        emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+        emp_fc = torch.as_tensor(emp_fc)
         emp_fcd_cum = torch.as_tensor(fcd_1029[subrange[0]:subrange[1]].astype(
             np.float64))
         emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
@@ -663,11 +673,11 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
         ]
         test_dir = os.path.join(parent_dir,
                                 f'test/trial{trial_nbr}/seed{seed_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
-        mfm_tester.test(sc_euler, fc_emp, emp_fcd_cum)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
+        mfm_tester.test_old(sc_euler, emp_fc, emp_fcd_cum)
 
     return 0
 
@@ -680,26 +690,30 @@ if __name__ == "__main__":
         print("Current GPU: ",
               torch.cuda.get_device_name(torch.cuda.current_device()))
 
-    apply_on_all_participants(mode='train',
-                              trial_nbr=sys.argv[1],
-                              seed_nbr=sys.argv[2],
-                              epoch=None)
+    # * lightweight tasks
+    for trial_idx in [22]:
+        for seed_idx in [3]:
+            apply_on_all_participants(phase='best_from_train',
+                                      trial_idx=trial_idx,
+                                      seed_idx=seed_idx)
+
+    # * heavy tasks to be submitted to the scheduler
+    # apply_on_all_participants(phase='train',
+    #                           trial_idx=sys.argv[1],
+    #                           seed_idx=sys.argv[2])
     # save_dir = os.path.join(LOG_DIR, 'HCPYA', 'all_participants')
     # if os.path.exists(
     #         os.path.join(save_dir, 'train', f'trial{sys.argv[1]}',
     #                      f'seed{sys.argv[2]}', 'param_save_epoch99.pth')):
-    #     apply_on_all_participants(mode='validation',
-    #                               trial_nbr=sys.argv[1],
-    #                               seed_nbr=sys.argv[2],
-    #                               epoch=99)
-    #     apply_on_all_participants(mode='val_best',
-    #                               trial_nbr=sys.argv[1],
-    #                               seed_nbr=sys.argv[2],
-    #                               epoch=None)
-    #     apply_on_all_participants(mode='simulate_fc_fcd',
-    #                               trial_nbr=sys.argv[1],
-    #                               seed_nbr=sys.argv[2],
-    #                               epoch=None)
+    #     apply_on_all_participants(phase='validation',
+    #                               trial_idx=sys.argv[1],
+    #                               seed_idx=sys.argv[2])
+    #     apply_on_all_participants(phase='val_best',
+    #                               trial_idx=sys.argv[1],
+    #                               seed_idx=sys.argv[2])
+    #     apply_on_all_participants(phase='simulate_fc_fcd',
+    #                               trial_idx=sys.argv[1],
+    #                               seed_idx=sys.argv[2])
 
     # apply_large_group(mode='train',
     #                   trial_nbr=sys.argv[1],

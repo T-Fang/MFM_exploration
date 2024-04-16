@@ -96,13 +96,14 @@ def check_dl_version_test_results_one_epoch(train_results_dir,
     if os.path.exists(test_results_path):
         d = torch.load(test_results_path)
 
-        dl_valid_param_length = len(d['valid_param_list_dl'])
-        valid_param_length = len(d['valid_param_list'])
+        dl_valid_param_length = len(d['valid_param_indices_dl'])
+        valid_param_length = len(d['valid_param_indices'])
         print('dl_valid_param_length ', dl_valid_param_length)
         print('valid_param_length', valid_param_length)
         for i in range(valid_param_length):
             for j in range(dl_valid_param_length):
-                if d['valid_param_list'][i] == d['valid_param_list_dl'][j]:
+                if d['valid_param_indices'][i] == d['valid_param_indices_dl'][
+                        j]:
                     count += 1
                     if 'pred_loss' in d_dl:
                         corr_dl = d_dl['pred_loss'][j, 0]
@@ -148,7 +149,7 @@ def check_dl_version_test_results_one_epoch(train_results_dir,
                np.mean(ks_euler_list))
     else:  # The test results path doesn't exist
         print("Hybrid Euler.")
-        valid_param_length = len(d_dl['valid_param_list'])
+        valid_param_length = len(d_dl['valid_param_indices'])
         corr_ = torch.mean(d_dl['corr_loss']).numpy()
         l1_ = torch.mean(d_dl['L1_loss']).numpy()
         ks_ = torch.mean(d_dl['ks_loss']).numpy()
@@ -160,7 +161,7 @@ def check_dl_version_test_results_one_epoch(train_results_dir,
         if save_figure_dir is None:
             raise Exception(
                 "You need to specify your figure saving directory.")
-        x = np.arange(0, len(d['valid_param_list']), 1)
+        x = np.arange(0, len(d['valid_param_indices']), 1)
         for i in range(3):
             loss_name = loss_name_list[i]
             plt.figure()

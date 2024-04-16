@@ -6,6 +6,7 @@ from src.basic.constants import DEFAULT_DTYPE
 def get_device():
     if torch.cuda.is_available():
         os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+        os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
         device = torch.device('cuda')
     else:
         device = torch.device('cpu')

@@ -13,25 +13,25 @@ conda_env=MFM_exploration
 dataset_name=HCPYA # ['HCPYA', 'PNC']
 main_py="${scripts_dir}/main_${dataset_name}.py"
 
-target_list=('only1_group')
-# ('only1_group' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
+target_list=('all_participants')
+# ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
 ncpus=2
 need_gpu=1
-mem=5G
+mem=4G
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(21)
-# seed_list=(1)
-seed_list=($(seq 1 1 5))
+trial_list=(22)
+seed_list=(1 3 4)
+# seed_list=($(seq 3 1 5))
 # seed_list=($(seq 2 1 1000))
 
 for target in "${target_list[@]}"; do
     # For group
-    if [ ${target} = 'only1_group' ]; then # No group_nbr need
+    if [ ${target} = 'all_participants' ]; then # No group_nbr need
 
         logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
 
@@ -53,7 +53,7 @@ for target in "${target_list[@]}"; do
                     log_out="se${seed_nbr}_out.log"
                     if [ ${need_gpu} = 1 ]; then
                         cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 15:00:00 -ncpus $ncpus -ngpus 1 -mem $mem -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 16:00:00 -ncpus $ncpus -ngpus 1 -mem $mem -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
                         $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 5:00:00 -ncpus $ncpus -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"

@@ -675,8 +675,8 @@ def mean_fc_profile_vs_age_group():
         group_mats_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/age_group_Harvard/{group_nbr}'
         fc_fcd_file = sio.loadmat(
             os.path.join(group_mats_path, 'fc_fcd_cdf_aCompCor.mat'))
-        fc_emp = np.array(fc_fcd_file['fc'])
-        fc_list[valid_count] = np.mean(fc_emp, axis=1)
+        emp_fc = np.array(fc_fcd_file['fc'])
+        fc_list[valid_count] = np.mean(emp_fc, axis=1)
 
         age_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/age_group_Harvard/{group_nbr}/subjects_demo.txt'
         age = pd.read_csv(age_path, sep='\t', header=None, index_col=False)

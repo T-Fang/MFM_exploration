@@ -315,10 +315,10 @@ def group_sim_fc_fcd_to_individual(sub_nbr, group_same_fc_fcd):
             print(f"Valid FCD runs are not 4.")
             return
 
-    # fc_emp = np.array([fc_runs['fc_REST2_LR'], fc_runs['fc_REST2_RL']])
-    # fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-    fc_emp = np.array(fc_runs['fc_REST2_RL'])
-    fc_emp = torch.as_tensor(fc_emp)
+    # emp_fc = np.array([fc_runs['fc_REST2_LR'], fc_runs['fc_REST2_RL']])
+    # emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+    emp_fc = np.array(fc_runs['fc_REST2_RL'])
+    emp_fc = torch.as_tensor(emp_fc)
     # emp_fcd_cum = (fcd_runs['fcd_cdf_3'] + fcd_runs['fcd_cdf_4'])
     emp_fcd_cum = fcd_runs['fcd_cdf_4']
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum.astype(np.float64))
@@ -327,7 +327,7 @@ def group_sim_fc_fcd_to_individual(sub_nbr, group_same_fc_fcd):
     fc_sim = group_same_fc_fcd['fc']
     fcd_pdf = group_same_fc_fcd['fcd_pdf']
     total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-        fc_sim, fcd_pdf, fc_emp, emp_fcd_cum)
+        fc_sim, fcd_pdf, emp_fc, emp_fcd_cum)
     save_loss = torch.hstack(
         (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1), ks_loss.unsqueeze(1)))
 
@@ -385,8 +385,8 @@ def compute_KS_distance():
 def visualize_FC():
     # fc_1029 = sio.loadmat('/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat')
     # fc_1029 = fc_1029['fc_roi_1029']
-    # fc_emp = np.array(fc_1029[860:1029])
-    # fc = tzeng_func.tzeng_fisher_average(fc_emp)
+    # emp_fc = np.array(fc_1029[860:1029])
+    # fc = tzeng_func.tzeng_fisher_average(emp_fc)
     fc = torch.load(
         '/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/simulate/trial1/sim_results_5seeds.pth'
     )
@@ -404,9 +404,9 @@ def simulate_results_loss_analysis():
         '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
     )
     fc_1029 = fc_1029['fc_roi_1029']
-    fc_emp = np.array(fc_1029[subrange[0]:subrange[1]])
-    fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = np.array(fc_1029[subrange[0]:subrange[1]])
+    emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+    emp_fc = torch.as_tensor(emp_fc)
     fcd_1029 = sio.loadmat(
         '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
     )
@@ -424,7 +424,7 @@ def simulate_results_loss_analysis():
     fc_losses = np.zeros((10, 3))
     for i in range(10):
         _, fc_losses[i] = MfmModel2014.FC_correlation_n_L1_cost(
-            fc_sim[i], fc_emp)
+            fc_sim[i], emp_fc)
     print(fc_losses)
     # fcd_pdf_sim  = sim_res['fcd_pdf']
     # fcd_losses = np.zeros((10, 3))
@@ -436,14 +436,14 @@ def simulate_results_loss_analysis():
 def merge_desikan_group_mat():
     save_mat_dir = '/home/ftian/storage/projects/MFM_exploration/data/DL_group_mats/Desikan'
     source_mat_dir = '/mnt/isilon/CSC1/Yeolab/Users/tzeng/Matlab/HCPS1200/matfiles/NeuralMass/DL_group_mats/grouped_mats_Desikan'
-    for mode in ['train', 'val', 'test']:
+    for phase in ['train', 'val', 'test']:
         mat_file_list = ['fc', 'fcd', 'myelin', 'rsfc', 'sc']
         mat_file_path_list = [
-            os.path.join(source_mat_dir, f'{f}_{mode}.mat')
+            os.path.join(source_mat_dir, f'{f}_{phase}.mat')
             for f in mat_file_list
         ]
         merge_mat_files(mat_file_path_list,
-                        os.path.join(save_mat_dir, f'{mode}.mat'))
+                        os.path.join(save_mat_dir, f'{phase}.mat'))
 
 
 if __name__ == "__main__":

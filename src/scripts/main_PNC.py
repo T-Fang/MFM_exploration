@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.scripts.Hybrid_CMA_ES import DLVersionCMAESValidator, DLVersionCMAESTester, \
+from src.scripts.Hybrid_CMA_ES import CMAESValidator, CMAESTester, \
     get_EI_ratio, train_help_function
 
 
@@ -40,11 +40,11 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
     sc_euler = sc_mat / torch.max(
         sc_mat) * 0.02  # [68, 68] for Euler integration
 
-    fc_emp = pd.read_csv(
+    emp_fc = pd.read_csv(
         f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_vol/rest/FC/sub-{subject_id}.csv',
         header=None,
         index_col=False)
-    fc_emp = torch.as_tensor(np.array(fc_emp))
+    emp_fc = torch.as_tensor(np.array(emp_fc))
     emp_fcd_cum = spio.loadmat(
         f'/home/shaoshi.z/storage/MFM/PNC/desikan_FC_FCD_from_vol/rest/FCD/sub-{subject_id}.mat'
     )
@@ -63,11 +63,11 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 50),
                                     dl_rfic_range=[],
@@ -100,9 +100,9 @@ def apply_individual(mode, sub_nbr, trial_nbr, seed_nbr):
                                           f'param_save_epoch{epoch}.pth')
             d = torch.load(parameter_path)
 
-            valid_param_list_pre = d['valid_param_list']
+            valid_param_indices_pre = d['valid_param_indices']
             parameter = d['parameter']
-            parameter = parameter[:, valid_param_list_pre]
+            parameter = parameter[:, valid_param_indices_pre]
             total_loss = torch.sum(d['FC_FCD_loss'], dim=1)  # [xxx]
             best_param_ind = torch.argmin(total_loss)
             parameter = parameter[:, best_param_ind]  # [parameter_dim]
@@ -152,11 +152,11 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
     sc_euler = sc_mat / torch.max(
         sc_mat) * 0.02  # [68, 68] for Euler integration
 
-    fc_emp = np.array(
+    emp_fc = np.array(
         pd.read_csv(os.path.join(group_mats_path, f'FC_{postfix}.csv'),
                     header=None,
                     index_col=False))
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = torch.as_tensor(emp_fc)
     emp_fcd_cum = spio.loadmat(
         os.path.join(group_mats_path, f'FCD_{postfix}.mat'))
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[f'FCD_{postfix}'].astype(
@@ -174,11 +174,11 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 50),
                                     dl_rfic_range=[],
@@ -196,15 +196,14 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         val_dir = os.path.join(
             parent_dir,
             f'validation/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
@@ -217,10 +216,10 @@ def apply_age_group(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         test_dir = os.path.join(
             parent_dir,
             f'test/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
         mfm_tester.select_best_from_val()
 
     elif mode == 'EI':
@@ -282,11 +281,11 @@ def apply_overall_acc_group(mode,
     sc_euler = sc_mat / torch.max(
         sc_mat) * 0.02  # [68, 68] for Euler integration
 
-    fc_emp = np.array(
+    emp_fc = np.array(
         pd.read_csv(os.path.join(group_mats_path, f'FC_{postfix}.csv'),
                     header=None,
                     index_col=False))
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = torch.as_tensor(emp_fc)
     emp_fcd_cum = spio.loadmat(
         os.path.join(group_mats_path, f'FCD_{postfix}.mat'))
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[f'FCD_{postfix}'].astype(
@@ -304,11 +303,11 @@ def apply_overall_acc_group(mode,
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=[],
                                     euler_pfic_range=np.arange(0, 50),
                                     dl_rfic_range=[],
@@ -326,15 +325,14 @@ def apply_overall_acc_group(mode,
         val_dir = os.path.join(
             parent_dir,
             f'validation/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
@@ -354,10 +352,10 @@ def apply_overall_acc_group(mode,
         test_dir = os.path.join(
             parent_dir,
             f'test/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
         mfm_tester.select_best_from_val()
 
     elif mode == 'EI':
@@ -413,11 +411,11 @@ def apply_age_group_Yan100(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
     sc_euler = sc_mat / torch.max(
         sc_mat) * 0.02  # [n_roi, n_roi] for Euler integration
 
-    fc_emp = np.array(
+    emp_fc = np.array(
         pd.read_csv(os.path.join(group_mats_path, f'FC_{postfix}.csv'),
                     header=None,
                     index_col=False))
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = torch.as_tensor(emp_fc)
     emp_fcd_cum = spio.loadmat(
         os.path.join(group_mats_path, f'FCD_{postfix}.mat'))
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[f'FCD_{postfix}'].astype(
@@ -435,11 +433,11 @@ def apply_age_group_Yan100(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=np.arange(0, 45),
                                     euler_pfic_range=np.arange(45, 50),
                                     dl_rfic_range=[],
@@ -457,15 +455,14 @@ def apply_age_group_Yan100(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         val_dir = os.path.join(
             parent_dir,
             f'validation/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
@@ -478,10 +475,10 @@ def apply_age_group_Yan100(mode, group_nbr, trial_nbr, seed_nbr, epoch=None):
         test_dir = os.path.join(
             parent_dir,
             f'test/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
         mfm_tester.select_best_from_val()
 
     elif mode == 'EI':
@@ -546,11 +543,11 @@ def apply_overall_acc_group_Yan100(mode,
     sc_euler = sc_mat / torch.max(
         sc_mat) * 0.02  # [68, 68] for Euler integration
 
-    fc_emp = np.array(
+    emp_fc = np.array(
         pd.read_csv(os.path.join(group_mats_path, f'FC_{postfix}.csv'),
                     header=None,
                     index_col=False))
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = torch.as_tensor(emp_fc)
     emp_fcd_cum = spio.loadmat(
         os.path.join(group_mats_path, f'FCD_{postfix}.mat'))
     emp_fcd_cum = torch.as_tensor(emp_fcd_cum[f'FCD_{postfix}'].astype(
@@ -568,11 +565,11 @@ def apply_overall_acc_group_Yan100(mode,
         state = train_help_function(config=config,
                                     myelin=myelin,
                                     RSFC_gradient=rsfc_gradient,
-                                    sc_mat=sc_mat,
-                                    fc_emp=fc_emp,
+                                    sc_euler=sc_mat,
+                                    emp_fc=emp_fc,
                                     emp_fcd_cum=emp_fcd_cum,
-                                    save_param_dir=save_param_dir,
-                                    epochs=epochs,
+                                    train_save_dir=save_param_dir,
+                                    num_epochs=epochs,
                                     dl_pfic_range=np.arange(0, 45),
                                     euler_pfic_range=np.arange(45, 50),
                                     dl_rfic_range=[],
@@ -590,15 +587,14 @@ def apply_overall_acc_group_Yan100(mode,
         val_dir = os.path.join(
             parent_dir,
             f'validation/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_validator = DLVersionCMAESValidator(config, save_param_dir,
-                                                val_dir)
+        mfm_validator = CMAESValidator(config, save_param_dir, val_dir)
         if epoch is None:
             for ep in range(0, epochs):
-                mfm_validator.val_best_parameters(sc_euler, fc_emp,
+                mfm_validator.val_best_parameters(sc_euler, emp_fc,
                                                   emp_fcd_cum, ep)
         else:
             epoch = int(epoch)
-            mfm_validator.val_best_parameters(sc_euler, fc_emp, emp_fcd_cum,
+            mfm_validator.val_best_parameters(sc_euler, emp_fc, emp_fcd_cum,
                                               epoch)
 
     elif mode == 'test':
@@ -618,10 +614,10 @@ def apply_overall_acc_group_Yan100(mode,
         test_dir = os.path.join(
             parent_dir,
             f'test/trial{trial_nbr}/seed{seed_nbr}/group{group_nbr}')
-        mfm_tester = DLVersionCMAESTester(config,
-                                          val_dirs,
-                                          test_dir,
-                                          trained_epochs=epochs)
+        mfm_tester = CMAESTester(config,
+                                 val_dirs,
+                                 test_dir,
+                                 train_num_epochs=epochs)
         mfm_tester.select_best_from_val()
 
     elif mode == 'EI':

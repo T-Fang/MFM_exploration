@@ -1,69 +1,130 @@
 import os
 import subprocess
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 from scipy import stats, io as sio
 import torch
+import cv2
 
 from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
-from src.utils.file_utils import convert_to_mat, get_fig_dir, get_fig_file_path, get_losses_fig_dir, \
-    get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict
+from src.utils.file_utils import convert_to_mat, get_fig_dir_in_logs, get_fig_path_in_logs, get_losses_fig_dir, \
+    get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_fig_path
 
 ############################################################
 # Visualization related
 ############################################################
 
 
-def concat_images(imga, imgb):
+# * General Visualization Functions
+def concat_n_images(image_path_list, rows, cols, save_file_path=None):
     """
-    Combines two color image ndarrays side-by-side.
-    """
-    ha, wa = imga.shape[:2]
-    hb, wb = imgb.shape[:2]
-    max_height = np.max([ha, hb])
-    total_width = wa + wb
-    new_img = np.zeros(shape=(max_height, total_width, 3))
-    new_img[:ha, :wa] = imga
-    new_img[:hb, wa:wa + wb] = imgb
-    return new_img
+    Combines N color images from a list of image paths into a grid of specified rows and columns.
+    If the dimensions of the images are not consistent, the images will be rescaled according to the dimensions of the first image.
 
+    Args:
+        image_path_list (List[str]): List of image paths.
+        rows (int): Number of rows in the grid.
+        cols (int): Number of columns in the grid.
+        save_file_path (str, optional): File path to save the concatenated image. Defaults to None.
 
-def concat_n_images(image_path_list, save_file_path=None):
+    Returns:
+        ndarray: The concatenated image as a numpy array.
     """
-    Combines N color images from a list of image paths.
-    """
-    output = None
-    for i, img_path in enumerate(image_path_list):
-        img = plt.imread(img_path)[:, :, :3]
-        if i == 0:
-            output = img
-        else:
-            output = concat_images(output, img)
+    if len(image_path_list) != rows * cols:
+        raise ValueError("Number of images does not match the grid dimensions")
+
+    first_image = plt.imread(image_path_list[0])[:, :, :3]
+    first_image_height, first_image_width, _ = first_image.shape
+
+    output = []
+    for r in range(rows):
+        row_images = []
+        for c in range(cols):
+            img_path = image_path_list[r * cols + c]
+            img = plt.imread(img_path)[:, :, :3]
+            img_height, img_width, _ = img.shape
+            if img_height != first_image_height or img_width != first_image_width:
+                img = resize_image(img, first_image_height, first_image_width)
+            row_images.append(img)
+        output.append(np.hstack(row_images))
+    output = np.vstack(output)
+
     if save_file_path is not None:
         plt.imsave(save_file_path, output)
     return output
 
 
-def visualize_stats(stats, stats_name, fig_file_path):
+def resize_image(image, target_height, target_width):
     """
-    First, cd into MATLAB_SCRIPT_PATH.
-    Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
-    Finally, run the visualize_parameter_desikan_fslr function to visualize the stats.
+    Resizes an image to the target height and width.
+
+    Args:
+        image (ndarray): The image as a numpy array.
+        target_height (int): The target height.
+        target_width (int): The target width.
+
+    Returns:
+        ndarray: The resized image as a numpy array.
     """
+    resized_image = cv2.resize(image, (target_width, target_height))
+    return resized_image
 
-    mat_file_path = convert_to_mat(stats, stats_name)
 
-    print(f"Visualizing {stats_name} from {mat_file_path}...")
+def visualize_stats(stats_list, stats_names, fig_file_paths):
+    """
+    Visualize the stats using MATLAB script.
+    Firstly, load the [68, 1] statistic (one scalar for each ROI).
+    Then, run the visualize_parameter_desikan_fslr function to visualize the stats.
 
-    command = [
-        f"cd {MATLAB_SCRIPT_DIR}; "
-        f"matlab -nodisplay -nosplash -nodesktop -r "
-        f"\"try, load('{mat_file_path}', '{stats_name}'); "
-        f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}'); "
-        f"catch ME, disp(ME.message), exit(1), end, exit;\""
-    ]
+    Args:
+        stats_list (Union[ndarray, List[ndarray]]): The list of statistics data.
+        stats_names (Union[str, List[str]]): The list of names of the statistics.
+        fig_file_paths (Union[str, List[str]]): The list of file paths to save the visualizations.
 
-    result = subprocess.run(command,
+    Raises:
+        Exception: If MATLAB encounters an error or terminates.
+    """
+    if not isinstance(stats_list, list):
+        stats_list = [stats_list]
+    if not isinstance(stats_names, list):
+        stats_names = [stats_names]
+    if not isinstance(fig_file_paths, list):
+        fig_file_paths = [fig_file_paths]
+
+    commands = []
+    for stats_data, stats_name, fig_file_path in zip(stats_list, stats_names,
+                                                     fig_file_paths):
+        commands.append(
+            f"load('{convert_to_mat(stats_data, stats_name)}', '{stats_name}')"
+        )
+        commands.append(
+            f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}')"
+        )
+
+    run_matlab_commands(commands)
+    print("Visualizations saved to:", fig_file_paths)
+
+
+def run_matlab_commands(commands):
+    """
+    Run a MATLAB command in the MATLAB
+    ! Remember to use double quote for the command string,
+    ! and single quote to indicate strings/char vectors in MATLAB.
+    ! Additionally, there is no need to add ; at the end of each MATLAB command.
+
+    Args:
+        command (str or List[str]): The MATLAB command(s) to run.
+
+    Raises:
+        Exception: If MATLAB encounters an error or terminates.
+    """
+    if isinstance(commands, str):
+        commands = [commands]
+    commands = f"cd {MATLAB_SCRIPT_DIR}; matlab -nodisplay -nosplash -nodesktop -r \"try, {'; '.join(commands)}; catch ME, disp(ME.message), exit(1), end, exit;\""  # noqa: E501
+
+    print("Running MATLAB command:", commands)
+    result = subprocess.run(commands,
                             shell=True,
                             capture_output=True,
                             text=True)
@@ -72,7 +133,103 @@ def visualize_stats(stats, stats_name, fig_file_path):
         raise Exception("Matlab encountered an error or terminated.")
     else:
         print(result.stdout)
-        print(f'Visualization saved to {fig_file_path}')
+
+
+# * Plot FC and FCD
+def plot_sim_fc_fcd(
+    ds_name: str,
+    target: str,
+    phase: int,
+    trial_idx: int,
+    seed_idx: int,
+    param_idx: int,
+):
+    """
+    Plot simulated FC and FCD from the given simulation result.
+
+    Args:
+        sim_res_path (str): Path to the simulation result.
+        param_idx (int): Index of the parameter to plot.
+    """
+
+    sim_res_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
+                                    seed_idx,
+                                    f'sim_results_on_{phase}_set.pth')
+
+    sim_res = torch.load(sim_res_path, map_location='cpu')
+    fc_sim = sim_res['fc_sim'][param_idx]
+    fcd_sim = sim_res['fcd_sim'][param_idx]
+
+    fcd_sim_save_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
+                                         seed_idx, 'sim_fcd.csv')
+    fc_sim_save_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
+                                        seed_idx, 'sim_fc.csv')
+
+    # save to csv
+    pd.DataFrame(fc_sim).to_csv(fc_sim_save_path, index=False, header=False)
+    pd.DataFrame(fcd_sim).to_csv(fcd_sim_save_path, index=False, header=False)
+
+    # draw heatmaps
+    draw_heatmap(
+        [fc_sim_save_path, fcd_sim_save_path],
+        [f'simulated FC on {phase} set', f'simulated FCD on {phase} set'], [
+            fc_sim_save_path.replace('.csv', '.png'),
+            fcd_sim_save_path.replace('.csv', '.png')
+        ])
+
+
+def compare_fc(sim_fc_path, emp_fc_path):
+    """
+    Compare the simulated FC with the empirical FC.
+    """
+    agreement_fig_path = sim_fc_path.replace('.csv', '_agreement_with_emp.png')
+    command = f"compare_FC('{sim_fc_path}', '{emp_fc_path}', '{agreement_fig_path}')"
+    run_matlab_commands(command)
+
+    compare_fig_path = sim_fc_path.replace('.csv', '_compare_with_emp.png')
+    sim_fc_fig_path = sim_fc_path.replace('.csv', '.png')
+    emp_fc_fig_path = emp_fc_path.replace('.csv', '.png')
+    concat_n_images([sim_fc_fig_path, emp_fc_fig_path, agreement_fig_path], 1,
+                    3, compare_fig_path)
+
+
+def compare_fcd(sim_fcd_path, emp_fcd_path):
+    """
+    Compare the simulated FCD with the empirical FCD.
+    """
+    sim_fcd_fig_path = sim_fcd_path.replace('.csv', '.png')
+    emp_fcd_fig_path = emp_fcd_path.replace('.csv', '.png')
+    concat_n_images([sim_fcd_fig_path, emp_fcd_fig_path], 1, 2,
+                    sim_fcd_path.replace('.csv', '_compare_with_emp.png'))
+
+
+def draw_heatmap(heatmap_data_paths, titles, save_file_paths):
+    """
+    Draw heatmaps from the heatmap data files.
+
+    Args:
+        heatmap_data_paths (Union[str, List[str]]): The path(s) to the heatmap data csv file(s).
+        titles (Union[str, List[str]]): The title(s) of the heatmap(s).
+        save_file_paths (Union[str, List[str]]): The path(s) to save the heatmap(s).
+    """
+
+    if not isinstance(heatmap_data_paths, list):
+        heatmap_data_paths = [heatmap_data_paths]
+
+    if not isinstance(titles, list):
+        titles = [titles]
+
+    if not isinstance(save_file_paths, list):
+        save_file_paths = [save_file_paths]
+
+    commands = []
+    for heatmap_data_path, title, save_file_path in zip(
+            heatmap_data_paths, titles, save_file_paths):
+        command = f"draw_heatmap('{heatmap_data_path}', '{title}', '{save_file_path}')"
+        commands.append(command)
+
+    run_matlab_commands(commands)
+    print("Heatmaps saved to:", save_file_paths)
 
 
 def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
@@ -366,29 +523,36 @@ def plot_train_loss(ds_name,
                     save_fig_path=None,
                     lowest_top_k=10,
                     show_individual_loss=None):
+
     if save_fig_path is None:
+        group_prefix = '' if group_idx is None else f'group{group_idx}_'
         postfix = '' if show_individual_loss is None else f'_{show_individual_loss}'
-        save_fig_path = get_fig_file_path(
+        postfix += f'_for_top{lowest_top_k}_children' if lowest_top_k is not None else ''
+        save_fig_path = get_fig_path_in_logs(
             ds_name, target, 'losses', trial_idx, seed_idx,
-            f'group{group_idx}_train_losses{postfix}.png')
+            f'{group_prefix}train_losses{postfix}.png')
 
     corr_list = []
     l1_list = []
     ks_list = []
     r_E_list = []
     for epoch_idx in epoch_range:
-        d = load_train_dict(ds_name, target, trial_idx, seed_idx, group_idx,
-                            epoch_idx)
-        _, lowest_top_k_indices = get_train_top_k(d, k=lowest_top_k)
-        lowest_top_k_indices = lowest_top_k_indices.numpy()
-        corr_losses = d['FC_FCD_loss'][:, 0][lowest_top_k_indices]
+        d = load_train_dict(ds_name,
+                            target,
+                            trial_idx,
+                            seed_idx,
+                            group_idx,
+                            epoch_idx,
+                            apply_sort=True)
+
+        corr_losses = d['corr_loss'][:lowest_top_k]
         corr_list.append(torch.mean(corr_losses).item())
-        l1_losses = d['FC_FCD_loss'][:, 1][lowest_top_k_indices]
+        l1_losses = d['l1_loss'][:lowest_top_k]
         l1_list.append(torch.mean(l1_losses).item())
-        ks_losses = d['FC_FCD_loss'][:, 2][lowest_top_k_indices]
+        ks_losses = d['ks_loss'][:lowest_top_k]
         ks_list.append(torch.mean(ks_losses).item())
         if 'r_E_reg_loss' in d.keys():
-            r_E_reg_losses = d['r_E_reg_loss'][lowest_top_k_indices]
+            r_E_reg_losses = d['r_E_reg_loss'][:lowest_top_k]
             r_E_list.append(torch.mean(r_E_reg_losses).item())
 
     x = np.array(epoch_range)
@@ -415,11 +579,15 @@ def plot_train_loss(ds_name,
                 f'Invalid show_individual_loss {show_individual_loss}')
     plt.xlabel('iterations')
     plt.ylabel('loss')
-    plt.title(f'{target.replace("_", " ")} {group_idx} train losses')
+    group_affix = '' if group_idx is None else f'{group_idx}'
+    suffix = f' for top {lowest_top_k} children' if lowest_top_k is not None else ' for all children'
+
+    plt.title(
+        f'{target.replace("_", " ")} {group_affix} train losses {suffix}')
     plt.legend()
     plt.savefig(save_fig_path)
     plt.close()
-    print('Saved.')
+    print('Saved to:', save_fig_path)
 
 
 ############################################################
@@ -525,13 +693,18 @@ def boxplot_train_r_E(ds_name,
     """
     all_epochs_r_E = []
     for epoch_idx in epoch_range:
-        saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
-                                     group_idx, epoch_idx)
-        _, top_k_indices = get_train_top_k(saved_dict, k=top_k)
-        r_E_for_valid_params = saved_dict['r_E_for_valid_params']
+        saved_dict = load_train_dict(ds_name,
+                                     target,
+                                     trial_idx,
+                                     seed_idx,
+                                     group_idx,
+                                     epoch_idx,
+                                     apply_sort=True)
+        # extract the r_E for each of the top_k children at each ROI at each epoch from the 'r_E_for_valid_params' tensor
+        ROI_r_E_at_epoch = saved_dict['r_E_for_valid_params']
+        if top_k is not None:
+            ROI_r_E_at_epoch = ROI_r_E_at_epoch[:, :top_k]
 
-        # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor
-        ROI_r_E_at_epoch = r_E_for_valid_params[:, top_k_indices]
         if plot_outlier_r_E:
             ROI_r_E_deviation_at_epoch = ROI_r_E_at_epoch - 3
             r_E_at_epoch = torch.max(torch.abs(ROI_r_E_deviation_at_epoch),
@@ -542,12 +715,13 @@ def boxplot_train_r_E(ds_name,
         all_epochs_r_E.append(r_E_at_epoch.numpy())
 
     if save_fig_path is None:
-        postfix = '_outlier' if plot_outlier_r_E else ''
+        suffix = '_outlier' if plot_outlier_r_E else ''
+        group_affix = '' if group_idx is None else f'_of_group{group_idx}'
         if top_k is not None:
-            postfix += f'_top{top_k}'
-        save_fig_path = get_fig_file_path(
+            suffix += f'_for_top{top_k}_children'
+        save_fig_path = get_fig_path_in_logs(
             ds_name, target, 'train_r_E_boxplot', trial_idx, seed_idx,
-            f'r_E_of_group{group_idx}_boxplot{postfix}.png')
+            f'r_E{group_affix}_boxplot{suffix}.png')
 
     plt.figure()
     plt.boxplot(all_epochs_r_E, labels=epoch_range)
@@ -556,11 +730,13 @@ def boxplot_train_r_E(ds_name,
         plt.ylabel('|r_E - 3|')
     else:
         plt.ylabel('r_E')
-    postfix = ' r_E (outlier)' if plot_outlier_r_E else ' mean r_E'
-    plt.title(f'{target.replace("_", " ")} {group_idx}{postfix}')
+    suffix = ' r_E (outlier)' if plot_outlier_r_E else ' mean r_E'
+    suffix += f' for top {top_k} children' if top_k is not None else ' for all children'
+    group_affix = '' if group_idx is None else f'{group_idx}'
+    plt.title(f'{target.replace("_", " ")} {group_affix}{suffix}')
     plt.savefig(save_fig_path)
     plt.close()
-    print('Saved.')
+    print('Saved to:', save_fig_path)
 
 
 def export_train_r_E(ds_name,
@@ -570,31 +746,68 @@ def export_train_r_E(ds_name,
                      group_idx,
                      epoch_idx,
                      save_mat_path=None):
-    saved_dict = load_train_dict(ds_name, target, trial_idx, seed_idx,
-                                 group_idx, epoch_idx)
-    _, top_k_indices = get_train_top_k(saved_dict, k=1)
-    r_E_for_valid_params = saved_dict['r_E_for_valid_params']
+    saved_dict = load_train_dict(ds_name,
+                                 target,
+                                 trial_idx,
+                                 seed_idx,
+                                 group_idx,
+                                 epoch_idx,
+                                 apply_sort=True)
 
-    # extract the r_E for each child at each ROI at each epoch from the 'r_E_for_valid_params' tensor
-    r_E_at_epoch = r_E_for_valid_params[:, top_k_indices]
+    # extract the r_E at each ROI at each epoch for the best child from the 'r_E_for_valid_params' tensor
+    r_E_at_epoch = saved_dict[
+        'r_E_for_valid_params'][:, :1]  # ! r_E should be a column vector
 
     # save the r_E_at_epoch as mat
+    group_affix = '' if group_idx is None else f'_of_group{group_idx}'
     if save_mat_path is None:
-        save_mat_path = get_fig_file_path(
+        save_mat_path = get_fig_path_in_logs(
             ds_name, target, 'train_r_E_surf_map', trial_idx, seed_idx,
-            f'r_E_of_group{group_idx}_at_epoch{epoch_idx}')
+            f'r_E{group_affix}_at_epoch{epoch_idx}.mat')
     sio.savemat(save_mat_path, {'r_E': r_E_at_epoch})
+    return save_mat_path
 
 
 def visualize_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
                         epoch_idx):
-    save_mat_path = get_fig_file_path(
-        ds_name, target, 'train_r_E', trial_idx, seed_idx,
-        f'r_E_of_group{group_idx}_at_epoch{epoch_idx}.mat')
-    export_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
-                     epoch_idx, save_mat_path)
+    save_mat_path = export_train_r_E(ds_name, target, trial_idx, seed_idx,
+                                     group_idx, epoch_idx)
     visualize_stats(save_mat_path, 'r_E',
                     save_mat_path.replace('.mat', '_surf_map.png'))
+
+
+def visualize_train_r_E_for_multi_epochs(ds_name, target, trial_idx, seed_idx,
+                                         group_idx, n_epochs, rows, cols):
+    """
+    Visualize the r_E at each ROI at each epoch for the best child for multiple epochs,
+    According to rows and cols, we decide how many surf maps to show: n_surf_maps.
+    Then, get n_surf_maps epoch that are equally spaced in range(n_epochs).
+        Note that we always include the first and the last epoch.
+    Based on the epochs chosen, we export the r_E to mat files using export_train_r_E.
+    Then, we can call visualize_stats that takes in list of mat_file_paths, list containing 'r_E', and a list of fig_file_paths.
+    Finally, combine these n_surf_maps images into one image using concat_n_images.
+    """
+
+    n_surf_maps = rows * cols
+    epochs = np.floor(np.linspace(0, n_epochs - 1, n_surf_maps)).astype(int)
+    mat_file_paths = []
+    stats_names = []
+    fig_file_paths = []
+    for epoch_idx in epochs:
+        mat_file_paths.append(
+            export_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
+                             epoch_idx))
+        stats_names.append('r_E')
+        fig_file_paths.append(mat_file_paths[-1].replace(
+            '.mat', '_surf_map.png'))
+
+    visualize_stats(mat_file_paths, stats_names, fig_file_paths)
+
+    group_affix = '' if group_idx is None else f'_of_group{group_idx}'
+    concat_n_images(
+        fig_file_paths, rows, cols,
+        get_fig_path_in_logs(ds_name, target, 'train_r_E_surf_map', trial_idx,
+                             seed_idx, f'r_E{group_affix}_surf_map.png'))
 
 
 def merge_train_dict_across_seed(ds_name,
@@ -690,8 +903,8 @@ def scatter_loss_vs_r_E(ds_name,
     loss_dict['l1'] = FC_FCD_loss[:, 1]
     loss_dict['ks'] = FC_FCD_loss[:, 2]
 
-    fig_dir = get_fig_dir(ds_name, target, 'scatter_loss_vs_r_E', trial_idx,
-                          "_all")
+    fig_dir = get_fig_dir_in_logs(ds_name, target, 'scatter_loss_vs_r_E',
+                                  trial_idx, "_all")
 
     group_idx_str = "" if group_idx is None else f"{group_idx}"
     target_str = target.replace("_", " ")

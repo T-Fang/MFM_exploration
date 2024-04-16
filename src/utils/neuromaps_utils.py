@@ -178,7 +178,7 @@ def get_mean_of_neuromaps_under(dir: str,
 
 
 def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
-                      num_of_PCs: str = 3,
+                      PCs: int | list[int] = 3,
                       use_mean_map=False,
                       use_unit_vector=True):
     """
@@ -196,7 +196,10 @@ def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
     else:
         concat_matrix = [one_array]
 
-    for i in range(1, num_of_PCs + 1):
+    if isinstance(PCs, int):
+        PCs = list(range(1, PCs + 1))
+
+    for i in PCs:
         PC = pd.read_csv(os.path.join(dir, f'pc{i}.csv'),
                          header=None).values.flatten()
         if use_unit_vector:
@@ -211,7 +214,7 @@ def reconstruct(num_of_PCs,
                 target_name,
                 visualize_recon=False,
                 use_mean_map=False):
-    X = get_concat_matrix(num_of_PCs=num_of_PCs)
+    X = get_concat_matrix(PCs=num_of_PCs)
     N = X.shape[0]
 
     print(f'Reconstructing {target_name}:')
@@ -283,4 +286,5 @@ def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
         os.path.join(
             fig_dir,
             f"{target_name}_reconstruction_residuals_surf_map{suffix}.png")
-    ], os.path.join(fig_dir, f"{target_name}_reconstruction{suffix}.png"))
+    ], 1, 3, os.path.join(fig_dir,
+                          f"{target_name}_reconstruction{suffix}.png"))

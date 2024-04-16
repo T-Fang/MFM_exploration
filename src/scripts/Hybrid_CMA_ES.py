@@ -8,6 +8,7 @@ import datetime
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
 from src.basic.constants import DESIKAN_NEUROMAPS_DIR
+from src.utils.file_utils import combine_all_param_dicts, get_train_file_path
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
 from src.utils.neuromaps_utils import get_concat_matrix
@@ -18,47 +19,6 @@ def csv2tensor(csv_path):
     content = pd.read_csv(csv_path, header=None, index_col=False)
     content = np.array(content)
     return torch.as_tensor(content, dtype=torch.double)
-
-
-def regularization_loss(parameter,
-                        w_wee,
-                        w_wei,
-                        w_sigma,
-                        concat_mat,
-                        pinv_concat_mat=None):
-    """rFIC regularization loss
-
-    Args:
-        parameters (tensor): wEE, wEI, G, sigma. [3N+1, param_sets]
-        w_wee (scalar): the weight for the regularization term for wee_regularization_loss.
-        w_wei (scalar): the weight for the regularization term for wei_regularization_loss.
-        w_sigma (scalar): the weight for the regularization term for sigma_regularization_loss.
-        concat_mat (tensor): [bias (ones_like myelin), myelin, RSFC gradient]
-        pinv_concat_mat (tensor, optional): pinv(concat_mat). Defaults to None.
-
-    Returns:
-        (tensors): [param_sets, 3]. wEE, wEI, sigma regularization loss terms
-    """
-    N = concat_mat.shape[0]  # ROI num
-    if pinv_concat_mat is None:
-        pinv_concat_mat = torch.linalg.pinv(concat_mat)
-    beta_wee = torch.matmul(pinv_concat_mat, parameter[0:N])  # [3, param_sets]
-    beta_wei = torch.matmul(pinv_concat_mat, parameter[N:2 * N])
-    beta_sigma = torch.matmul(pinv_concat_mat, parameter[2 * N + 1:])
-    wee_hat = torch.matmul(concat_mat, beta_wee)  # [N, param_sets]
-    wei_hat = torch.matmul(concat_mat, beta_wei)
-    sigma_hat = torch.matmul(concat_mat, beta_sigma)
-
-    wee_regularization_loss = w_wee * torch.mean(
-        torch.square(parameter[0:N] - wee_hat), dim=0)  # [param_sets]
-    wei_regularization_loss = w_wei * torch.mean(
-        torch.square(parameter[N:2 * N] - wei_hat), dim=0)
-    sigma_regularization_loss = w_sigma * torch.mean(
-        torch.square(parameter[2 * N + 1:] - sigma_hat), dim=0)
-
-    return torch.hstack((wee_regularization_loss.unsqueeze(1),
-                         wei_regularization_loss.unsqueeze(1),
-                         sigma_regularization_loss.unsqueeze(1)))
 
 
 def get_r_E_reg_loss(r_E, target_r_E, loss_type='L2'):
@@ -94,7 +54,7 @@ def select_best_parameter_from_savedict(save_dict):
         )
 
     index_in_valid = torch.argmin(total_loss)
-    index_min = save_dict['valid_param_list'][index_in_valid]
+    index_min = save_dict['valid_param_indices'][index_in_valid]
     if 'parameter' in save_dict:
         best_parameter = save_dict['parameter'][:, index_min]
     elif 'param_coef' in save_dict:
@@ -108,75 +68,14 @@ def select_best_parameter_from_savedict(save_dict):
     return best_parameter
 
 
-# def get_euler_hyperparameters(dataset_name):
-#     if dataset_name == 'HCP':
-#         t_epochlong = 14.4
-#         burn_in_minute = 2.4
-#         t_bold = 0.72
-#         window_size = 83
-#     elif dataset_name == 'PNC':
-#         t_epochlong = 6.2
-#         burn_in_minute = 1.2
-#         t_bold = 3
-#         window_size = 20
-#     elif dataset_name == 'HCP_Dev':
-#         t_epochlong = 6.36
-#         burn_in_minute = 1.06
-#         t_bold = 0.8
-#         window_size = 75
-#     elif dataset_name == 'HCA':
-#         t_epochlong = 6.36
-#         burn_in_minute = 1.06
-#         t_bold = 0.8
-#         window_size = 75
-#     elif dataset_name == 'Alprazolam':
-#         t_epochlong = 10.5
-#         burn_in_minute = 1.5
-#         t_bold = 3
-#         window_size = 20
-#     elif dataset_name == 'test':
-#         t_epochlong = 0.1
-#         burn_in_minute = 0.1
-#         t_bold = 0.1
-#         window_size = 5
-#     else:
-#         raise Exception("Your specified dataset name doesn't exist.")
-#     return t_epochlong, burn_in_minute, t_bold, window_size
-
-
-@DeprecationWarning
-def get_dl_model_path(dl_model_key):
-    if dl_model_key == 'HCP_group' or 'PNC_group':
-        classifier_path = '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/classifier/hcp_group_2_1.pth'
-        predictor_path = '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/predictor/hcp_group_5_1.pth'
-    elif dl_model_key == 'HCP_individual':
-        classifier_path = '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/classifier/hcp_individual_2_1.pth'
-        predictor_path = '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/predictor/hcp_individual_5_1.pth'
-    else:
-        classifier_path = None
-        predictor_path = None
-    # Previous
-    """
-    HCP individual: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/classifier/classifier2_7_hcp_individual.pth'
-    PNC individual: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/classifier/classifier2_7_finetune_3.pth'
-    HCP/PNC group: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/classifier/classifier2_7.pth'
-
-    HCP individual: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/predictor/predictor5_5_hcp_individual.pth'
-    PNC individual: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/predictor/predictor5_5_finetune_8.pth'
-    PNC group: '/home/tzeng/storage/Python/MFMApplication/ModelSave/ModelDict/predictor/predictor5_5_finetune_6.pth' or
-                not finetuned version (hcp group) (better)
-    """
-    return classifier_path, predictor_path
-
-
 def train_help_function(config,
                         myelin,
                         RSFC_gradient,
-                        sc_mat,
-                        fc_emp,
+                        sc_euler,
+                        emp_fc,
                         emp_fcd_cum,
-                        save_param_dir,
-                        epochs,
+                        train_save_dir,
+                        num_epochs,
                         dl_pfic_range,
                         euler_pfic_range,
                         dl_rfic_range,
@@ -188,23 +87,22 @@ def train_help_function(config,
                         other_parameterization=None):
     # TODO: comment out codes if we want to use the original parameterization
     other_parameterization = get_concat_matrix(
-        DESIKAN_NEUROMAPS_DIR, num_of_PCs=3)  # shape: (N, num_of_PCs + 1)
+        DESIKAN_NEUROMAPS_DIR, PCs=1)  # shape: (N, num_of_PCs + 1)
     # TODO: comment out codes if we want to use the original parameterization
-    mfm_trainer = DLVersionCMAESForward(
-        config=config,
-        myelin=myelin,
-        RSFC_gradient=RSFC_gradient,
-        sc_mat=sc_mat,
-        fc_emp=fc_emp,
-        emp_fcd_cum=emp_fcd_cum,
-        save_param_dir=save_param_dir,
-        epochs=epochs,
-        dl_pfic_range=dl_pfic_range,
-        euler_pfic_range=euler_pfic_range,
-        dl_rfic_range=dl_rfic_range,
-        euler_rfic_range=euler_rfic_range,
-        query_wei_range=query_wei_range,
-        other_parameterization=other_parameterization)
+    mfm_trainer = CMAESTrainer(config=config,
+                               myelin=myelin,
+                               RSFC_gradient=RSFC_gradient,
+                               sc_euler=sc_euler,
+                               emp_fc=emp_fc,
+                               emp_fcd_cum=emp_fcd_cum,
+                               train_save_dir=train_save_dir,
+                               num_epochs=num_epochs,
+                               dl_pfic_range=dl_pfic_range,
+                               euler_pfic_range=euler_pfic_range,
+                               dl_rfic_range=dl_rfic_range,
+                               euler_rfic_range=euler_rfic_range,
+                               query_wei_range=query_wei_range,
+                               other_parameterization=other_parameterization)
     opportunities = opportunities
     next_epoch = next_epoch
     for i in range(opportunities):
@@ -228,17 +126,431 @@ def train_help_function(config,
     return state
 
 
-class DLVersionCMAESForward:
+class ModelHandler:
+    """
+    Parent class for Trainer, Validator, and Tester
+    """
+
+    def __init__(self, config, phase, sc_euler: torch.Tensor,
+                 emp_fc: torch.Tensor, emp_fcd_cum: torch.Tensor):
+        """
+        Initialize the ModelHandler
+
+        Args:
+            config (dict): the configuration dictionary
+            phase (str): the phase of the model handler, must be one of ['train', 'val', 'test']
+            sc_mat (tensor): [N, N] the structural connectivity matrix
+            emp_fc (tensor): [N, N] the empirical functional connectivity matrix
+            emp_fcd_cum (tensor): [bins, 1] the empirical FCD cumulative histogram
+        """
+
+        assert phase in ['train', 'val', 'test'
+                         ], "phase must be one of ['train', 'val', 'test']"
+        self.device, self.dtype = set_torch_default()
+        self.config = config
+        self.phase = phase
+
+        # # Check the config file for descriptions of the parameters
+        # Dataset parameters
+        dataset_parameters = config['Dataset Parameters']
+        self.simulate_time = float(dataset_parameters['simulate_time'])
+        self.burn_in_time = float(dataset_parameters['burn_in_time'])
+        self.TR = float(dataset_parameters['TR'])
+        self.window_size = int(dataset_parameters['window_size'])
+
+        # Simulating parameters
+        simulating_parameters = config['Simulating Parameters']
+        self.N = int(simulating_parameters['n_ROI'])
+        self.parameters_dim = 3 * self.N + 1  # The dimension of parameters in MFM model.
+        self.param_sets = int(
+            simulating_parameters['test_param_sets' if phase ==
+                                  'test' else 'param_sets'])
+        self.select_param_sets = int(
+            simulating_parameters['select_param_sets'])
+        self.min_select_param_sets = int(
+            simulating_parameters['min_select_param_sets'])
+        self.param_dup = int(simulating_parameters['param_dup'])
+        self.fcd_hist_bins = int(simulating_parameters['fcd_hist_bins'])
+        self.dt = float(simulating_parameters[f'dt_{phase}'])
+
+        # TODO: Regularize firing rate
+        self.use_r_E_reg_loss = False
+        # TODO: Regularize firing rate
+        # TODO: Save r_E
+        self.save_r_E = True
+        # TODO: Save r_E
+
+        # Empirical data
+        self.sc_euler = sc_euler  # [N, N] for Euler integration
+        self.fc_euler = emp_fc  # [N, N]
+        self.fcd_cum_euler = emp_fcd_cum  # [bins, 1]
+
+        if self.phase == 'train':
+            sc_mask = torch.triu(torch.ones(self.N, self.N, dtype=torch.bool),
+                                 1)  # Upper triangle
+            self.sc_dl = torch.as_tensor(
+                sc_euler[sc_mask])  # [N * (N - 1) / 2]
+            self.fc_dl = emp_fc[sc_mask]  # [N * (N - 1) / 2]
+            self.fcd_dl = torch.diff(emp_fcd_cum.squeeze() * 100,
+                                     dim=0,
+                                     prepend=torch.as_tensor([0]))  # [bins]
+
+    def sim_param_with_dup(self, param_vectors, reshape_res=True):
+        """
+        Simulate the MFM model with duplicated parameters
+
+        Args:
+            param_vectors (tensor): [3N+1, param_sets]
+
+        Returns:
+            bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
+            valid_M_mask (tensor): (param_sets, param_dup)
+            r_E_ave (tensor): (N, param_sets, param_dup)
+        """
+        parameter_repeat = param_vectors.repeat(
+            1, self.param_dup)  # [3*N+1, param_sets * param_dup]
+        mfm_model = MfmModel2014(self.config,
+                                 parameter_repeat,
+                                 self.sc_euler,
+                                 dt=self.dt)
+        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
+            simulate_time=self.simulate_time,
+            burn_in_time=self.burn_in_time,
+            TR=self.TR)
+        # bold_signal, valid_M_mask = CBIG_mfm_single_simulation_no_input_noise(parameter_repeat, sc_mat, self.t_epochlong)
+
+        if reshape_res:
+            bold_signal, valid_M_mask, r_E_ave = self.reshape_sim_res(
+                bold_signal, valid_M_mask, r_E_ave)
+        return bold_signal, valid_M_mask, r_E_ave
+
+    def reshape_sim_res(self, bold_signal, valid_M_mask, r_E_ave):
+        """
+        Reshape the simulation results
+
+        Args:
+            bold_signal (tensor): (N, param_sets * param_dup, #time_points_in_BOLD)
+            valid_M_mask (tensor): (param_sets * aram_dup, )
+            r_E_ave (tensor): (N, param_sets * param_dup)
+
+        Returns:
+            bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
+            valid_M_mask (tensor): (param_sets, param_dup)
+            r_E_ave (tensor): (N, param_sets, param_dup)
+        """
+        param_sets = bold_signal.shape[1] // self.param_dup
+        bold_signal = bold_signal.view(
+            self.N, self.param_dup, param_sets, -1).transpose(
+                1, 2)  # [N, param_sets, param_dup, #time_points_in_BOLD]
+        valid_M_mask = valid_M_mask.view(
+            self.param_dup, param_sets).T  # [param_sets, param_dup]
+        r_E_ave = r_E_ave.view(self.N, self.param_dup, param_sets).transpose(
+            1, 2)  # [N, param_sets, param_dup]
+        return bold_signal, valid_M_mask, r_E_ave
+
+    def get_valid_params(self, valid_M_mask):
+        """
+        Get the valid parameters
+
+        Args:
+            valid_M_mask (tensor): (param_sets, param_dup)
+
+        Returns:
+            valid_param_indices (list): the list of valid parameter indices
+        """
+        if valid_M_mask.ndim == 1:
+            valid_M_mask = valid_M_mask.unsqueeze(0)
+        valid_param_indices = []
+        for i in range(valid_M_mask.shape[0]):
+            mask_this_param = valid_M_mask[i]
+            if mask_this_param.any():
+                valid_param_indices.append(i)
+        return valid_param_indices
+
+    def get_fc_fcd_for_valid_params(self,
+                                    valid_param_indices,
+                                    bold_signal,
+                                    valid_M_mask,
+                                    r_E_ave,
+                                    get_FCD_matrix=False,
+                                    get_mean_bold=False):
+        """
+        Get the valid parameters
+
+        Args:
+            valid_param_indices (list): the list of valid parameter indices
+            bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
+            valid_M_mask (tensor): (param_sets, param_dup)
+            r_E_ave (tensor): (N, param_sets, param_dup)
+        Returns:
+            fc_sim (tensor): (#valid_params, N, N)
+            fcd_sim (tensor): (fcd_hist_bins, #valid_params) or (#valid_params, window_num, window_num) if get_FCD_matrix is True
+            r_E_for_valid_params (tensor): (N, #valid_params)
+            mean_bold (tensor): (N, #valid_params, #time_points_in_BOLD) if get_mean_bold is True
+        """
+        num_valid = len(valid_param_indices)
+        t_len = bold_signal.shape[3]
+        fc_sim = torch.zeros(num_valid, self.N, self.N)
+        fcd_hist = torch.zeros(self.fcd_hist_bins, num_valid)
+        mean_bold = torch.zeros(self.N, num_valid, t_len)
+
+        if get_FCD_matrix:
+            window_num = t_len - self.window_size + 1
+            fcd_matrices = torch.zeros(num_valid, window_num, window_num)
+
+        if self.save_r_E:
+            r_E_for_valid_params = torch.zeros(self.N, num_valid)
+        else:
+            r_E_for_valid_params = None
+
+        for i, idx in enumerate(valid_param_indices):
+            # for each set of parameter
+            mask_this_param = valid_M_mask[idx]  # (param_dup, )
+            bold_this_param = bold_signal[:, idx,
+                                          mask_this_param, :]  # [N, 1/2/3/param_dup, #time_points_in_BOLD]
+            if get_mean_bold:
+                mean_bold[:, i] = torch.mean(bold_this_param, dim=1)
+
+            fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
+            fc_this_param = torch.mean(fc_this_param, dim=0)
+            fcd_mat_this_param, fcd_hist_this_param = MfmModel2014.FCD_calculate(
+                bold_this_param,
+                self.window_size,
+                get_FCD_matrix=get_FCD_matrix)
+            fcd_hist_this_param = torch.mean(fcd_hist_this_param, dim=1)
+
+            fc_sim[i] = fc_this_param
+            fcd_hist[:, i] = fcd_hist_this_param
+            if get_FCD_matrix:
+                # ! we shound't directly average fcd matrices
+                fcd_matrices[i] = fcd_mat_this_param[0]
+            if self.save_r_E:
+                r_E_ave_this_param = r_E_ave[:, idx,
+                                             mask_this_param]  # [N, 1/2/3/param_dup]
+                r_E_for_valid_params[:, i] = torch.mean(r_E_ave_this_param,
+                                                        dim=1)
+
+        extra = {}
+        if get_FCD_matrix:
+            extra['fcd_sim'] = fcd_matrices
+            extra['fc_sim'] = fc_sim
+        if get_mean_bold:
+            extra['bold_TC_sim'] = mean_bold
+
+        return fc_sim, fcd_hist, r_E_for_valid_params, extra
+
+    def calc_losses(self,
+                    fc_sim,
+                    fcd_hist_sim,
+                    reg_loss=None,
+                    apply_sort=True):
+        """
+        Calculate the losses for the simulated FC and FCD
+
+        Args:
+            fc_sim (tensor): (#valid_params, N, N)
+            fcd_hist_sim (tensor): (fcd_hist_bins, #valid_params)
+            reg_loss (dict): the regularization loss
+            apply_sort (bool): whether to sort the losses
+        """
+        total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
+            fc_sim, fcd_hist_sim, self.fc_euler,
+            self.fcd_cum_euler)  # [num_valid]
+
+        # FC_FCD_loss = torch.hstack(
+        #     (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1),
+        #      ks_loss.unsqueeze(1)))
+
+        if reg_loss is not None:
+            for loss in reg_loss.values():
+                total_loss = total_loss + loss
+
+        index_sorted_in_valid = None
+        if apply_sort:
+            total_loss, index_sorted_in_valid = torch.sort(total_loss,
+                                                           descending=False)
+            corr_loss = corr_loss[index_sorted_in_valid]
+            L1_loss = L1_loss[index_sorted_in_valid]
+            ks_loss = ks_loss[index_sorted_in_valid]
+            if reg_loss is not None:
+                for key in reg_loss.keys():
+                    reg_loss[key] = reg_loss[key][index_sorted_in_valid]
+
+        losses = {
+            'total_loss': total_loss,
+            'corr_loss': corr_loss,
+            'l1_loss': L1_loss,
+            'ks_loss': ks_loss
+        }
+        if reg_loss is not None:
+            losses.update(reg_loss)
+
+        return losses, index_sorted_in_valid
+
+    def get_reg_loss(self,
+                     param_vectors,
+                     use_rFIC=False,
+                     r_E_for_valid_params=None):
+        """
+        Get the regularization loss
+        :param param_vectors: [3*N+1, num_valid]
+        :param use_rFIC: False stands for pFIC, True stands for rFIC
+        :param r_E_for_valid_params: [N, num_valid]
+
+        :return: reg_loss: {'rFIC_reg_loss': [num_valid, ], 'r_E_reg_loss': [num_valid, ]}
+        """
+        reg_loss = {}
+        if r_E_for_valid_params is not None and self.use_r_E_reg_loss:
+            r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
+                                            3,
+                                            loss_type='L2')
+            reg_loss['r_E_reg_loss'] = r_E_reg_loss
+
+        return reg_loss
+
+    def sim_first_param_multi_times(self,
+                                    param_save_path: str,
+                                    sim_res_file_path: str,
+                                    sim_times: int = 10,
+                                    get_FCD_matrix: bool = True,
+                                    get_bold: bool = True,
+                                    seed=None):
+        """
+        Simulate the MFM model multiple times with the first param vector from the param_save_path
+        Then save the simulation result to f'simulation_{i}' folder under the save_dir, where i is the smallest number such that f'simulation_{i}'
+        Repeat this for `sim_times`
+
+        Args:
+            param_save_path (str): the path to the saved parameter vectors
+            sim_res_file_path (str): the path to save the simulation results
+            sim_times (int): the number of times to simulate
+            get_FCD_matrix (bool): whether to save the entire FCD matrix instead of the histogram of the FCD
+            get_bold (bool): whether to get the mean bold signal
+        """
+
+        if seed is None:
+            seed = np.random.randint(0, 1000000000000)
+        torch.manual_seed(seed)
+
+        saved_params = torch.load(param_save_path,
+                                  map_location=self.device)['parameter']
+        param_vector = saved_params[:, 0:1]
+        param_vectors = param_vector.repeat(
+            1, sim_times)  # [3*N+1, sim_times * param_dup]
+        print(
+            f'Simulating the MFM model {sim_times} times with the first parameter vector from {param_save_path}...'
+        )
+        print(f'param_vectors shape: {param_vectors.shape}')
+
+        save_dict = self.sim_n_get_losses(param_vectors,
+                                          get_FCD_matrix=get_FCD_matrix,
+                                          get_bold=get_bold)
+        save_dict['seed'] = seed
+
+        save_path = os.path.join(sim_res_file_path,
+                                 f'sim_results_on_{self.phase}_set.pth')
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        torch.save(save_dict, save_path)
+        print(f'Successfully saved the simulation results to {save_path}')
+
+    def sim_n_get_fc_fcd(self,
+                         param_vectors,
+                         get_FCD_matrix: bool = False,
+                         get_bold: bool = False):
+        """
+        Simulate the MFM using the given param_vectors and get their corresponding FC and FCD.
+
+        Args:
+            param_vectors (tensor): (3N+1, param_sets)
+            save_FCD_matrix (bool): whether to save the entire FCD matrix instead of the histogram of the FCD
+            get_bold (bool): whether to get the mean bold signal
+
+        Returns:
+            fc_sim (tensor): (#valid_params, N, N)
+            fcd_sim (tensor): (fcd_hist_bins, #valid_params) or (#valid_params, window_num, window_num) if get_FCD_matrix is True
+            r_E_for_valid_params (tensor): (N, #valid_params)
+            valid_param_indices (list[int]): the list of valid parameter indices
+        """
+
+        bold_signal, valid_M_mask, r_E_ave = self.sim_param_with_dup(
+            param_vectors, reshape_res=True)
+        valid_param_indices = self.get_valid_params(valid_M_mask)
+        fc_sim, fcd_sim, r_E_for_valid_params, extra = self.get_fc_fcd_for_valid_params(
+            valid_param_indices,
+            bold_signal,
+            valid_M_mask,
+            r_E_ave,
+            get_FCD_matrix,
+            get_mean_bold=get_bold)
+
+        return fc_sim, fcd_sim, r_E_for_valid_params, valid_param_indices, extra
+
+    def sim_n_get_losses(self,
+                         param_vectors,
+                         use_rFIC=False,
+                         get_FCD_matrix: bool = False,
+                         get_bold: bool = False):
+        """
+        Simulate the MFM using the given param_vectors and get their corresponding losses.
+        The param_vectors, valid_param_indices, losses for valid param vectors are returned in a dictionary.
+        Additionally, if self.save_r_E is True, r_E_for_valid_params is also returned.
+
+        Args:
+            param_vectors (tensor): [3N+1, param_sets]
+            use_rFIC (bool): whether to use rFIC or not
+            get_bold (bool): whether to get the mean bold signal
+
+        Returns:
+            a dictionary containing the following keys:
+                'total_loss': (#valid_params, )
+                'corr_loss': (#valid_params, )
+                'l1_loss': (#valid_params, )
+                'ks_loss': (#valid_params, )
+                'rFIC_reg_loss': (#valid_params, ) if use_rFIC is True
+                'r_E_reg_loss': (#valid_params, ) if self.save_r_E is True
+                'parameter': (3N+1, param_sets)
+                'valid_param_indices': (#valid_params, )
+                'r_E_for_valid_params': (N, #valid_params) if self.save_r_E is True
+        """
+        fc_sim, fcd_hist_sim, r_E_for_valid_params, valid_param_indices, extra = self.sim_n_get_fc_fcd(
+            param_vectors, get_FCD_matrix=get_FCD_matrix, get_bold=get_bold)
+
+        reg_loss = self.get_reg_loss(param_vectors[:, valid_param_indices],
+                                     use_rFIC, r_E_for_valid_params)
+
+        losses, index_sorted_in_valid = self.calc_losses(fc_sim,
+                                                         fcd_hist_sim,
+                                                         reg_loss,
+                                                         apply_sort=True)
+
+        valid_param_indices = torch.as_tensor(valid_param_indices)
+        valid_param_indices = valid_param_indices[index_sorted_in_valid]
+
+        save_dict = losses
+        save_dict['parameter'] = param_vectors
+        save_dict['valid_param_indices'] = valid_param_indices
+
+        if self.save_r_E:
+            save_dict[
+                'r_E_for_valid_params'] = r_E_for_valid_params[:,
+                                                               index_sorted_in_valid]
+        save_dict.update(extra)
+
+        return save_dict
+
+
+class CMAESTrainer(ModelHandler):
 
     def __init__(self,
                  config,
                  myelin: torch.Tensor,
                  RSFC_gradient: torch.Tensor,
-                 sc_mat: torch.Tensor,
-                 fc_emp: torch.Tensor,
+                 sc_euler: torch.Tensor,
+                 emp_fc: torch.Tensor,
                  emp_fcd_cum: torch.Tensor,
-                 save_param_dir,
-                 epochs,
+                 train_save_dir,
+                 num_epochs,
                  dl_pfic_range,
                  euler_pfic_range,
                  dl_rfic_range,
@@ -252,7 +564,7 @@ class DLVersionCMAESForward:
             myelin (tensor): [ROIs, 1]
             RSFC_gradient (tensor): [ROIs, 1]
             sc_mat (tensor): [ROIs, ROIs]
-            fc_emp (tensor): [ROIs, ROIs]
+            emp_fc (tensor): [ROIs, ROIs]
             emp_fcd_cum (tensor): [bins, 1], has been normalized (largest is 1)
             save_param_dir (str): the parameters saving directory
             epochs (int): total epochs
@@ -260,17 +572,9 @@ class DLVersionCMAESForward:
                 we will feed in the new concat matrix of shape (N, p) here,
                 where p is the number of parameterization variables
         """
-        self.device, self.dtype = set_torch_default()
 
-        myelin = myelin.to(self.device)
-        RSFC_gradient = RSFC_gradient.to(self.device)
-        sc_mat = sc_mat.to(self.device)
-        fc_emp = fc_emp.to(self.device)
-        emp_fcd_cum = emp_fcd_cum.to(self.device)
+        super().__init__(config, 'train', sc_euler, emp_fc, emp_fcd_cum)
 
-        self.config = config
-
-        self.N = myelin.shape[0]
         self.myelin = myelin  # [N, 1]
         self.RSFC_gradient = RSFC_gradient  # [N, 1]
 
@@ -286,50 +590,13 @@ class DLVersionCMAESForward:
         self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
         # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
 
-        sc_mask = torch.triu(torch.ones(self.N, self.N, dtype=torch.bool),
-                             1)  # Upper triangle
-        self.sc_dl = torch.as_tensor(sc_mat[sc_mask])  # [N * (N - 1) / 2]
-        self.sc_euler = sc_mat / torch.max(
-            sc_mat) * 0.02  # [N, N] for Euler integration
-        self.fc_dl = torch.as_tensor(fc_emp[sc_mask])  # [N * (N - 1) / 2]
-        self.fc_euler = torch.as_tensor(fc_emp)
-        self.fcd_dl = torch.diff(emp_fcd_cum.squeeze() * 100,
-                                 dim=0,
-                                 prepend=torch.as_tensor([0]))  # [bins]
-        self.fcd_cum_euler = emp_fcd_cum  # [bins, 1]
-
         self.parameter_dim = 3 * self.N + 1  # 3N + 1. The dimension of parameters in MFM model.
 
-        # Dataset parameters
-        dataset_parameters = config['Dataset Parameters']
-        self.simulate_time = float(dataset_parameters['simulate_time'])
-        self.burn_in_time = float(dataset_parameters['burn_in_time'])
-        self.TR = float(dataset_parameters['TR'])
-        self.window_size = int(dataset_parameters['window_size'])
-
-        # Simulating parameters
-        simulating_parameters = config['Simulating Parameters']
-        self.param_sets = int(
-            simulating_parameters['param_sets']
-        )  # Every epoch the number of sampled parameter sets
-        self.select_param_sets = int(
-            simulating_parameters['select_param_sets']
-        )  # Number of selecting parameters to update CMA-ES from ${param_sets} parameter sets.
-        self.min_select_param_sets = int(
-            simulating_parameters['min_select_param_sets']
-        )  # If cannot get ${select_param_sets} parameters valid, the minimum number of valid parameters. Or CMA-ES will break.
         # TODO: change to 2 * self.p + 1, if we want to totally remove parameterization for sigma
         self.param_dim = 3 * self.p + 1  # The dimension of the parameters in our parameterization
-        self.param_dup = int(
-            simulating_parameters['param_dup']
-        )  # duplicate for 3 times for each parameter in Euler integration
-        self.fcd_hist_bins = int(
-            simulating_parameters['fcd_hist_bins']
-        )  # For reforming FCD matrix to probability distribution.
-        self.dt = float(simulating_parameters['dt_train'])
 
         # Training and generating parameters
-        self.epochs = int(epochs)
+        self.num_epochs = int(num_epochs)
         self.dl_pfic_range = np.array(dl_pfic_range, dtype=int)  # 1D array
         self.euler_pfic_range = np.array(euler_pfic_range, dtype=int)
         self.pfic_range = np.concatenate(
@@ -383,11 +650,11 @@ class DLVersionCMAESForward:
         if len(self.dl_rfic_range) > 0:
             raise Exception("rFIC deep learning model has not been developed.")
 
-        self.save_param_dir = save_param_dir
-        if not os.path.exists(self.save_param_dir):
-            os.makedirs(self.save_param_dir)
+        self.train_save_dir = train_save_dir
+        if not os.path.exists(self.train_save_dir):
+            os.makedirs(self.train_save_dir)
         print(
-            f'Successfully init pMFM deep learning version CMA-ES forward trainer. The results will be saved in {self.save_param_dir}'
+            f'Successfully init pMFM deep learning version CMA-ES forward trainer. The results will be saved in {self.train_save_dir}'
         )
 
     def get_parameters(self, param_coef):
@@ -460,10 +727,10 @@ class DLVersionCMAESForward:
             # [IMPORTANT] the probability this parameter will be available.
             pred_nan = torch.squeeze(pred_nan)  # [xxx]
             valid_mask = pred_nan > 0.5
-            valid_param_list = torch.arange(0, parameter.shape[0], 1)
-            valid_param_list = valid_param_list[valid_mask]
+            valid_param_indices = torch.arange(0, parameter.shape[0], 1)
+            valid_param_indices = valid_param_indices[valid_mask]
 
-            count_valid = len(valid_param_list)
+            count_valid = len(valid_param_indices)
             select_param_sets = self.select_param_sets
             if count_valid >= self.select_param_sets:
                 pass
@@ -477,7 +744,7 @@ class DLVersionCMAESForward:
                 else:
                     return None, None
 
-            valid_parameter = parameter[valid_param_list]
+            valid_parameter = parameter[valid_param_indices]
             sc_this = self.sc_dl.unsqueeze(0).expand(valid_parameter.shape[0],
                                                      -1)
             fc_this = self.fc_dl.unsqueeze(0).expand(valid_parameter.shape[0],
@@ -490,165 +757,123 @@ class DLVersionCMAESForward:
             total_loss = torch.sum(pred_loss, dim=1)  # [xxx]
             loss_sorted, index_sorted_in_valid = torch.sort(total_loss,
                                                             descending=False)
-            index_sorted = valid_param_list[index_sorted_in_valid]
+            index_sorted = valid_param_indices[index_sorted_in_valid]
 
-            print("Start saving parameter, valid_param_list and loss...")
+            print("Start saving parameter, valid_param_indices and loss...")
+            # TODO: split the FC_FCD_loss into three terms if we want to use DL model
             save_dict = {
                 'parameter': parameter.T,
-                'valid_param_list': valid_param_list,
+                'valid_param_indices': valid_param_indices,
                 'FC_FCD_loss': pred_loss
             }
-            torch.save(
-                save_dict,
-                os.path.join(self.save_param_dir,
-                             'param_save_epoch' + str(epoch) + '.pth'))
+            train_file_path = get_train_file_path(self.train_save_dir, epoch)
+            torch.save(save_dict, train_file_path)
             print("Successfully saved params and losses.")
 
             return loss_sorted[:
                                select_param_sets], index_sorted[:
                                                                 select_param_sets]
 
-    def mfm_model_loss_euler(self, parameter, epoch, flag_pFIC_rFIC=0):
+    def get_select_param_sets(self, num_valid):
+        if num_valid >= self.select_param_sets:
+            return self.select_param_sets
+        else:
+            print(
+                f'Valid parameter sets are not enough, only {num_valid} parameters!'
+            )
+            if num_valid >= self.min_select_param_sets:
+                print('Choose min parameter sets instead.')
+                return num_valid
+            else:
+                return None
+
+    def get_rFIC_reg_loss(self, param_vectors):
+        """
+        rFIC regularization loss
+        w_wee (scalar): the weight for the regularization term for wee_regularization_loss.
+        w_wei (scalar): the weight for the regularization term for wei_regularization_loss.
+        w_sigma (scalar): the weight for the regularization term for sigma_regularization_loss.
+        concat_mat (tensor): [bias (ones_like myelin), myelin, RSFC gradient]
+        pinv_concat_mat (tensor, optional): pinv(concat_mat). Defaults to None.
+
+        Args:
+            parameters (tensor): wEE, wEI, G, sigma. [3N+1, param_sets]
+
+        Returns:
+            (tensors): [param_sets, 3]. wEE, wEI, sigma regularization loss terms
+        """
+        if self.pinv_concat_mat is None:
+            self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
+        beta_wee = torch.matmul(self.pinv_concat_mat,
+                                param_vectors[0:self.N])  # [3, param_sets]
+        beta_wei = torch.matmul(self.pinv_concat_mat,
+                                param_vectors[self.N:2 * self.N])
+        beta_sigma = torch.matmul(self.pinv_concat_mat,
+                                  param_vectors[2 * self.N + 1:])
+        wee_hat = torch.matmul(self.concat_mat, beta_wee)  # [N, param_sets]
+        wei_hat = torch.matmul(self.concat_mat, beta_wei)
+        sigma_hat = torch.matmul(self.concat_mat, beta_sigma)
+
+        wee_regularization_loss = self.w_wee * torch.mean(
+            torch.square(param_vectors[0:self.N] - wee_hat),
+            dim=0)  # [param_sets]
+        wei_regularization_loss = self.w_wei * torch.mean(
+            torch.square(param_vectors[self.N:2 * self.N] - wei_hat), dim=0)
+        sigma_regularization_loss = self.w_sigma * torch.mean(
+            torch.square(param_vectors[2 * self.N + 1:] - sigma_hat), dim=0)
+
+        return torch.hstack((wee_regularization_loss.unsqueeze(1),
+                             wei_regularization_loss.unsqueeze(1),
+                             sigma_regularization_loss.unsqueeze(1)))
+
+    def get_reg_loss(self,
+                     param_vectors,
+                     use_rFIC=False,
+                     r_E_for_valid_params=None):
+        """
+        Get the regularization loss
+        :param param_vectors: [3*N+1, num_valid]
+        :param use_rFIC: False stands for pFIC, True stands for rFIC
+        :param r_E_for_valid_params: [N, num_valid]
+
+        :return: reg_loss: {'rFIC_reg_loss': [num_valid, ], 'r_E_reg_loss': [num_valid, ]}
+        """
+        reg_loss = super().get_reg_loss(param_vectors, use_rFIC,
+                                        r_E_for_valid_params)
+        if use_rFIC:
+            rFIC_reg_loss = self.get_rFIC_reg_loss(
+                param_vectors)  # shape: (num_valid, 3)
+            rFIC_reg_loss = torch.sum(rFIC_reg_loss, dim=1)
+            reg_loss['rFIC_reg_loss'] = rFIC_reg_loss
+
+        return reg_loss
+
+    def mfm_model_loss_euler(self, param_vectors, epoch, use_rFIC=False):
         """
         Calculate the total loss of MFM model
         :param parameter: [3*N+1, M]
         :param epoch: current epoch, just for naming the save file.
-        :param flag_pFIC_rFIC: 0 stands for pFIC, 1 stands for rFIC
+        :param use_rFIC: False stands for pFIC, True stands for rFIC
         :return: loss [select_param_sets(10),]; index [select_param_sets,]
         """
-        parameter_repeat = parameter.repeat(
-            1, self.param_dup)  # [3*N+1, param_sets * param_dup]
-        mfm_model = MfmModel2014(self.config,
-                                 parameter_repeat,
-                                 self.sc_euler,
-                                 dt=self.dt)
-        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
-            simulate_time=self.simulate_time,
-            burn_in_time=self.burn_in_time,
-            TR=self.TR)
-        # bold_signal: [N, M=param_sets * param_dup, t_for_bold]; valid_M_mask: [param_sets * param_dup]; r_E_ave: [N, param_sets * param_dup]
-        # bold_signal, valid_M_mask = CBIG_mfm_single_simulation_no_input_noise(parameter_repeat, sc_mat, self.t_epochlong)
+        save_dict = self.sim_n_get_losses(param_vectors, use_rFIC)
 
-        bold_signal = bold_signal.view(
-            self.N, self.param_dup, self.param_sets,
-            -1).transpose(1, 2)  # [N, param_sets, param_dup, t_for_bold]
-        valid_M_mask = valid_M_mask.view(
-            self.param_dup, self.param_sets).T  # [param_sets, param_dup]
+        valid_param_indices = save_dict['valid_param_indices']
+        num_valid = len(valid_param_indices)
+        select_param_sets = self.get_select_param_sets(num_valid)
+        if select_param_sets is None:
+            return None, None
 
-        valid_param_list = []  # record valid param index
-        fc_sim = torch.zeros(self.param_sets, self.N, self.N)
-        fcd_hist = torch.zeros(self.fcd_hist_bins, self.param_sets)
+        print("Start saving parameter, valid_param_indices and losses...")
+        train_file_path = get_train_file_path(self.train_save_dir, epoch)
+        torch.save(save_dict, train_file_path)
+        print("Successfully saved params and losses to:", train_file_path)
 
-        # TODO: Save r_E
-        r_E_ave = r_E_ave.view(self.N,
-                               self.param_dup, self.param_sets).transpose(
-                                   1, 2)  # [N, param_sets, param_dup]
-        r_E_for_valid_params = torch.zeros(self.N, self.param_sets)
-        # TODO: Save r_E
-        count_valid = 0
-        for i in range(self.param_sets):
-            # for each set of parameter
-            mask_this_param = valid_M_mask[i]  # [param_dup]
-            if mask_this_param.any():
-                valid_param_list.append(i)
-                bold_this_param = bold_signal[:, i,
-                                              mask_this_param, :]  # [N, 1/2/3/param_dup, t_for_bold]
-                fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
-                fc_this_param = torch.mean(fc_this_param, dim=0)
-                _, fcd_hist_this_param = MfmModel2014.FCD_calculate(
-                    bold_this_param, self.window_size)
-                fcd_hist_this_param = torch.mean(fcd_hist_this_param, dim=1)
-
-                fc_sim[count_valid] = fc_this_param
-                fcd_hist[:, count_valid] = fcd_hist_this_param
-                # TODO: Save r_E
-                r_E_ave_this_param = r_E_ave[:, i,
-                                             mask_this_param]  # [N, 1/2/3/param_dup]
-                r_E_for_valid_params[:, count_valid] = torch.mean(
-                    r_E_ave_this_param, dim=1)
-                # TODO: Save r_E
-                count_valid += 1
-
-        select_param_sets = self.select_param_sets
-        if count_valid >= self.select_param_sets:
-            pass
-        else:
-            print(
-                f'Valid parameter sets are not enough, only {count_valid} parameters!'
-            )
-            if count_valid >= self.min_select_param_sets:
-                print('Choose min parameter sets instead.')
-                select_param_sets = count_valid
-            else:
-                return None, None
-
-        fc_sim = fc_sim[:count_valid]
-        fcd_hist = fcd_hist[:, :count_valid]
-        # TODO: Save r_E
-        r_E_for_valid_params = r_E_for_valid_params[:, :count_valid]
-        # TODO: Save r_E
-        total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-            fc_sim, fcd_hist, self.fc_euler,
-            self.fcd_cum_euler)  # [count_valid]
-        FC_FCD_loss = torch.hstack(
-            (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1),
-             ks_loss.unsqueeze(1)))
-        if flag_pFIC_rFIC == 1:
-            reg_loss = regularization_loss(
-                parameter[:, valid_param_list],
-                w_wee=self.w_wee,
-                w_wei=self.w_wei,
-                w_sigma=self.w_sigma,
-                concat_mat=self.concat_mat,
-                pinv_concat_mat=self.pinv_concat_mat)
-            # [count_valid, 3]
-            total_loss = total_loss + torch.sum(reg_loss, dim=1)
-
-        # TODO: Regularize firing rate
-        # if mfm_model.r_E:
-        #     r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
-        #                                     mfm_model.r_E,
-        #                                     loss_type='L2')
-        #     # TODO: Try without any constraint on r_E
-        #     total_loss = total_loss + r_E_reg_loss
-        #     # TODO: Try without any constraint on r_E
-
-        # TODO: Regularize firing rate
-
-        loss_sorted, index_sorted_in_valid = torch.sort(total_loss,
-                                                        descending=False)
-        valid_param_list = torch.as_tensor(valid_param_list)
-        index_sorted = valid_param_list[index_sorted_in_valid]
-
-        print("Start saving parameter, valid_param_list and loss...")
-        save_dict = {
-            'parameter': parameter,
-            'valid_param_list': valid_param_list,
-            'FC_FCD_loss': FC_FCD_loss
-        }
-        if flag_pFIC_rFIC == 1:
-            save_dict['reg_loss'] = reg_loss
-
-        # TODO: Save r_E
-        if mfm_model.r_E:
-            # save r_E_for_valid_params
-            save_dict['r_E_for_valid_params'] = r_E_for_valid_params
-            # TODO: Regularize firing rate
-            # save_dict['r_E_reg_loss'] = r_E_reg_loss
-            # TODO: Regularize firing rate
-        # TODO: Save r_E
-
-        torch.save(
-            save_dict,
-            os.path.join(self.save_param_dir,
-                         'param_save_epoch' + str(epoch) + '.pth'))
-        print("Successfully saved params and losses.")
-
-        return loss_sorted[:select_param_sets], index_sorted[:
-                                                             select_param_sets]
+        return save_dict['total_loss'][:select_param_sets], \
+            valid_param_indices[:select_param_sets]
 
     def train_hybrid_pFIC_rFIC(self, seed=None, next_epoch=0):
-        if next_epoch >= self.epochs:
+        if next_epoch >= self.num_epochs:
             raise Exception('You do not need any more epoch.')
 
         N = self.N
@@ -676,7 +901,7 @@ class DLVersionCMAESForward:
             print("Training parameters have been initialized...")
 
         elif next_epoch in self.euler_pfic_range:
-            previous_final_state_path = os.path.join(self.save_param_dir,
+            previous_final_state_path = os.path.join(self.train_save_dir,
                                                      'final_state_pFIC.pth')
             if not os.path.exists(previous_final_state_path):
                 raise Exception("Previous final state path doesn't exist.")
@@ -698,11 +923,11 @@ class DLVersionCMAESForward:
             )
 
         elif next_epoch == self.euler_rfic_range[0]:
-            previous_final_state_path = os.path.join(self.save_param_dir,
+            previous_final_state_path = os.path.join(self.train_save_dir,
                                                      'final_state_pFIC.pth')
             if not os.path.exists(previous_final_state_path):
                 previous_final_state_path = os.path.join(
-                    self.save_param_dir, 'final_state.pth')
+                    self.train_save_dir, 'final_state.pth')
                 if not os.path.exists(previous_final_state_path):
                     raise Exception("Previous final state path doesn't exist.")
             print(f"Load final dict from {previous_final_state_path}...")
@@ -723,8 +948,8 @@ class DLVersionCMAESForward:
             raise Exception("Check next epoch.")
 
         print(' -- Start training by CMA-ES --')
-        for k in range(next_epoch, self.epochs):
-            print("Epoch: [{}/{}]".format(k + 1, self.epochs))
+        for k in range(next_epoch, self.num_epochs):
+            print("Epoch: [{}/{}]".format(k + 1, self.num_epochs))
 
             if k in self.pfic_range:
                 epoch_res = self._train_one_epoch_pFIC(k, m_k, sigma_k, cov_k,
@@ -751,14 +976,14 @@ class DLVersionCMAESForward:
                     }
                     torch.save(
                         final_dict,
-                        os.path.join(self.save_param_dir,
+                        os.path.join(self.train_save_dir,
                                      'final_state_pFIC.pth'))
                     print("Successfully saved pFIC final dict.")
 
             elif k in self.rfic_range:
                 if k == self.rfic_range[0]:
-                    previous_epoch_path = os.path.join(
-                        self.save_param_dir, f'param_save_epoch{k - 1}.pth')
+                    previous_epoch_path = get_train_file_path(
+                        self.train_save_dir, k - 1)
                     if not os.path.exists(previous_epoch_path):
                         raise Exception(
                             "The previous 1 epoch parameter path doesn't exist."
@@ -793,7 +1018,7 @@ class DLVersionCMAESForward:
             'wEI_search_range': search_range[N:2 * N]
         }
         torch.save(final_dict,
-                   os.path.join(self.save_param_dir, 'final_state.pth'))
+                   os.path.join(self.train_save_dir, 'final_state.pth'))
         print("Successfully saved final dict.")
 
         return 0
@@ -845,7 +1070,7 @@ class DLVersionCMAESForward:
 
         loss_k, index_k = self.mfm_model_loss_euler(parameter_k,
                                                     k,
-                                                    flag_pFIC_rFIC=1)
+                                                    use_rFIC=True)
 
         if loss_k is None:
             print("Iteration ends.")
@@ -1154,38 +1379,26 @@ class DLVersionCMAESForward:
         return sampled_parameters
 
 
-class DLVersionCMAESValidator:
+class CMAESValidator(ModelHandler):
     """The validator for Hybrid version CMA-ES
 
     Functions:
-    val_by_euler: use Euler integration to validate those epochs trained by Deep learning model
     val_best_parameters: Choose those best parameters in train set and apply them to validation set
     """
 
-    def __init__(self, config, save_param_dir, val_save_dir):
+    def __init__(self,
+                 config,
+                 train_save_dir,
+                 val_save_dir,
+                 sc_euler: torch.Tensor = None,
+                 emp_fc: torch.Tensor = None,
+                 emp_fcd_cum: torch.Tensor = None,
+                 train_num_epochs: int = 100):
+        super().__init__(config, 'val', sc_euler, emp_fc, emp_fcd_cum)
 
-        self.device, self.dtype = set_torch_default()
-
-        self.config = config
-
-        # Dataset parameters
-        dataset_parameters = config['Dataset Parameters']
-        self.simulate_time = float(dataset_parameters['simulate_time'])
-        self.burn_in_time = float(dataset_parameters['burn_in_time'])
-        self.TR = float(dataset_parameters['TR'])
-        self.window_size = int(dataset_parameters['window_size'])
-
-        # Simulating parameters
-        simulating_parameters = config['Simulating Parameters']
-        self.N = int(simulating_parameters['n_ROI'])
-        self.parameters_dim = 3 * self.N + 1  # The dimension of parameters in MFM model.
-        self.param_sets = int(simulating_parameters['param_sets'])
-        self.param_dup = int(simulating_parameters['param_dup'])
-        self.fcd_hist_bins = int(simulating_parameters['fcd_hist_bins'])
-        self.dt = float(simulating_parameters['dt_val'])
-
-        self.save_param_dir = save_param_dir
+        self.train_save_dir = train_save_dir
         self.val_save_dir = val_save_dir
+        self.train_num_epochs = train_num_epochs
 
         if not os.path.exists(self.val_save_dir):
             os.makedirs(self.val_save_dir)
@@ -1193,84 +1406,67 @@ class DLVersionCMAESValidator:
             f"DL Version CMA-ES validator has been successfully initialized. Results will be saved in {self.val_save_dir}"
         )
 
-    @DeprecationWarning  # Need modify
-    def val_by_euler(self, myelin, rsfc_gradient, sc_euler, fc_emp,
-                     emp_fcd_cum, epoch):
-        print(" -- Start validating -- ")
+    def get_best_train_params(self, top_k_for_each_epoch: int = 1):
+        """
+        Firstly, load the dict for each epoch under 'self.train_save_dir'.
+        Afterwards, get the best param vector along with their costs for each train epoch.
+        Then combine them into a dict with the same structure.
+        Finally, save the dict as 'best_from_train.pth' under 'self.val_save_dir'
+        """
 
-        self.dt = 0.006
+        train_save_files = [
+            get_train_file_path(self.train_save_dir, ep)
+            for ep in range(self.train_num_epochs)
+        ]
+
+        best_from_train = combine_all_param_dicts(
+            train_save_files, top_k_per_dict=top_k_for_each_epoch)
+
+        # save the top few param vectors with the lowest validation loss
+        best_from_train_file_path = os.path.join(self.val_save_dir,
+                                                 'best_from_train.pth')
+        torch.save(best_from_train, best_from_train_file_path)
+        print(
+            f"Successfully saved the top {top_k_for_each_epoch} parameters from each train epoch to: {best_from_train_file_path}"
+        )
+
+        return best_from_train
+
+    def validate(self, seed=None):
+        print(" -- Start validating -- ")
         # Set random seed
-        seed = np.random.randint(0, 1000000000000)
+        if seed is None:
+            seed = np.random.randint(0, 1000000000000)
         torch.manual_seed(seed)
 
-        param_coef_path = os.path.join(self.save_param_dir,
-                                       f'param_save_epoch{epoch}.pth')
-        if not os.path.exists(param_coef_path):
-            raise Exception("Path doesn't exist.")
-        d = torch.load(param_coef_path)
-        param_coef = d['param_coef']
-        valid_param_list_dl = d['valid_param_list']
-        parameter = parameterize_myelin_rsfc(myelin, rsfc_gradient, param_coef)
-        parameter_repeat = parameter.repeat(
-            1, self.param_dup)  # [3*N+1, param_sets * param_dup]
-        mfm_model = MfmModel2014(parameter_repeat, sc_euler, dt=self.dt)
-        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
-            simulate_time=self.simulate_time,
-            burn_in_time=self.burn_in_time,
-            TR=self.TR)
+        # load the best_from_train
+        best_from_train_file_path = os.path.join(self.val_save_dir,
+                                                 'best_from_train.pth')
+        if not os.path.exists(best_from_train_file_path):
+            self.get_best_train_params()
+        best_from_train = torch.load(best_from_train_file_path,
+                                     map_location=self.device)
 
-        bold_signal = bold_signal.view(
-            self.N, self.param_dup, self.param_sets,
-            -1).transpose(1, 2)  # [N, param_sets, param_dup, t_for_bold]
-        valid_M_mask = valid_M_mask.view(
-            self.param_dup, self.param_sets).T  # [param_sets, param_dup]
+        # simulate on the validation set
+        param_vectors = best_from_train['parameter']
+        save_dict = self.sim_n_get_losses(param_vectors)
 
-        valid_param_list = []  # record valid param index
-        fc_sim = torch.zeros(self.param_sets, self.N, self.N)
-        fcd_hist = torch.zeros(self.fcd_hist_bins, self.param_sets)
-        count_valid = 0
-        for i in range(self.param_sets):
-            # for each set of parameter
-            mask_this_param = valid_M_mask[i]  # [param_dup]
-            if mask_this_param.any():
-                valid_param_list.append(i)
-                bold_this_param = bold_signal[:, i,
-                                              mask_this_param, :]  # [N, 1/2/3/param_dup, t_for_bold]
-                fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
-                fc_this_param = torch.mean(fc_this_param, dim=0)
-                _, fcd_hist_this_param = MfmModel2014.FCD_calculate(
-                    bold_this_param, self.window_size)
-                fcd_hist_this_param = torch.mean(fcd_hist_this_param, dim=1)
+        # save the simulation results
+        print(datetime.datetime.now(), 'Start saving results...')
+        save_dict['seed'] = seed
 
-                fc_sim[count_valid] = fc_this_param
-                fcd_hist[:, count_valid] = fcd_hist_this_param
-                count_valid += 1
-        fc_sim = fc_sim[:count_valid]
-        fcd_hist = fcd_hist[:, :count_valid]
-        total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-            fc_sim, fcd_hist, fc_emp, emp_fcd_cum)  # [count_valid]
-        valid_param_list = torch.as_tensor(valid_param_list)
+        sim_on_val_file_path = os.path.join(self.val_save_dir,
+                                            'best_from_train_sim_on_val.pth')
+        torch.save(save_dict, sim_on_val_file_path)
+        print("Successfully saved to:", sim_on_val_file_path)
 
-        print('Start saving results...')
-        save_dict = {
-            'valid_param_list_dl': valid_param_list_dl,
-            'valid_param_list': valid_param_list,
-            'corr_loss': corr_loss,
-            'l1_loss': L1_loss,
-            'ks_loss': ks_loss,
-            'seed': seed
-        }
-        torch.save(
-            save_dict,
-            os.path.join(self.val_save_dir, f'Euler_epoch{epoch}' + '.pth'))
-        print("Successfully saved valid param lists and losses.")
-
-        print(" -- Done validating -- ")
+        print(datetime.datetime.now(), " -- Done validating -- ")
         return 0
 
+    @DeprecationWarning
     def val_best_parameters(self,
                             sc_euler,
-                            fc_emp,
+                            emp_fc,
                             emp_fcd_cum,
                             epoch,
                             seed=None):
@@ -1280,15 +1476,14 @@ class DLVersionCMAESValidator:
             seed = np.random.randint(0, 1000000000000)
         torch.manual_seed(seed)
 
-        parameter_path = os.path.join(self.save_param_dir,
-                                      f'param_save_epoch{epoch}.pth')
+        parameter_path = get_train_file_path(self.train_save_dir, epoch)
         if not os.path.exists(parameter_path):
             raise Exception("Path doesn't exist.")
         d = torch.load(parameter_path, map_location=self.device)
 
-        valid_param_list_pre = d['valid_param_list']
+        valid_param_indices_pre = d['valid_param_indices']
         parameter = d['parameter']
-        parameter = parameter[:, valid_param_list_pre]
+        parameter = parameter[:, valid_param_indices_pre]
         if 'FC_FCD_loss' in d:
             # TODO: Try without FCD KS loss
             # FC_FCD_loss is [param_sets, 3]
@@ -1323,7 +1518,7 @@ class DLVersionCMAESValidator:
         fc_this_param = None
         if valid_M_mask.any():
             bold_this_param = bold_signal[:,
-                                          valid_M_mask, :]  # [N, 1/2/3/param_dup, t_for_bold]
+                                          valid_M_mask, :]  # [N, 1/2/3/param_dup, #time_points_in_BOLD]
             fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
             fc_this_param = torch.mean(fc_this_param, dim=0)
             fcd_mat_this_param, fcd_hist_this_param = MfmModel2014.FCD_calculate(
@@ -1338,7 +1533,7 @@ class DLVersionCMAESValidator:
             return 1
 
         _, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-            fc_this_param.unsqueeze(0), fcd_hist_this_param, fc_emp,
+            fc_this_param.unsqueeze(0), fcd_hist_this_param, emp_fc,
             emp_fcd_cum)  # [1]
         print(datetime.datetime.now(), 'Start saving results...')
         save_dict = {
@@ -1374,46 +1569,88 @@ class DLVersionCMAESValidator:
         return 0
 
 
-class DLVersionCMAESTester:
+class CMAESTester(ModelHandler):
 
-    def __init__(self, config, val_dirs, test_dir, trained_epochs):
-        self.device, self.dtype = set_torch_default()
-        self.config = config
+    def __init__(self,
+                 config,
+                 val_save_dirs,
+                 test_save_dir,
+                 sc_euler: torch.Tensor = None,
+                 emp_fc: torch.Tensor = None,
+                 emp_fcd_cum: torch.Tensor = None,
+                 train_num_epochs: int = 100):
+        super().__init__(config, 'test', sc_euler, emp_fc, emp_fcd_cum)
 
-        # Dataset parameters
-        dataset_parameters = config['Dataset Parameters']
-        self.simulate_time = float(dataset_parameters['simulate_time'])
-        self.burn_in_time = float(dataset_parameters['burn_in_time'])
-        self.TR = float(dataset_parameters['TR'])
-        self.window_size = int(dataset_parameters['window_size'])
+        self.val_save_dirs = val_save_dirs
+        self.test_save_dir = test_save_dir
+        self.val_save_dirs_len = len(self.val_save_dirs)
+        self.train_num_epochs = train_num_epochs  # The number of param files in one validation directory
 
-        # Simulating parameters
-        simulating_parameters = config['Simulating Parameters']
-        self.N = int(simulating_parameters['n_ROI'])
-        self.parameters_dim = 3 * self.N + 1  # The dimension of parameters in MFM model.
-        self.param_sets = int(
-            simulating_parameters['test_param_sets']
-        )  # select number of best parameters from val_dirs
-        # [NOTE] here param_sets is not identical to the definition in Validator and Trainer
-        self.param_dup = int(simulating_parameters['param_dup'])
-        self.fcd_hist_bins = int(simulating_parameters['fcd_hist_bins'])
-        self.dt = float(simulating_parameters['dt_test'])
-
-        self.trained_epochs = trained_epochs  # The number of param files in one validation directory
-
-        self.val_dirs = val_dirs
-        self.test_dir = test_dir
-        self.val_dirs_len = len(self.val_dirs)
-
-        if not os.path.exists(self.test_dir):
-            os.makedirs(self.test_dir)
-        print("Validation dirs: ", val_dirs)
+        if not os.path.exists(self.test_save_dir):
+            os.makedirs(self.test_save_dir)
+        print("Validation dirs: ", val_save_dirs)
         print(
-            f"DL Version CMA-ES tester has been successfully initialized. Results will be stored in {self.test_dir}"
+            f"DL Version CMA-ES tester has been successfully initialized. Results will be stored in {self.test_save_dir}"
         )
 
+    def get_best_val_params(self):
+        """
+        Firstly, load the dict in each 'best_from_train_sim_on_val.pth' under each of the 'self.val_save_dirs'.
+        Afterwards, get the best param vector along with their costs for each train epoch.
+        Then combine them into a dict with the same structure.
+        Finally, save the dict as 'best_from_train.pth' under 'self.val_save_dir'
+        """
+        val_save_files = [
+            os.path.join(val_dir, 'best_from_train_sim_on_val.pth')
+            for val_dir in self.val_save_dirs
+        ]
+
+        best_from_val = combine_all_param_dicts(
+            val_save_files, top_k_among_all_dicts=self.param_sets)
+
+        # save the top few param vectors with the lowest validation loss
+        best_from_val_file_path = os.path.join(self.test_save_dir,
+                                               'best_from_val.pth')
+        torch.save(best_from_val, best_from_val_file_path)
+        print(
+            f"Successfully saved the top {self.param_sets} parameters with lowest validation loss to: {best_from_val_file_path}"
+        )
+
+        return best_from_val
+
+    def test(self, seed=None):
+        print(" -- Start testing -- ")
+        # Set random seed
+        if seed is None:
+            seed = np.random.randint(0, 1000000000000)
+        torch.manual_seed(seed)
+
+        # load the best_from_val
+        best_from_val_file_path = os.path.join(self.test_save_dir,
+                                               'best_from_val.pth')
+        if not os.path.exists(best_from_val_file_path):
+            self.get_best_val_params()
+        best_from_val = torch.load(best_from_val_file_path,
+                                   map_location=self.device)
+
+        # simulate on test set
+        param_vectors = best_from_val['parameter']
+        save_dict = self.sim_n_get_losses(param_vectors)
+
+        # save the simulation result
+        print(datetime.datetime.now(), 'Start saving results...')
+        save_dict['seed'] = seed
+
+        sim_on_test_file_path = os.path.join(
+            self.val_save_dir, 'best_from_train_sim_on_test.pth')
+        torch.save(save_dict, sim_on_test_file_path)
+        print("Successfully saved to:", sim_on_test_file_path)
+
+        print(datetime.datetime.now(), " -- Done validating -- ")
+        return 0
+
     # TODO: Modify this as well if we want to regularize firing rate for HCPYA
-    def test(self, sc_euler, fc_emp, emp_fcd_cum, seed=None):
+    def test_old(self, sc_euler, emp_fc, emp_fcd_cum, seed=None):
         print(" -- Start testing -- ")
 
         # Set random seed
@@ -1421,18 +1658,20 @@ class DLVersionCMAESTester:
             seed = np.random.randint(0, 1000000000000)
         torch.manual_seed(seed)
 
-        parameter_sets = torch.zeros(self.parameters_dim, self.val_dirs_len *
-                                     self.trained_epochs)  # [N, 500]
-        val_loss_sets = torch.ones(self.val_dirs_len * self.trained_epochs) * 3
+        parameter_sets = torch.zeros(self.parameters_dim,
+                                     self.val_save_dirs_len *
+                                     self.train_num_epochs)  # [N, 500]
+        val_loss_sets = torch.ones(
+            self.val_save_dirs_len * self.train_num_epochs) * 3
         valid_val_dir_count = 0
         valid_val_epoch_count = 0
-        for val_dir_i in range(self.val_dirs_len):
-            val_dir = self.val_dirs[val_dir_i]
+        for val_dir_i in range(self.val_save_dirs_len):
+            val_dir = self.val_save_dirs[val_dir_i]
             if not os.path.exists(val_dir):
                 print(f"{val_dir} doesn't exist.")
                 continue
             valid_val_dir_count += 1
-            for epoch in range(self.trained_epochs):
+            for epoch in range(self.train_num_epochs):
                 param_val_path = os.path.join(val_dir,
                                               f'best_param{epoch}.pth')
                 if not os.path.exists(param_val_path):
@@ -1440,10 +1679,10 @@ class DLVersionCMAESTester:
                     continue
                 valid_val_epoch_count += 1
                 d = torch.load(param_val_path, map_location=self.device)
-                parameter_sets[:, val_dir_i * self.trained_epochs +
+                parameter_sets[:, val_dir_i * self.train_num_epochs +
                                epoch] = torch.squeeze(d['parameter'])
                 val_loss_sets[
-                    val_dir_i * self.trained_epochs +
+                    val_dir_i * self.train_num_epochs +
                     epoch] = d['corr_loss'] + d['l1_loss'] + d['ks_loss']
         if valid_val_dir_count == 0:
             print("No valid validated directories.")
@@ -1469,12 +1708,12 @@ class DLVersionCMAESTester:
             TR=self.TR)
 
         bold_signal = bold_signal.view(
-            self.N, self.param_dup, self.param_sets,
-            -1).transpose(1, 2)  # [N, param_sets, param_dup, t_for_bold]
+            self.N, self.param_dup, self.param_sets, -1).transpose(
+                1, 2)  # [N, param_sets, param_dup, #time_points_in_BOLD]
         valid_M_mask = valid_M_mask.view(
             self.param_dup, self.param_sets).T  # [param_sets, param_dup]
 
-        valid_param_list = []  # record valid param index
+        valid_param_indices = []  # record valid param index
         fc_sim = torch.zeros(self.param_sets, self.N, self.N)
         fcd_hist = torch.zeros(self.fcd_hist_bins, self.param_sets)
         count_valid = 0
@@ -1482,9 +1721,9 @@ class DLVersionCMAESTester:
             # for each set of parameter
             mask_this_param = valid_M_mask[i]  # [param_dup]
             if mask_this_param.any():
-                valid_param_list.append(i)
+                valid_param_indices.append(i)
                 bold_this_param = bold_signal[:, i,
-                                              mask_this_param, :]  # [N, 1/2/3/param_dup, t_for_bold]
+                                              mask_this_param, :]  # [N, 1/2/3/param_dup, #time_points_in_BOLD]
                 fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
                 fc_this_param = torch.mean(fc_this_param, dim=0)
                 _, fcd_hist_this_param = MfmModel2014.FCD_calculate(
@@ -1497,21 +1736,22 @@ class DLVersionCMAESTester:
         fc_sim = fc_sim[:count_valid]
         fcd_hist = fcd_hist[:, :count_valid]
         total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-            fc_sim, fcd_hist, fc_emp, emp_fcd_cum)  # [count_valid]
-        valid_param_list = torch.as_tensor(valid_param_list)
+            fc_sim, fcd_hist, emp_fc, emp_fcd_cum)  # [count_valid]
+        valid_param_indices = torch.as_tensor(valid_param_indices)
 
         print('Start saving results...')
         save_dict = {
             'parameter': parameter,
             'val_losses': val_losses,
             'sorted_index': sorted_index,
-            'valid_param_list': valid_param_list,
+            'valid_param_indices': valid_param_indices,
             'corr_loss': corr_loss,
             'l1_loss': L1_loss,
             'ks_loss': ks_loss,
             'seed': seed
         }
-        torch.save(save_dict, os.path.join(self.test_dir, 'test_results.pth'))
+        torch.save(save_dict,
+                   os.path.join(self.test_save_dir, 'test_results.pth'))
         print("Successfully saved test results.")
 
         print(" -- Done testing -- ")
@@ -1521,35 +1761,35 @@ class DLVersionCMAESTester:
         print(" -- Start testing -- ")
 
         parameter_sets = torch.zeros(
-            self.parameters_dim, self.val_dirs_len *
-            self.trained_epochs)  # [205, 50 * num_of_tried_seeds]
+            self.parameters_dim, self.val_save_dirs_len *
+            self.train_num_epochs)  # [205, 50 * num_of_tried_seeds]
         # TODO: Regularize firing rate
         num_of_losses = 4  # was 4 without r_E_reg_loss
         # TODO: Regularize firing rate
-        val_loss_sets = torch.ones(self.val_dirs_len * self.trained_epochs,
-                                   num_of_losses) * 3
+        val_loss_sets = torch.ones(
+            self.val_save_dirs_len * self.train_num_epochs, num_of_losses) * 3
         # [total, corr, L1, ks]
         valid_val_dir_count = 0
-        for val_dir_i in range(self.val_dirs_len):
-            val_dir = self.val_dirs[val_dir_i]
+        for val_dir_i in range(self.val_save_dirs_len):
+            val_dir = self.val_save_dirs[val_dir_i]
             if not os.path.exists(val_dir):
                 print(f"{val_dir} doesn't exist.")
                 continue
             valid_val_dir_count += 1
-            for epoch in range(self.trained_epochs):
+            for epoch in range(self.train_num_epochs):
                 param_val_path = os.path.join(val_dir,
                                               f'best_param{epoch}.pth')
                 if not os.path.exists(param_val_path):
                     print(f"{param_val_path} doesn't exist.")
                     continue
                 d = torch.load(param_val_path, map_location=self.device)
-                parameter_sets[:, val_dir_i * self.trained_epochs +
+                parameter_sets[:, val_dir_i * self.train_num_epochs +
                                epoch] = torch.squeeze(d['parameter'])
-                val_loss_sets[val_dir_i * self.trained_epochs + epoch,
+                val_loss_sets[val_dir_i * self.train_num_epochs + epoch,
                               1] = d['corr_loss']
-                val_loss_sets[val_dir_i * self.trained_epochs + epoch,
+                val_loss_sets[val_dir_i * self.train_num_epochs + epoch,
                               2] = d['l1_loss']
-                val_loss_sets[val_dir_i * self.trained_epochs + epoch,
+                val_loss_sets[val_dir_i * self.train_num_epochs + epoch,
                               3] = d['ks_loss']
                 # TODO: Regularize firing rate
                 # # key for the r_E regularization loss is 'r_E_reg_loss'
@@ -1589,7 +1829,8 @@ class DLVersionCMAESTester:
         # if all_loss.shape[1] > 4:
         #     save_dict['r_E_reg_loss'] = all_loss[:, 4]
         # TODO: Regularize firing rate
-        torch.save(save_dict, os.path.join(self.test_dir, 'val_results.pth'))
+        torch.save(save_dict,
+                   os.path.join(self.test_save_dir, 'val_results.pth'))
         print("Successfully saved test results.")
 
         print(" -- Done testing -- ")
@@ -1607,7 +1848,7 @@ def simulate_fc_fcd(config,
                     parameter,
                     param_dup,
                     sc_euler,
-                    fc_emp=None,
+                    emp_fc=None,
                     emp_fcd_cdf=None,
                     seed=None):
     # Save FC, FCD for each param_sets, Average across param_dup.
@@ -1637,11 +1878,11 @@ def simulate_fc_fcd(config,
         simulate_time=simulate_time, burn_in_time=burn_in_time, TR=TR)
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     bold_signal = bold_signal.view(N, param_dup, param_sets, -1).transpose(
-        1, 2)  # [N, param_sets, param_dup, t_for_bold]
+        1, 2)  # [N, param_sets, param_dup, #time_points_in_BOLD]
     valid_M_mask = valid_M_mask.view(param_dup,
                                      param_sets).T  # [param_sets, param_dup]
 
-    valid_param_list = []  # record valid param index
+    valid_param_indices = []  # record valid param index
     fc_sim = torch.zeros(param_sets, N, N)
     fcd_hist = torch.zeros(fcd_hist_bins, param_sets)
     count_valid = 0
@@ -1649,9 +1890,9 @@ def simulate_fc_fcd(config,
         # for each set of parameter
         mask_this_param = valid_M_mask[i]  # [param_dup]
         if mask_this_param.any():
-            valid_param_list.append(i)
+            valid_param_indices.append(i)
             bold_this_param = bold_signal[:, i,
-                                          mask_this_param, :]  # [N, 1/2/3/param_dup, t_for_bold]
+                                          mask_this_param, :]  # [N, 1/2/3/param_dup, #time_points_in_BOLD]
             fc_this_param = MfmModel2014.FC_calculate(
                 bold_this_param)  # [param_dup, roi, roi]
             fc_this_param = torch.mean(fc_this_param, dim=0)
@@ -1673,16 +1914,16 @@ def simulate_fc_fcd(config,
     corr_loss = None
     L1_loss = None
     ks_loss = None
-    if fc_emp is not None and emp_fcd_cdf is not None:
+    if emp_fc is not None and emp_fcd_cdf is not None:
         _, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-            fc_sim, fcd_hist, fc_emp, emp_fcd_cdf)  # [param_dup]
-    valid_param_list = torch.as_tensor(valid_param_list)
+            fc_sim, fcd_hist, emp_fc, emp_fcd_cdf)  # [param_dup]
+    valid_param_indices = torch.as_tensor(valid_param_indices)
 
     print('Start saving results...')
     # save_dict = {'fc': fc_this_param, 'fcd': fcd_mat_this_param, 'corr_loss': corr_loss,
     #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_coef': param_coef,    'parameter': parameter}
     save_dict = {
-        'valid_param_list': valid_param_list,
+        'valid_param_indices': valid_param_indices,
         'fc': fc_sim,
         'fcd_pdf': fcd_hist,
         'corr_loss': corr_loss,
@@ -1732,11 +1973,11 @@ def simulate_fc_fcd_mat(config,
         simulate_time=simulate_time, burn_in_time=burn_in_time, TR=TR)
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     bold_signal = bold_signal.view(N, param_dup, param_sets, -1).transpose(
-        1, 2)  # [N, param_sets, param_dup, t_for_bold]
+        1, 2)  # [N, param_sets, param_dup, #time_points_in_BOLD]
     valid_M_mask = valid_M_mask.view(param_dup,
                                      param_sets).T  # [param_sets, param_dup]
 
-    valid_param_list = []  # record valid param index
+    valid_param_indices = []  # record valid param index
     fc_sim = torch.zeros(param_sets, param_dup, N, N)
     window_num = bold_signal.shape[3] - window_size + 1
     fcd_mats = torch.zeros(param_sets, param_dup, window_num, window_num)
@@ -1746,9 +1987,9 @@ def simulate_fc_fcd_mat(config,
         # for each set of parameter
         mask_this_param = valid_M_mask[i]  # [param_dup]
         if mask_this_param.all():  # Must all be true
-            valid_param_list.append(i)
+            valid_param_indices.append(i)
             bold_this_param = bold_signal[:, i,
-                                          mask_this_param, :]  # [N, param_dup, t_for_bold]
+                                          mask_this_param, :]  # [N, param_dup, #time_points_in_BOLD]
             fc_sim[count_valid] = MfmModel2014.FC_calculate(
                 bold_this_param)  # [param_dup, roi, roi]
             fcd_mats[count_valid], fcd_hist[
@@ -1763,13 +2004,13 @@ def simulate_fc_fcd_mat(config,
     fcd_mats = fcd_mats[:count_valid]
     fcd_hist = fcd_hist[:count_valid]
 
-    valid_param_list = torch.as_tensor(valid_param_list)
+    valid_param_indices = torch.as_tensor(valid_param_indices)
 
     print('Start saving results...')
     # save_dict = {'fc': fc_this_param, 'fcd': fcd_mat_this_param, 'corr_loss': corr_loss,
     #              'l1_loss': L1_loss, 'ks_loss': ks_loss, 'seed': seed, 'param_coef': param_coef,    'parameter': parameter}
     save_dict = {
-        'valid_param_list': valid_param_list,
+        'valid_param_indices': valid_param_indices,
         'fc': fc_sim,
         'fcd_mats': fcd_mats,
         'fcd_pdf': fcd_hist,
@@ -1788,7 +2029,7 @@ def simulate_fc(config,
                 parameter,
                 param_dup,
                 sc_euler,
-                fc_emp,
+                emp_fc,
                 emp_fcd_cdf,
                 seed=None):
     # Set MFM hyper-parameters
@@ -1817,7 +2058,7 @@ def simulate_fc(config,
     # bold_signal: [ROIs, param_dup, t]; valid_M_mask: [param_dup]
     if valid_M_mask.any():
         bold_this_param = bold_signal[:,
-                                      valid_M_mask, :]  # [N, 1/2/3/param_dup, t_for_bold]
+                                      valid_M_mask, :]  # [N, 1/2/3/param_dup, #time_points_in_BOLD]
         fc_this_param = MfmModel2014.FC_calculate(bold_this_param)
         fc_this_param = torch.mean(fc_this_param, dim=0)
         fcd_mat_this_param, fcd_hist_this_param = MfmModel2014.FCD_calculate(
@@ -1833,7 +2074,7 @@ def simulate_fc(config,
         return 1
 
     _, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-        fc_this_param.unsqueeze(0), fcd_hist_this_param, fc_emp,
+        fc_this_param.unsqueeze(0), fcd_hist_this_param, emp_fc,
         emp_fcd_cdf)  # [1]
     print('Start saving results...')
 
@@ -1888,7 +2129,7 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
         TR=TR,
         need_EI=True)
     print(f"Bold {bold_signal.shape}; S_E {s_e_ave.shape}")
-    # bold_signal = bold_signal.view(roi_num, param_dup, param_sets, -1).transpose(1, 2)  # [N, param_sets, param_dup, t_for_bold]
+    # bold_signal = bold_signal.view(roi_num, param_dup, param_sets, -1).transpose(1, 2)  # [N, param_sets, param_dup, #time_points_in_BOLD]
     # valid_M_mask = valid_M_mask.view(param_dup, param_sets).T  # [param_sets, param_dup]
     # S_E: [n_roi, param_dup]
 

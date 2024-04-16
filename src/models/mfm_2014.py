@@ -221,6 +221,9 @@ class MfmModel2014:
 
         # Start calculating
         for t in main_loop:
+            # print t at the interval of 100
+            if t % 10000 == 0:
+                print(datetime.datetime.now(), ": t = ", t)
             dSE_dt, dSI_dt, r_E = self._synaptic_dynamical_equations_2014(
                 S_E, S_I)
             S_E = S_E + dSE_dt * dt + self.sigma * torch.randn(
@@ -288,16 +291,16 @@ class MfmModel2014:
             return bold[:, :, burn_in_bold + 1:], valid_M_mask, r_E_ave
 
     @staticmethod
-    def all_loss_calculate_from_fc_fcd(fc_sim, fcd_hist, fc_emp, emp_fcd_cum):
+    def all_loss_calculate_from_fc_fcd(fc_sim, fcd_hist, emp_fc, emp_fcd_cum):
         """
         Calculate corr_loss, L1_loss and KS_loss from simulated FC matrix and FCD histogram
         :param fc_sim: [M, N, N]
         :param fcd_hist: [10000, M], no need to cumsum or normalize. Will do automatically in KS_cost
-        :param fc_emp: [N, N]
+        :param emp_fc: [N, N]
         :param emp_fcd_cum: [10000, 1]
         :return: [M]
         """
-        corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, fc_emp)
+        corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, emp_fc)
         corr_loss = 1 - corr
         ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
         # TODO: Try without FCD KS loss
@@ -307,16 +310,16 @@ class MfmModel2014:
         return total_loss, corr_loss, L1_loss, ks_loss
 
     @staticmethod
-    def all_loss_calculate_from_bold(bold, fc_emp, emp_fcd_cum):
+    def all_loss_calculate_from_bold(bold, emp_fc, emp_fcd_cum):
         """
         Calculate corr_loss, L1_loss and KS_loss from BOLD signals
         :param bold: [N, M, len], the simulated BOLD signals
-        :param fc_emp: [N, N], the empirical FC matrix
+        :param emp_fc: [N, N], the empirical FC matrix
         :param emp_fcd_cum: [10000, 1]. Has been done cumulative summation and normalization (dividing by emp_fcd_cum[-1:, :])
         :return: total_loss: [M]
         """
         fc_sim = MfmModel2014.FC_calculate(bold)
-        corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, fc_emp)
+        corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, emp_fc)
         corr_loss = 1 - corr
         _, fcd_hist = MfmModel2014.FCD_calculate(bold)
         ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
@@ -338,12 +341,12 @@ class MfmModel2014:
         return fc_mat
 
     @staticmethod
-    def FC_correlation_n_L1_cost(fc_sim, fc_emp):
+    def FC_correlation_n_L1_cost(fc_sim, emp_fc):
         """
         Compute the FC correlation and L1 cost for all M sets.
         [ATTENTION] here L1 is not the real L1 (subtraction of values and get the mean), but the subtraction of two mean values.
         :param fc_sim: [M, N, N]
-        :param fc_emp: [N, N]
+        :param emp_fc: [N, N]
         :return: corr: [M,]; L1: [M,]
         """
         M = fc_sim.shape[0]
@@ -352,7 +355,7 @@ class MfmModel2014:
         # Extract the upper triangular part
         mask = torch.ones(N, N, dtype=torch.bool)
         mask = torch.triu(mask, 1)
-        vec_emp = fc_emp[mask]
+        vec_emp = emp_fc[mask]
         vec_emp = vec_emp.unsqueeze(0).expand(M, -1)  # [M, len]
         vec_sim = fc_sim[:, mask]
 
@@ -397,12 +400,13 @@ class MfmModel2014:
         return cor_fc[0, 1]
 
     @staticmethod
-    def FCD_calculate(bold, window_size=83, bins=10000):
+    def FCD_calculate(bold, window_size=83, bins=10000, get_FCD_matrix=False):
         """
         Moving windows and calculating the FC matrix for every window_size, then calculating the correlation between these FC matrix.
         :param bold: [N, M, t_len]
         :param window_size:
         :param bins: The histogram bins
+        :param get_FCD_matrix: whether return the FCD matrix
         :return: FCD matrix [M, window_num, window_num]. window_num = t_len - window_size + 1
                 FCD histogram: [10000, M]
         """
@@ -447,8 +451,10 @@ class MfmModel2014:
                                               min=-1.,
                                               max=1.)
 
-        # Calculate whole FCD matrix
-        # fcd_mat = fcd_mat + fcd_mat.transpose(1, 2) + torch.eye(window_num).expand(M, -1, -1)
+        # if get_FCD_matrix:
+        #     # Calculate whole FCD matrix
+        #     fcd_mat = fcd_mat + fcd_mat.transpose(
+        #         1, 2) + torch.eye(window_num).expand(M, -1, -1)
 
         # time_elapse = time.time() - start_time
         # print("The time for FCD matrix and FCD histogram is: ", time_elapse)

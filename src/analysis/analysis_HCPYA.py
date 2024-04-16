@@ -9,9 +9,12 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
+from src.basic.constants import SUBJECT_ID_RANGE
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import scatter_loss_vs_r_E  # noqa
+from src.utils.analysis_utils import boxplot_train_r_E, compare_fc, compare_fcd, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap, plot_sim_fc_fcd  # noqa
+from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_emp_fig_dir, get_sim_fig_path
+from src.models.mfm_2014 import MfmModel2014
 
 sub_109 = [
     862, 863, 864, 865, 866, 868, 869, 870, 871, 872, 873, 874, 875, 877, 879,
@@ -23,6 +26,48 @@ sub_109 = [
     998, 999, 1001, 1002, 1003, 1004, 1006, 1008, 1014, 1016, 1017, 1019, 1021,
     1022, 1023, 1024, 1025, 1026, 1028
 ]
+
+DS_NAME = 'HCPYA'
+N_EPOCHS = 100
+
+
+def get_HCPYA_group_emp_fcd(range_start: int, range_end: int):
+    group_TC = get_HCPYA_group_emp_TC(range_start, range_end)
+    group_TC = group_TC.unsqueeze(1)
+    fcd, _ = MfmModel2014.FCD_calculate(group_TC, get_FCD_matrix=True)
+    fcd = fcd.squeeze()
+    assert fcd.ndim == 2
+
+    return fcd
+
+
+def plot_HCPYA_group_emp_fc_fcd(range_start: int, range_end: int):
+    # get emp fc and emp fcd tensors
+    group_emp_fc = get_HCPYA_group_emp_fc(range_start, range_end).cpu().numpy()
+    group_emp_fcd = get_HCPYA_group_emp_fcd(range_start,
+                                            range_end).cpu().numpy()
+
+    fcd_save_dir = get_emp_fig_dir(DS_NAME, 'all_participants', 'FCD')
+    fc_save_dir = get_emp_fig_dir(DS_NAME, 'all_participants', 'FC')
+    fcd_save_path = os.path.join(
+        fcd_save_dir, f'group_emp_fcd_{range_start}_{range_end}.csv')
+    fc_save_path = os.path.join(fc_save_dir,
+                                f'group_emp_fc_{range_start}_{range_end}.csv')
+
+    # save to csv
+    pd.DataFrame(group_emp_fc).to_csv(fc_save_path, index=False, header=False)
+    pd.DataFrame(group_emp_fcd).to_csv(fcd_save_path,
+                                       index=False,
+                                       header=False)
+
+    # draw heatmaps
+    draw_heatmap([fc_save_path, fcd_save_path], [
+        f'empirical FC for subjects {range_start} to {range_end}',
+        f'empirical FCD for subjects {range_start} to {range_end}'
+    ], [
+        fc_save_path.replace('.csv', '.png'),
+        fcd_save_path.replace('.csv', '.png')
+    ])
 
 
 def plot_pred_loss():
@@ -380,22 +425,108 @@ def compare_group_test_results():
         ylabel='KS Loss')
 
 
+def analyze_run(target, trial_idx, seed_idx):
+    for k in [1, 10]:
+        plot_train_loss(DS_NAME,
+                        target,
+                        trial_idx,
+                        seed_idx,
+                        None,
+                        epoch_range=range(99),
+                        lowest_top_k=k)
+    # plot_train_loss(DS_NAME,
+    #                 target,
+    #                 trial_idx,
+    #                 seed_idx,
+    #                 None,
+    #                 epoch_range=range(49),
+    #                 show_individual_loss='r_E_reg_loss')
+    for top_k in [10, 100]:
+        for plot_outlier_r_E in [True, False]:
+            boxplot_train_r_E(DS_NAME,
+                              target,
+                              trial_idx,
+                              seed_idx,
+                              None, [0, 19, 39, 59, 79, 99],
+                              top_k=top_k,
+                              plot_outlier_r_E=plot_outlier_r_E)
+    visualize_train_r_E_for_multi_epochs(DS_NAME, target, trial_idx, seed_idx,
+                                         None, N_EPOCHS, 2, 3)
+
+
+def analyze_phase(target, trial_idx, seed_idx, phase):
+    # plot_sim_fc_fcd(DS_NAME, target, phase, trial_idx, seed_idx, 0)
+    sim_fc_path = get_sim_fig_path(DS_NAME, target, phase, trial_idx, seed_idx,
+                                   'sim_fc.csv')
+    sim_fcd_path = get_sim_fig_path(DS_NAME, target, phase, trial_idx,
+                                    seed_idx, 'sim_fcd.csv')
+    emp_fc_fig_dir = get_emp_fig_dir(DS_NAME, target, 'FC')
+    emp_fcd_fig_dir = get_emp_fig_dir(DS_NAME, target, 'FCD')
+    range_start, range_end = SUBJECT_ID_RANGE[DS_NAME][phase]
+    emp_fc_path = os.path.join(emp_fc_fig_dir,
+                               f'group_emp_fc_{range_start}_{range_end}.csv')
+    emp_fcd_path = os.path.join(
+        emp_fcd_fig_dir, f'group_emp_fcd_{range_start}_{range_end}.csv')
+
+    compare_fc(sim_fc_path, emp_fc_path)
+    compare_fcd(sim_fcd_path, emp_fcd_path)
+
+    # TODO: Compare TC
+
+
 if __name__ == "__main__":
+    ALL_TARGETS = ['all_participants']
+    # * Epoch-level analysis
+    # for target in ALL_TARGETS:
+    #     for trial_idx in [3, 6]:
+    #         for seed_idx in [1]:
+    #             for group_idx in [1]:
+    #                 for epoch_idx in [0, 9, 19, 29, 39, 49]:
+    #                     analyze_epoch(target, trial_idx, seed_idx, group_idx,
+    #                                   epoch_idx)
+
+    # * phase-level analysis
+    for target in ALL_TARGETS:
+        for trial_idx in range(21, 23):
+            for seed_idx in range(3, 4):
+                for phase in ['train']:
+                    analyze_phase(target, trial_idx, seed_idx, phase)
+
+    # # * Run-level analysis
+    # for target in ALL_TARGETS:
+    #     for trial_idx in range(22, 23):
+    #         for seed_idx in range(3, 4):
+    #             analyze_run(target, trial_idx, seed_idx)
+
+    # * Trial-level analysis
+    # for target in ALL_TARGETS:
+    #     for trial_idx in [10]:
+    #         analyze_trial(target, trial_idx)
+
+    # * Target-level analysis
+    # for target in ALL_TARGETS:
+    #     analyze_target(target)
+
+    # * Others
+    # plot_HCPYA_group_emp_fc_fcd(0, 343)
+    # plot_HCPYA_group_emp_fc_fcd(343, 686)
+    plot_HCPYA_group_emp_fc_fcd(686, 1029)
+
     # compare_test_results_plot()
     # compare_group_params_apply_to_individual()
     # compare_group_test_results()
     # plot_pred_loss()
 
-    for epoch in [3]:
-        for r_E_range in [[float('-inf'), float('inf')], [1, 5]]:
-            for total_loss_range in [[float('-inf'), float('inf')], [0, 1]]:
-                # if r_E_range == [float('-inf'), float('inf')] and total_loss_range == [float('-inf'), float('inf')]:
-                #     continue
-                scatter_loss_vs_r_E('HCPYA',
-                                    'group_860_1029',
-                                    13,
-                                    range(1, 1001),
-                                    None, [epoch],
-                                    r_E_range=r_E_range,
-                                    total_loss_range=total_loss_range,
-                                    plot_param_ranges=True)
+    # for epoch in [3]:
+    #     for r_E_range in [[float('-inf'), float('inf')], [1, 5]]:
+    #         for total_loss_range in [[float('-inf'), float('inf')], [0, 1]]:
+    #             # if r_E_range == [float('-inf'), float('inf')] and total_loss_range == [float('-inf'), float('inf')]:
+    #             #     continue
+    #             scatter_loss_vs_r_E('HCPYA',
+    #                                 'group_860_1029',
+    #                                 13,
+    #                                 range(1, 1001),
+    #                                 None, [epoch],
+    #                                 r_E_range=r_E_range,
+    #                                 total_loss_range=total_loss_range,
+    #                                 plot_param_ranges=True)

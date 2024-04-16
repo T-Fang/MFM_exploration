@@ -138,8 +138,8 @@ def fc_mean_datasets():
     pnc_age = []
     for group_nbr in range(1, 30):
         group_mats_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}'
-        fc_emp = np.array(pd.read_csv(os.path.join(group_mats_path, f'FC_train.csv'), header=None, index_col=False))
-        pnc_fc.append(np.mean(fc_emp))
+        emp_fc = np.array(pd.read_csv(os.path.join(group_mats_path, f'FC_train.csv'), header=None, index_col=False))
+        pnc_fc.append(np.mean(emp_fc))
 
         age_path = f'/home/shaoshi.z/storage/MFM/PNC/rest/age_results/seed_296/input/{group_nbr}/validation_subject_age.txt'
         age = np.array(pd.read_csv(age_path, header=None, index_col=False))
@@ -155,8 +155,8 @@ def fc_mean_datasets():
         group_mats_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/age_group_Harvard/{group_nbr}'
         fc_fcd_file = sio.loadmat(
             os.path.join(group_mats_path, 'fc_fcd_cdf_aCompCor.mat'))
-        fc_emp = np.array(fc_fcd_file['fc'])
-        hcd_fc.append(np.mean(fc_emp))
+        emp_fc = np.array(fc_fcd_file['fc'])
+        hcd_fc.append(np.mean(emp_fc))
 
         age_path = f'/home/tzeng/storage/Matlab/HCP_Dev/matfiles/pMFM/age_group_Harvard/{group_nbr}/subjects_demo.txt'
         age = pd.read_csv(age_path, sep='\t', header=None, index_col=False)

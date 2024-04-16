@@ -98,12 +98,12 @@ def group_sim_fc_fcd_to_individual(subject_id):
     if fcd_retest_runs is None:
         return
 
-    fc_emp = np.array([
+    emp_fc = np.array([
         fc_retest_runs['fc_REST1_LR'], fc_retest_runs['fc_REST1_RL'],
         fc_retest_runs['fc_REST2_LR'], fc_retest_runs['fc_REST2_RL']
     ])
-    fc_emp = tzeng_func.tzeng_fisher_average(fc_emp)
-    fc_emp = torch.as_tensor(fc_emp)
+    emp_fc = tzeng_func.tzeng_fisher_average(emp_fc)
+    emp_fc = torch.as_tensor(emp_fc)
 
     emp_fcd_cum = fcd_retest_runs['fcd_cdf_REST1_LR'] + fcd_retest_runs[
         'fcd_cdf_REST1_RL'] + fcd_retest_runs[
@@ -118,7 +118,7 @@ def group_sim_fc_fcd_to_individual(subject_id):
     fc_sim = group_same_fc_fcd['fc']
     fcd_pdf = group_same_fc_fcd['fcd_pdf']
     total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
-        fc_sim, fcd_pdf, fc_emp, emp_fcd_cum)
+        fc_sim, fcd_pdf, emp_fc, emp_fcd_cum)
     save_loss = torch.hstack(
         (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1), ks_loss.unsqueeze(1)))
 
