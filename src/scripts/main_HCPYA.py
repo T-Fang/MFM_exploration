@@ -11,19 +11,17 @@ sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.scripts.Hybrid_CMA_ES import ModelHandler, CMAESValidator, CMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
-from src.utils.init_utils import set_torch_default, get_input_args_for_pool  # noqa: F401
+from src.utils.init_utils import set_torch_default
 from src.basic.constants import CONFIG_DIR, LOG_DIR
 from src.utils.file_utils import get_HCPYA_group_stats, get_sim_fig_path, get_run_dir, get_target_dir
-from multiprocessing import Pool, set_start_method  # noqa: F401
+from multiprocessing import Pool, set_start_method
 
 DS_NAME = 'HCPYA'
 
 
 def apply_on_all_participants(phase, trial_idx, seed_idx):
     config = configparser.ConfigParser()
-    config.read(
-        '/home/ftian/storage/projects/MFM_exploration/configs/model/config_hcpya.ini'
-    )
+    config.read(os.path.join(CONFIG_DIR, 'model', 'config_hcpya.ini'))
 
     trial_idx = int(trial_idx)
     seed_idx = int(seed_idx)
@@ -49,7 +47,7 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='Uniform',
-                                    opportunities=10,
+                                    opportunities=1,
                                     next_epoch=0,
                                     seed=seed)
         print("Exit state: ", state)
@@ -691,16 +689,28 @@ if __name__ == "__main__":
               torch.cuda.get_device_name(torch.cuda.current_device()))
 
     # * lightweight tasks
-    for trial_idx in [22]:
-        for seed_idx in [3]:
-            apply_on_all_participants(phase='best_from_train',
-                                      trial_idx=trial_idx,
-                                      seed_idx=seed_idx)
+    # for trial_idx in [22]:
+    #     for seed_idx in [3]:
+    #         apply_on_all_participants(phase='best_from_train',
+    #                                   trial_idx=trial_idx,
+    #                                   seed_idx=seed_idx)
 
     # * heavy tasks to be submitted to the scheduler
-    # apply_on_all_participants(phase='train',
-    #                           trial_idx=sys.argv[1],
-    #                           seed_idx=sys.argv[2])
+    USE_MULTIPROC = False
+    phases = ['train']
+    for phase in phases:
+        if USE_MULTIPROC:
+            set_start_method('spawn')
+            num_thread = n_seeds = int(sys.argv[2])
+            trial_idx = int(sys.argv[1])
+            with Pool(num_thread) as p:
+                p.starmap(apply_on_all_participants,
+                          [(phase, trial_idx, seed_idx)
+                           for seed_idx in range(1, n_seeds + 1)])
+        else:
+            apply_on_all_participants(phase=phase,
+                                      trial_idx=sys.argv[1],
+                                      seed_idx=sys.argv[2])
     # save_dir = os.path.join(LOG_DIR, 'HCPYA', 'all_participants')
     # if os.path.exists(
     #         os.path.join(save_dir, 'train', f'trial{sys.argv[1]}',

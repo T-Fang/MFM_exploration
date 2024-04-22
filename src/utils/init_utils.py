@@ -27,5 +27,9 @@ def set_torch_default(device=None, dtype=None):
     return device, dtype
 
 
-def get_input_args_for_pool(iterable, *args):
+def unpack_args_before(iterable, *args):
     return [(i, *args) for i in iterable]
+
+
+def unpack_args_after(iterable, *args):
+    return [(*args, i) for i in iterable]

@@ -450,12 +450,12 @@ def analyze_run(target, trial_idx, seed_idx):
                               None, [0, 19, 39, 59, 79, 99],
                               top_k=top_k,
                               plot_outlier_r_E=plot_outlier_r_E)
-    visualize_train_r_E_for_multi_epochs(DS_NAME, target, trial_idx, seed_idx,
-                                         None, N_EPOCHS, 2, 3)
+    # visualize_train_r_E_for_multi_epochs(DS_NAME, target, trial_idx, seed_idx,
+    #                                      None, N_EPOCHS, 2, 3)
 
 
 def analyze_phase(target, trial_idx, seed_idx, phase):
-    # plot_sim_fc_fcd(DS_NAME, target, phase, trial_idx, seed_idx, 0)
+    plot_sim_fc_fcd(DS_NAME, target, phase, trial_idx, seed_idx, 0)
     sim_fc_path = get_sim_fig_path(DS_NAME, target, phase, trial_idx, seed_idx,
                                    'sim_fc.csv')
     sim_fcd_path = get_sim_fig_path(DS_NAME, target, phase, trial_idx,
@@ -486,17 +486,17 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # * phase-level analysis
-    for target in ALL_TARGETS:
-        for trial_idx in range(21, 23):
-            for seed_idx in range(3, 4):
-                for phase in ['train']:
-                    analyze_phase(target, trial_idx, seed_idx, phase)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in range(31, 35):
+    #         for seed_idx in range(1, 3):
+    #             for phase in ['train']:
+    #                 analyze_phase(target, trial_idx, seed_idx, phase)
 
     # # * Run-level analysis
-    # for target in ALL_TARGETS:
-    #     for trial_idx in range(22, 23):
-    #         for seed_idx in range(3, 4):
-    #             analyze_run(target, trial_idx, seed_idx)
+    for target in ALL_TARGETS:
+        for trial_idx in range(31, 35):
+            for seed_idx in range(1, 3):
+                analyze_run(target, trial_idx, seed_idx)
 
     # * Trial-level analysis
     # for target in ALL_TARGETS:
@@ -510,7 +510,7 @@ if __name__ == "__main__":
     # * Others
     # plot_HCPYA_group_emp_fc_fcd(0, 343)
     # plot_HCPYA_group_emp_fc_fcd(343, 686)
-    plot_HCPYA_group_emp_fc_fcd(686, 1029)
+    # plot_HCPYA_group_emp_fc_fcd(686, 1029)
 
     # compare_test_results_plot()
     # compare_group_params_apply_to_individual()

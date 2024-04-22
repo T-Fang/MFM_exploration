@@ -105,12 +105,14 @@ def group_SC_matrices(sc_mats):
         Scale the final SC by log function. Set the diagonal to be 0.
 
     Args:
-        sc_mats (np.array): [n_mats, n_roi, n_roi]
+        sc_mats (np.array): [n_subs, n_roi, n_roi]
 
     Returns:
         grouped_sc (np.array): the group average of the input sc_mats. [n_roi, n_roi]
     """
-    n_mats = sc_mats.shape[0]
+    nan_mask = np.isnan(sc_mats[:, 0, 0])
+    sc_mats = sc_mats[~nan_mask]
+    n_subs = sc_mats.shape[0]
     n_roi = sc_mats.shape[1]
     grouped_sc = np.zeros((n_roi, n_roi))
 
@@ -122,16 +124,14 @@ def group_SC_matrices(sc_mats):
 
             count_non_zero = 0  # To count the number of non_zero
             sum_temp = 0
-            for mat_i in range(n_mats):  # For each SC matrix
-                if np.isnan(sc_mats[mat_i, i, j]):
-                    continue
+            for mat_i in range(n_subs):  # For each SC matrix
 
                 if sc_mats[mat_i, i, j] != 0:
                     count_non_zero += 1
                     sum_temp += sc_mats[mat_i, i, j]
             # End for mat_i
             # Only when there are over half of the SC[i, j] are not zero
-            if count_non_zero >= 0.5 * n_mats:
+            if count_non_zero >= 0.5 * n_subs:
                 grouped_sc[i, j] = np.log(sum_temp / count_non_zero)
 
     return grouped_sc

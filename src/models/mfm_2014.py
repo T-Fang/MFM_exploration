@@ -270,13 +270,13 @@ class MfmModel2014:
             if torch.isnan(r_E_ave[:, i]).any():
                 print("r_E exploded!")
                 valid_M_mask[i] = False
-            # TODO: Try without r_E constraints
-            # elif (r_E_ave[:, i]
-            #       < self.r_E_min).any() or (r_E_ave[:, i]
-            #                                 > self.r_E_max).any():
-            #     bold[:, i, :] = float('nan')
-            #     valid_M_mask[i] = False
-            # TODO: Try without r_E constraints
+            # * TODO: Try without r_E constraints
+            elif (r_E_ave[:, i]
+                  < self.r_E_min).any() or (r_E_ave[:, i]
+                                            > self.r_E_max).any():
+                bold[:, i, :] = float('nan')
+                valid_M_mask[i] = False
+            # * TODO: Try without r_E constraints
             elif torch.isnan(bold[:, i, :]).any():
                 valid_M_mask[i] = False
 
@@ -359,16 +359,16 @@ class MfmModel2014:
         vec_emp = vec_emp.unsqueeze(0).expand(M, -1)  # [M, len]
         vec_sim = fc_sim[:, mask]
 
-        # TODO: experiment with different L1 cost
+        # * TODO: experiment with different L1 cost
 
         # L1 version 1: abs(mean)
-        # L1_cost = torch.abs(
-        #     torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        L1_cost = torch.abs(
+            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
-        L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
+        # L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
-        # TODO: experiment with different L1 cost
+        # * TODO: experiment with different L1 cost
         # L2 or MSE
         # L1_cost = torch.mean(torch.square(vec_emp - vec_sim), dim=1)
 

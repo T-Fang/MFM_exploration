@@ -341,7 +341,7 @@ def get_HCPYA_group_stats(range_start: int, range_end: int):
     sc_mat = get_HCPYA_group_sc_mat(range_start, range_end)
     sc_euler = sc_mat / torch.max(sc_mat) * 0.02
     emp_fc = get_HCPYA_group_emp_fc(range_start, range_end)
-    emp_fcd_cum = get_HCPYA_group_emp_fcd_cum(range_start, range_end)
+    emp_fcd_cum = get_HCPYA_group_emp_fcd_cdf(range_start, range_end)
 
     group_stats = {
         'myelin': myelin,
@@ -356,54 +356,49 @@ def get_HCPYA_group_stats(range_start: int, range_end: int):
 
 
 def get_HCPYA_group_myelin(range_start: int, range_end: int):
-    individual_mats_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029'
-    myelin_indi = sio.loadmat(
-        os.path.join(individual_mats_path, 'myelin_roi_1029.mat'))
-    myelin_indi = myelin_indi['myelin_roi_1029']
-    myelin = np.nanmean(myelin_indi[range_start:range_end], axis=0)
+    indiv_emp_myelin = sio.loadmat(
+        os.path.join(HCPYA_1029_DATA_DIR, 'myelin_DK68_1029.mat'))
+    indiv_emp_myelin = indiv_emp_myelin['myelin_DK68_1029']
+    myelin = np.nanmean(indiv_emp_myelin[range_start:range_end], axis=0)
     myelin = torch.as_tensor(myelin).to(DEFAULT_DTYPE).unsqueeze(1)
     return myelin
 
 
 def get_HCPYA_group_rsfc_gradient(range_start: int, range_end: int):
-    individual_mats_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029'
-    rsfc_indi = sio.loadmat(
-        os.path.join(individual_mats_path, 'rsfc_roi_1029.mat'))
-    rsfc_indi = rsfc_indi['rsfc_roi_1029']
-    rsfc_gradient = np.nanmean(rsfc_indi[range_start:range_end], axis=0)
+    indiv_emp_rsfc = sio.loadmat(
+        os.path.join(HCPYA_1029_DATA_DIR, 'rsfc_DK68_1029.mat'))
+    indiv_emp_rsfc = indiv_emp_rsfc['rsfc_DK68_1029']
+    rsfc_gradient = np.nanmean(indiv_emp_rsfc[range_start:range_end], axis=0)
     rsfc_gradient = torch.as_tensor(rsfc_gradient).to(DEFAULT_DTYPE).unsqueeze(
         1)
     return rsfc_gradient
 
 
 def get_HCPYA_group_sc_mat(range_start: int, range_end: int):
-    individual_mats_path = '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029'
-    sc_indi = sio.loadmat(os.path.join(individual_mats_path,
-                                       'sc_roi_1029.mat'))
-    sc_indi = sc_indi['sc_roi_1029']
-    sc_mat = group_SC_matrices(sc_indi[range_start:range_end])
+    indiv_emp_sc = sio.loadmat(
+        os.path.join(HCPYA_1029_DATA_DIR, 'sc_DK68_1029.mat'))
+    indiv_emp_sc = indiv_emp_sc['sc_DK68_1029']
+    sc_mat = group_SC_matrices(indiv_emp_sc[range_start:range_end])
     sc_mat = torch.as_tensor(sc_mat).to(DEFAULT_DTYPE)
     return sc_mat
 
 
 def get_HCPYA_group_emp_fc(range_start: int, range_end: int):
-    fc_1029 = sio.loadmat(
-        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fc_roi_1029.mat'
-    )
-    fc_1029 = fc_1029['fc_roi_1029']
-    emp_fc = np.array(fc_1029[range_start:range_end])
+    indiv_emp_fc = sio.loadmat(
+        os.path.join(HCPYA_1029_DATA_DIR, 'fc_DK68_1029.mat'))
+    indiv_emp_fc = indiv_emp_fc['fc_DK68_1029']
+    emp_fc = np.array(indiv_emp_fc[range_start:range_end])
     emp_fc = fisher_average(emp_fc)
     emp_fc = torch.as_tensor(emp_fc).to(DEFAULT_DTYPE)
     return emp_fc
 
 
-def get_HCPYA_group_emp_fcd_cum(range_start: int, range_end: int):
-    fcd_1029 = sio.loadmat(
-        '/home/tzeng/storage/Matlab/HCPS1200/matfiles/all_mats_1029/fcd_cum_1029.mat'
-    )
-    fcd_1029 = fcd_1029['fcd_cum_1029']
+def get_HCPYA_group_emp_fcd_cdf(range_start: int, range_end: int):
+    indiv_emp_fcd = sio.loadmat(
+        os.path.join(HCPYA_1029_DATA_DIR, 'fcd_cdf_DK68_1029.mat'))
+    indiv_emp_fcd = indiv_emp_fcd['fcd_cdf_DK68_1029']
     emp_fcd_cum = torch.as_tensor(
-        fcd_1029[range_start:range_end]).to(DEFAULT_DTYPE)
+        indiv_emp_fcd[range_start:range_end]).to(DEFAULT_DTYPE)
     emp_fcd_cum = torch.mean(emp_fcd_cum, dim=0)
     emp_fcd_cum = (emp_fcd_cum / emp_fcd_cum[-1]).unsqueeze(1)
     return emp_fcd_cum
@@ -414,10 +409,11 @@ def get_HCPYA_emp_TC(subject_id):
     Get the empirical time course data for the given subject ID in the HCPYA dataset.
     """
     subject_id = int(subject_id)
-    TC_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC')
+    # TODO: change TC_old back to TC
+    TC_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC_old')
     TC_file_path = os.path.join(TC_dir, f'{subject_id}_bold_4_runs.mat')
-    TC_file_path_after_GSR = os.path.join(
-        TC_dir, f'{subject_id}_bold_runs_valid_after_GSR.mat')
+    TC_file_path_after_GSR = os.path.join(TC_dir,
+                                          f'{subject_id}_bold_valid_runs.mat')
 
     if os.path.exists(TC_file_path):
         TC = sio.loadmat(TC_file_path)
@@ -455,7 +451,7 @@ def get_HCPYA_group_emp_TC(range_start: int,
     subject_ids_path = os.path.join(HCPYA_1029_DATA_DIR, 'subject_1029.csv')
     subject_ids = pd.read_csv(subject_ids_path, header=None).values.flatten()
 
-    group_TC_save_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC', 'group_TC')
+    group_TC_save_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC_old', 'group_TC')
     os.makedirs(group_TC_save_dir, exist_ok=True)
 
     group_TC_save_path = os.path.join(

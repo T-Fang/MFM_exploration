@@ -17,15 +17,15 @@ target_list=('all_participants')
 # ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-ncpus=2
+ncpus=5
 need_gpu=1
-mem=4G
+mem=10G
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(22)
-seed_list=(1 3 4)
+trial_list=(31)
+seed_list=(5)
 # seed_list=($(seq 3 1 5))
 # seed_list=($(seq 2 1 1000))
 

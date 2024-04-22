@@ -7,11 +7,11 @@ import datetime
 
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
-from src.basic.constants import DESIKAN_NEUROMAPS_DIR
+from src.basic.constants import DESIKAN_NEUROMAPS_DIR  # noqa: F401
 from src.utils.file_utils import combine_all_param_dicts, get_train_file_path
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
-from src.utils.neuromaps_utils import get_concat_matrix
+from src.utils.neuromaps_utils import get_concat_matrix  # noqa: F401
 from src.utils.init_utils import set_torch_default
 
 
@@ -85,10 +85,10 @@ def train_help_function(config,
                         next_epoch,
                         seed=None,
                         other_parameterization=None):
-    # TODO: comment out codes if we want to use the original parameterization
-    other_parameterization = get_concat_matrix(
-        DESIKAN_NEUROMAPS_DIR, PCs=1)  # shape: (N, num_of_PCs + 1)
-    # TODO: comment out codes if we want to use the original parameterization
+    # * TODO: comment out codes if we want to use the original parameterization
+    # other_parameterization = get_concat_matrix(
+    #     DESIKAN_NEUROMAPS_DIR, PCs=1)  # shape: (N, num_of_PCs + 1)
+    # * TODO: comment out codes if we want to use the original parameterization
     mfm_trainer = CMAESTrainer(config=config,
                                myelin=myelin,
                                RSFC_gradient=RSFC_gradient,
@@ -760,7 +760,6 @@ class CMAESTrainer(ModelHandler):
             index_sorted = valid_param_indices[index_sorted_in_valid]
 
             print("Start saving parameter, valid_param_indices and loss...")
-            # TODO: split the FC_FCD_loss into three terms if we want to use DL model
             save_dict = {
                 'parameter': parameter.T,
                 'valid_param_indices': valid_param_indices,
@@ -1308,10 +1307,10 @@ class CMAESTrainer(ModelHandler):
     # TODO: Try uniform sampling at the first iteration
 
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
-        # TODO: Try without parameterizing sigma
+        #  * TODO: Try without parameterizing sigma
         mean[2 * self.p + 1] = 0.005
         mean[2 * self.p + 2:] = 0
-        # TODO: Try without parameterizing sigma
+        # * TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
         total_count = 0
@@ -1322,10 +1321,10 @@ class CMAESTrainer(ModelHandler):
         while valid_count < self.param_sets:
             sampled_params[:, valid_count] = multivariate_normal.sample(
             )  # [3 * self.p + 1, param_sets]
-            # TODO: Try without parameterizing sigma
+            # * TODO: Try without parameterizing sigma
             sampled_params[2 * self.p + 1, valid_count] = 0.005
             sampled_params[2 * self.p + 2:, valid_count] = 0
-            # TODO: Try without parameterizing sigma
+            # * TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
 
@@ -1485,17 +1484,17 @@ class CMAESValidator(ModelHandler):
         parameter = d['parameter']
         parameter = parameter[:, valid_param_indices_pre]
         if 'FC_FCD_loss' in d:
-            # TODO: Try without FCD KS loss
+            # TODO_old: Try without FCD KS loss
             # FC_FCD_loss is [param_sets, 3]
             total_loss = torch.sum(d['FC_FCD_loss'], dim=1)
             # total_loss = torch.sum(d['FC_FCD_loss'][:, :2], dim=1)
-            # TODO: Try without FCD KS loss
+            # TODO_old: Try without FCD KS loss
 
-            # TODO: Regularize firing rate
-            # TODO: Try without any constraint on r_E
+            # TODO_old: Regularize firing rate
+            # TODO_old: Try without any constraint on r_E
             # total_loss += d['r_E_reg_loss']  # r_E_reg_loss is [param_sets]
-            # TODO: Try without any constraint on r_E
-            # TODO: Regularize firing rate
+            # TODO_old: Try without any constraint on r_E
+            # TODO_old: Regularize firing rate
         else:
             raise Exception("Check the dictionary keys.")
         best_param_ind = torch.argmin(total_loss)
@@ -1543,7 +1542,7 @@ class CMAESValidator(ModelHandler):
             'ks_loss': ks_loss,
             'seed': seed
         }
-        # TODO: Save r_E
+        # TODO_old: Save r_E
         if mfm_model.r_E and valid_M_mask.any():
             # save r_E_for_valid_params
             r_E_for_valid_params = r_E_ave[:, valid_M_mask]
@@ -1551,15 +1550,15 @@ class CMAESValidator(ModelHandler):
                                               dim=1,
                                               keepdim=True)
             save_dict['r_E_for_valid_params'] = r_E_for_valid_params
-            # TODO: Regularize firing rate
+            # TODO_old: Regularize firing rate
             # # get and save r_E_reg_loss
             # r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
             #                                 mfm_model.r_E,
             #                                 loss_type='L2')
             # save_dict['r_E_reg_loss'] = r_E_reg_loss
-            # TODO: Regularize firing rate
+            # TODO_old: Regularize firing rate
 
-        # TODO: Save r_E
+        # TODO_old: Save r_E
         torch.save(
             save_dict,
             os.path.join(self.val_save_dir, f'best_param{epoch}' + '.pth'))
@@ -1649,7 +1648,6 @@ class CMAESTester(ModelHandler):
         print(datetime.datetime.now(), " -- Done validating -- ")
         return 0
 
-    # TODO: Modify this as well if we want to regularize firing rate for HCPYA
     def test_old(self, sc_euler, emp_fc, emp_fcd_cum, seed=None):
         print(" -- Start testing -- ")
 
@@ -1763,9 +1761,9 @@ class CMAESTester(ModelHandler):
         parameter_sets = torch.zeros(
             self.parameters_dim, self.val_save_dirs_len *
             self.train_num_epochs)  # [205, 50 * num_of_tried_seeds]
-        # TODO: Regularize firing rate
+        # TODO_old: Regularize firing rate
         num_of_losses = 4  # was 4 without r_E_reg_loss
-        # TODO: Regularize firing rate
+        # TODO_old: Regularize firing rate
         val_loss_sets = torch.ones(
             self.val_save_dirs_len * self.train_num_epochs, num_of_losses) * 3
         # [total, corr, L1, ks]
@@ -1791,23 +1789,23 @@ class CMAESTester(ModelHandler):
                               2] = d['l1_loss']
                 val_loss_sets[val_dir_i * self.train_num_epochs + epoch,
                               3] = d['ks_loss']
-                # TODO: Regularize firing rate
+                # TODO_old: Regularize firing rate
                 # # key for the r_E regularization loss is 'r_E_reg_loss'
                 # if 'r_E_reg_loss' in d:
-                #     # TODO: Try without any constraint on r_E, can change the following line to assign zero values
+                #     # TODO_old: Try without any constraint on r_E, can change the following line to assign zero values
                 #     val_loss_sets[val_dir_i * self.trained_epochs + epoch,
                 #                   4] = d['r_E_reg_loss']
                 #     # val_loss_sets[val_dir_i * self.trained_epochs + epoch,
                 #     #               4] = 0
-                #     # TODO: Try without any constraint on r_E
-                # TODO: Regularize firing rate
+                #     # TODO_old: Try without any constraint on r_E
+                # TODO_old: Regularize firing rate
         if valid_val_dir_count == 0:
             print("No valid validated directories.")
             return 1
-        # TODO: Try without FCD KS loss
+        # TODO_old: Try without FCD KS loss
         val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:], dim=1)
         # val_loss_sets[:, 0] = torch.sum(val_loss_sets[:, 1:3], dim=1)
-        # TODO: Try without FCD KS loss
+        # TODO_old: Try without FCD KS loss
         # Record all param_coef and loss
         val_total_loss, sorted_index = torch.sort(val_loss_sets[:, 0],
                                                   descending=False)
@@ -1825,10 +1823,10 @@ class CMAESTester(ModelHandler):
             'l1_loss': all_loss[:, 2],
             'ks_loss': all_loss[:, 3]
         }
-        # TODO: Regularize firing rate
+        # TODO_old: Regularize firing rate
         # if all_loss.shape[1] > 4:
         #     save_dict['r_E_reg_loss'] = all_loss[:, 4]
-        # TODO: Regularize firing rate
+        # TODO_old: Regularize firing rate
         torch.save(save_dict,
                    os.path.join(self.test_save_dir, 'val_results.pth'))
         print("Successfully saved test results.")
@@ -1939,7 +1937,6 @@ def simulate_fc_fcd(config,
     return 0
 
 
-# TODO: Modify this as well if we want to regularize firing rate for HCPYA
 def simulate_fc_fcd_mat(config,
                         save_path,
                         parameter,
@@ -2154,19 +2151,19 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
         'parameter': parameter,
         'seed': seed
     }
-    # TODO: Save r_E
+    # TODO_old: Save r_E
     if mfm_model.r_E and valid_M_mask.any():
         # save r_E_for_valid_params
         r_E_for_valid_params = r_E_ave[:, valid_M_mask]
         save_dict['r_E_for_valid_params'] = r_E_for_valid_params
-        # TODO: Regularize firing rate
+        # TODO_old: Regularize firing rate
         # # get and save r_E_reg_loss
         # r_E_reg_loss = get_r_E_reg_loss(r_E_for_valid_params,
         #                                 mfm_model.r_E,
         #                                 loss_type='L2')
         # save_dict['r_E_reg_loss'] = r_E_reg_loss
-        # TODO: Regularize firing rate
-    # TODO: Save r_E
+        # TODO_old: Regularize firing rate
+    # TODO_old: Save r_E
     torch.save(save_dict, save_path)
     print("Successfully saved EI ratio.")
     print(" -- Done simulating -- ")
