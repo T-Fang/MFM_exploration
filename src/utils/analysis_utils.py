@@ -8,8 +8,8 @@ import torch
 import cv2
 
 from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
-from src.utils.file_utils import convert_to_mat, get_fig_dir_in_logs, get_fig_path_in_logs, get_losses_fig_dir, \
-    get_run_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_fig_path
+from src.utils.file_utils import convert_to_mat, get_best_params_sim_res_path, get_fig_dir_in_logs, get_fig_path_in_logs, get_losses_fig_dir, \
+    get_run_dir, get_sim_res_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_res_path
 
 ############################################################
 # Visualization related
@@ -71,36 +71,43 @@ def resize_image(image, target_height, target_width):
     return resized_image
 
 
-def visualize_stats(stats_list, stats_names, fig_file_paths):
+def vis_fsaverage6():
+    pass
+
+
+def visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles):
     """
     Visualize the stats using MATLAB script.
     Firstly, load the [68, 1] statistic (one scalar for each ROI).
-    Then, run the visualize_parameter_desikan_fslr function to visualize the stats.
+    Then, run the vis_DK68_param function to visualize the stats.
 
     Args:
         stats_list (Union[ndarray, List[ndarray]]): The list of statistics data.
         stats_names (Union[str, List[str]]): The list of names of the statistics.
         fig_file_paths (Union[str, List[str]]): The list of file paths to save the visualizations.
+        fig_titles (Union[str, List[str]]): The list of titles of the visualizations.
 
     Raises:
         Exception: If MATLAB encounters an error or terminates.
     """
-    if not isinstance(stats_list, list):
-        stats_list = [stats_list]
-    if not isinstance(stats_names, list):
-        stats_names = [stats_names]
-    if not isinstance(fig_file_paths, list):
-        fig_file_paths = [fig_file_paths]
+    stats_list = [stats_list
+                  ] if not isinstance(stats_list, list) else stats_list
+    stats_names = [stats_names
+                   ] if not isinstance(stats_names, list) else stats_names
+    fig_file_paths = [
+        fig_file_paths
+    ] if not isinstance(fig_file_paths, list) else fig_file_paths
+    fig_titles = [fig_titles
+                  ] if not isinstance(fig_titles, list) else fig_titles
 
     commands = []
-    for stats_data, stats_name, fig_file_path in zip(stats_list, stats_names,
-                                                     fig_file_paths):
+    for stats_data, stats_name, fig_file_path, fig_title in zip(
+            stats_list, stats_names, fig_file_paths, fig_titles):
         commands.append(
             f"load('{convert_to_mat(stats_data, stats_name)}', '{stats_name}')"
         )
         commands.append(
-            f"visualize_parameter_desikan_fslr({stats_name}, '{fig_file_path}')"
-        )
+            f"vis_DK68_param({stats_name}, '{fig_file_path}', '{fig_title}')")
 
     run_matlab_commands(commands)
     print("Visualizations saved to:", fig_file_paths)
@@ -121,7 +128,7 @@ def run_matlab_commands(commands):
     """
     if isinstance(commands, str):
         commands = [commands]
-    commands = f"cd {MATLAB_SCRIPT_DIR}; matlab -nodisplay -nosplash -nodesktop -r \"try, {'; '.join(commands)}; catch ME, disp(ME.message), exit(1), end, exit;\""  # noqa: E501
+    commands = f"matlab -nodisplay -nosplash -nodesktop -r \"try, addpath(genpath('{MATLAB_SCRIPT_DIR}')); {'; '.join(commands)}; catch ME, disp(ME.message), exit(1), end, exit;\""  # noqa: E501
 
     print("Running MATLAB command:", commands)
     result = subprocess.run(commands,
@@ -151,18 +158,16 @@ def plot_sim_fc_fcd(
         sim_res_path (str): Path to the simulation result.
         param_idx (int): Index of the parameter to plot.
     """
-
-    sim_res_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
-                                    seed_idx,
-                                    f'sim_results_on_{phase}_set.pth')
+    sim_res_dir = get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx)
+    sim_res_path = get_best_params_sim_res_path('train', 'train', sim_res_dir)
 
     sim_res = torch.load(sim_res_path, map_location='cpu')
     fc_sim = sim_res['fc_sim'][param_idx]
     fcd_sim = sim_res['fcd_sim'][param_idx]
 
-    fcd_sim_save_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
+    fcd_sim_save_path = get_sim_res_path(ds_name, target, phase, trial_idx,
                                          seed_idx, 'sim_fcd.csv')
-    fc_sim_save_path = get_sim_fig_path(ds_name, target, phase, trial_idx,
+    fc_sim_save_path = get_sim_res_path(ds_name, target, phase, trial_idx,
                                         seed_idx, 'sim_fc.csv')
 
     # save to csv
@@ -236,16 +241,16 @@ def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
     """
     First, cd into MATLAB_SCRIPT_PATH.
     Then, load the [68, 1] statistic (one scalar for each ROI) stored in the `mat_file_path` file.
-    Finally, run the visualize_parameter_desikan_fslr function to
+    Finally, run the vis_DK68_param function to
     generates a box plot depicting the network pattern of the input statistic.
     """
 
     print(f"Boxplotting {stats_name} from {mat_file_path}...")
 
     command = [(
-        f"cd {MATLAB_SCRIPT_DIR}; "
         f"matlab -nodisplay -nosplash -nodesktop -r "
-        f"\"load('{mat_file_path}', '{stats_name}'); "
+        f"\"addpath(genpath('{MATLAB_SCRIPT_DIR}')); "
+        f"load('{mat_file_path}', '{stats_name}'); "
         f"yeo7_network_boxplot({stats_name}, '{stats_name.replace('_', ' ')}', '{fig_file_path}'); "
         f"exit;\"")]
 
@@ -768,12 +773,17 @@ def export_train_r_E(ds_name,
     return save_mat_path
 
 
-def visualize_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
-                        epoch_idx):
+def visualize_train_r_E(ds_name,
+                        target,
+                        trial_idx,
+                        seed_idx,
+                        group_idx,
+                        epoch_idx,
+                        fig_title='train r_E'):
     save_mat_path = export_train_r_E(ds_name, target, trial_idx, seed_idx,
                                      group_idx, epoch_idx)
     visualize_stats(save_mat_path, 'r_E',
-                    save_mat_path.replace('.mat', '_surf_map.png'))
+                    save_mat_path.replace('.mat', '_surf_map.png'), fig_title)
 
 
 def visualize_train_r_E_for_multi_epochs(ds_name, target, trial_idx, seed_idx,
@@ -793,6 +803,7 @@ def visualize_train_r_E_for_multi_epochs(ds_name, target, trial_idx, seed_idx,
     mat_file_paths = []
     stats_names = []
     fig_file_paths = []
+    fig_titles = []
     for epoch_idx in epochs:
         mat_file_paths.append(
             export_train_r_E(ds_name, target, trial_idx, seed_idx, group_idx,
@@ -800,8 +811,9 @@ def visualize_train_r_E_for_multi_epochs(ds_name, target, trial_idx, seed_idx,
         stats_names.append('r_E')
         fig_file_paths.append(mat_file_paths[-1].replace(
             '.mat', '_surf_map.png'))
+        fig_titles.append(f'mean rE across time at epoch {epoch_idx}')
 
-    visualize_stats(mat_file_paths, stats_names, fig_file_paths)
+    visualize_stats(mat_file_paths, stats_names, fig_file_paths, fig_titles)
 
     group_affix = '' if group_idx is None else f'_of_group{group_idx}'
     concat_n_images(

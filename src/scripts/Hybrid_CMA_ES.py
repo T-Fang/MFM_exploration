@@ -8,7 +8,7 @@ import datetime
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
 from src.basic.constants import DESIKAN_NEUROMAPS_DIR  # noqa: F401
-from src.utils.file_utils import combine_all_param_dicts, get_train_file_path
+from src.utils.file_utils import combine_all_param_dicts, get_best_params_file_path, get_best_params_sim_res_path, get_train_file_path
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
 from src.utils.neuromaps_utils import get_concat_matrix  # noqa: F401
@@ -86,8 +86,11 @@ def train_help_function(config,
                         seed=None,
                         other_parameterization=None):
     # * TODO: comment out codes if we want to use the original parameterization
-    # other_parameterization = get_concat_matrix(
-    #     DESIKAN_NEUROMAPS_DIR, PCs=1)  # shape: (N, num_of_PCs + 1)
+    other_parameterization = get_concat_matrix(
+        DESIKAN_NEUROMAPS_DIR,
+        PCs=3,
+        use_mean_map=True,
+        use_standardizing=True)  # shape: (N, num_of_PCs + 2)
     # * TODO: comment out codes if we want to use the original parameterization
     mfm_trainer = CMAESTrainer(config=config,
                                myelin=myelin,
@@ -410,7 +413,7 @@ class ModelHandler:
 
     def sim_first_param_multi_times(self,
                                     param_save_path: str,
-                                    sim_res_file_path: str,
+                                    sim_res_dir: str,
                                     sim_times: int = 10,
                                     get_FCD_matrix: bool = True,
                                     get_bold: bool = True,
@@ -422,7 +425,7 @@ class ModelHandler:
 
         Args:
             param_save_path (str): the path to the saved parameter vectors
-            sim_res_file_path (str): the path to save the simulation results
+            sim_res_dir (str): the dir to save the simulation results
             sim_times (int): the number of times to simulate
             get_FCD_matrix (bool): whether to save the entire FCD matrix instead of the histogram of the FCD
             get_bold (bool): whether to get the mean bold signal
@@ -447,9 +450,8 @@ class ModelHandler:
                                           get_bold=get_bold)
         save_dict['seed'] = seed
 
-        save_path = os.path.join(sim_res_file_path,
-                                 f'sim_results_on_{self.phase}_set.pth')
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        os.makedirs(sim_res_dir, exist_ok=True)
+        save_path = get_best_params_sim_res_path('train', 'train', sim_res_dir)
 
         torch.save(save_dict, save_path)
         print(f'Successfully saved the simulation results to {save_path}')
@@ -585,7 +587,7 @@ class CMAESTrainer(ModelHandler):
                 (torch.ones_like(myelin), myelin, RSFC_gradient))  # (N, 3)
             self.p = 3
         else:
-            self.concat_mat = other_parameterization  # (N, p), where p = num_of_PCs + 1
+            self.concat_mat = other_parameterization  # (N, p), where p = num_of_PCs + 2
             self.p = other_parameterization.shape[1]
         self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
         # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
@@ -1032,12 +1034,22 @@ class CMAESTrainer(ModelHandler):
         #         m_k, sigma_k**2 * cov_k, self.search_range)
 
         # Original sampling
+        cov_for_gaussian = sigma_k**2 * cov_k
+        # check if cov_next contain nan
+        if torch.isnan(cov_for_gaussian).any():
+            print("cov_for_gaussian contains nan!")
+            print("sigma_k: ", sigma_k)
+            print("cov_k: ", cov_k)
+            return None
         param_coef_k, parameter_k = self._sample_valid_parameters_pFIC(
-            m_k, sigma_k**2 * cov_k, self.search_range)
+            m_k, cov_for_gaussian, self.search_range)
         # TODO: Try uniform sampling at the first iteration
         if param_coef_k is None or parameter_k is None:
             print("Sampling failed!")
             return None
+
+        print(f"Successfully sampled {param_coef_k.shape[1]} parameters.",
+              flush=True)
 
         if k in self.dl_pfic_range:
             loss_k, index_k = self.mfm_model_loss_dl(parameter_k, k)
@@ -1052,8 +1064,8 @@ class CMAESTrainer(ModelHandler):
         select_params = param_coef_k[:, index_k]
 
         # TODO: Try uniform sampling at the first iteration
-        if k == 0:  # The first epoch
-            m_k = torch.mean(select_params, dim=1)
+        # if k == 0:  # The first epoch
+        #     m_k = torch.mean(select_params, dim=1)
         # TODO: Try uniform sampling at the first iteration
 
         m_kp1, sigma_kp1, cov_kp1, p_sigma_kp1, p_c_kp1 = self._update_CMA_ES_pFIC(
@@ -1118,7 +1130,7 @@ class CMAESTrainer(ModelHandler):
         Lambda_ini[0:self.p] = start_point_wEE[0]
         Lambda_ini[self.p:2 * self.p] = start_point_wEI[0]
         Lambda_ini[2 * self.p] = 0.4
-        # Lambda_ini[2 * self.p + 1:] = 0.0005
+        Lambda_ini[2 * self.p + 1:] = 0.0005
         cov_0 = torch.matmul(V_ini,
                              torch.matmul(torch.diag(Lambda_ini**2), V_ini.T))
 
@@ -1161,6 +1173,15 @@ class CMAESTrainer(ModelHandler):
         :param k: current iter
         :return: parameters in k+1 iter.
         """
+        # TODO: remove all prints
+        # print("Start updating parameters in CMA-ES algorithm...")
+        # # print all inputs
+        # print("select_params: ", select_params)
+        # print("loss_k: ", loss_k)
+        # print("m_k: ", m_k)
+        # print("sigma_k: ", sigma_k)
+        # print("cov_k: ", cov_k)
+
         select_param_sets = select_params.shape[1]
         loss_inverse = 1 / loss_k
         weights = loss_inverse / torch.sum(
@@ -1169,12 +1190,19 @@ class CMAESTrainer(ModelHandler):
         m_kp1 = torch.matmul(select_params, weights)  # m_(k+1): [param_dim, 1]
         mueff = 1 / torch.sum(weights**2)  # mu_w
 
+        # print("select_param_sets: ", select_param_sets)
+        # print("loss_inverse: ", loss_inverse)
+        # print("weights: ", weights)
+        # print("m_kp1: ", m_kp1)
+        # print("mueff: ", mueff)
         # The evolution path p_sigma and p_c
         Lambda, V = torch.linalg.eigh(cov_k)  # eigen decomposition
         Lambda = torch.sqrt(Lambda)
         inv_sqrt_cov = torch.matmul(V, torch.matmul(torch.diag(Lambda**-1),
                                                     V.T))  # C^(-1/2)
-
+        # print('Lambda: ', Lambda)
+        # print('V: ', V)
+        # print('inv_sqrt_cov: ', inv_sqrt_cov)
         c_sigma = (mueff + 2) / (self.param_dim + mueff + 5)
         c_c = (4 + mueff / self.param_dim) / (self.param_dim + 4 +
                                               2 * mueff / self.param_dim)
@@ -1188,6 +1216,12 @@ class CMAESTrainer(ModelHandler):
         expected_value = self.param_dim**0.5 * (1 - 1 /
                                                 (4 * self.param_dim) + 1 /
                                                 (21 * self.param_dim**2))
+        # print("c_sigma: ", c_sigma)
+        # print("c_c: ", c_c)
+        # print("c_1: ", c_1)
+        # print("c_mu: ", c_mu)
+        # print("d_sigma: ", d_sigma)
+        # print("expected_value: ", expected_value)
 
         p_sigma_kp1 = (1 - c_sigma) * p_sigma_k + torch.sqrt(
             c_sigma * (2 - c_sigma) * mueff) * torch.matmul(
@@ -1198,16 +1232,25 @@ class CMAESTrainer(ModelHandler):
         p_c_kp1 = (1 - c_c) * p_c_k + indicator * torch.sqrt(
             c_c * (2 - c_c) * mueff) * (m_kp1 - m_k).unsqueeze(1) / sigma_k
 
+        # print("p_sigma_kp1: ", p_sigma_kp1)
+        # print("indicator: ", indicator)
+        # print("p_c_kp1: ", p_c_kp1)
+
         # Adapting covariance matrix C
         artmp = (1 / sigma_k) * (select_params -
                                  torch.tile(m_k, [select_param_sets, 1]).T)
         cov_kp1 = (1 - c_1 - c_mu) * cov_k + c_1 * (torch.matmul(p_c_kp1, p_c_kp1.T) + (1 - indicator) * c_c * (2 - c_c) * cov_k) + \
             c_mu * torch.matmul(artmp, torch.matmul(torch.diag(weights), artmp.T))
 
+        # print("artmp: ", artmp)
+        # print("cov_kp1: ", cov_kp1)
+        # return None
         # Adapting step size
         sigma_kp1 = sigma_k * torch.exp(
             (c_sigma / d_sigma) *
             (torch.linalg.norm(p_sigma_kp1) / expected_value - 1))
+        # print("sigma_kp1: ", sigma_kp1)
+
         return m_kp1, sigma_kp1, cov_kp1, p_sigma_kp1, p_c_kp1
 
     def _update_CMA_ES_rFIC(self, select_parameters, loss_k, m_k, sigma_k,
@@ -1307,23 +1350,25 @@ class CMAESTrainer(ModelHandler):
     # TODO: Try uniform sampling at the first iteration
 
     def _sample_valid_parameters_pFIC(self, mean, cov, search_range):
-        #  * TODO: Try without parameterizing sigma
-        mean[2 * self.p + 1] = 0.005
-        mean[2 * self.p + 2:] = 0
+        # * TODO: Try without parameterizing sigma
+        # mean[2 * self.p + 1] = 0.005
+        # mean[2 * self.p + 2:] = 0
         # * TODO: Try without parameterizing sigma
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
         total_count = 0
+        # TODO: change multiplier to the self.param_sets to a smaller number (originally 20000)
         total_threshold = 20000 * self.param_sets
         sampled_params = torch.zeros(self.param_dim, self.param_sets)
         sampled_parameters = torch.zeros(
             self.parameter_dim, self.param_sets)  # [3*N+1, param_sets]
         while valid_count < self.param_sets:
+            # print('current valid count: ', valid_count)
             sampled_params[:, valid_count] = multivariate_normal.sample(
             )  # [3 * self.p + 1, param_sets]
             # * TODO: Try without parameterizing sigma
-            sampled_params[2 * self.p + 1, valid_count] = 0.005
-            sampled_params[2 * self.p + 2:, valid_count] = 0
+            # sampled_params[2 * self.p + 1, valid_count] = 0.005
+            # sampled_params[2 * self.p + 2:, valid_count] = 0
             # * TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
@@ -1339,8 +1384,16 @@ class CMAESTrainer(ModelHandler):
                 wEI_myelin_corr = torch.squeeze(CBIG_corr(wEI, self.myelin))
                 wEI_rsfc_corr = torch.squeeze(
                     CBIG_corr(wEI, self.RSFC_gradient))
+                # print('wEE: ', sampled_parameters[0:self.N, valid_count])
+                # print('wEI: ', wEI)
+                # print('G: ', sampled_parameters[2 * self.N, valid_count])
+                # print('sigma: ', sampled_parameters[2 * self.N + 1:,
+                #                                     valid_count])
+
                 if (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
                         or (sampled_parameters[:, valid_count] > search_range[:, 1]).any() or (wEI_myelin_corr > 0) or (wEI_rsfc_corr < 0):
+                    # print("Out of search range!")
+
                     valid_count -= 1
 
             valid_count += 1
@@ -1350,6 +1403,7 @@ class CMAESTrainer(ModelHandler):
                     f"Not enough valid sampled parameters! Only sample {valid_count} parameters!"
                 )
                 return None, None
+
         return sampled_params, sampled_parameters
 
     def _sample_valid_parameters_rFIC(self, mean, cov, search_range):
@@ -1422,8 +1476,8 @@ class CMAESValidator(ModelHandler):
             train_save_files, top_k_per_dict=top_k_for_each_epoch)
 
         # save the top few param vectors with the lowest validation loss
-        best_from_train_file_path = os.path.join(self.val_save_dir,
-                                                 'best_from_train.pth')
+        best_from_train_file_path = get_best_params_file_path(
+            'train', self.val_save_dir)
         torch.save(best_from_train, best_from_train_file_path)
         print(
             f"Successfully saved the top {top_k_for_each_epoch} parameters from each train epoch to: {best_from_train_file_path}"
@@ -1439,8 +1493,8 @@ class CMAESValidator(ModelHandler):
         torch.manual_seed(seed)
 
         # load the best_from_train
-        best_from_train_file_path = os.path.join(self.val_save_dir,
-                                                 'best_from_train.pth')
+        best_from_train_file_path = get_best_params_file_path(
+            'train', self.val_save_dir)
         if not os.path.exists(best_from_train_file_path):
             self.get_best_train_params()
         best_from_train = torch.load(best_from_train_file_path,
@@ -1454,8 +1508,8 @@ class CMAESValidator(ModelHandler):
         print(datetime.datetime.now(), 'Start saving results...')
         save_dict['seed'] = seed
 
-        sim_on_val_file_path = os.path.join(self.val_save_dir,
-                                            'best_from_train_sim_on_val.pth')
+        sim_on_val_file_path = get_best_params_sim_res_path(
+            'train', 'val', self.val_save_dir)
         torch.save(save_dict, sim_on_val_file_path)
         print("Successfully saved to:", sim_on_val_file_path)
 
@@ -1597,10 +1651,10 @@ class CMAESTester(ModelHandler):
         Firstly, load the dict in each 'best_from_train_sim_on_val.pth' under each of the 'self.val_save_dirs'.
         Afterwards, get the best param vector along with their costs for each train epoch.
         Then combine them into a dict with the same structure.
-        Finally, save the dict as 'best_from_train.pth' under 'self.val_save_dir'
+        Finally, save the dict as 'best_from_val.pth' under 'self.test_save_dir'
         """
         val_save_files = [
-            os.path.join(val_dir, 'best_from_train_sim_on_val.pth')
+            get_best_params_sim_res_path('train', 'val', val_dir)
             for val_dir in self.val_save_dirs
         ]
 
@@ -1608,8 +1662,9 @@ class CMAESTester(ModelHandler):
             val_save_files, top_k_among_all_dicts=self.param_sets)
 
         # save the top few param vectors with the lowest validation loss
-        best_from_val_file_path = os.path.join(self.test_save_dir,
-                                               'best_from_val.pth')
+        best_from_val_file_path = get_best_params_file_path(
+            'val', self.test_save_dir)
+
         torch.save(best_from_val, best_from_val_file_path)
         print(
             f"Successfully saved the top {self.param_sets} parameters with lowest validation loss to: {best_from_val_file_path}"
@@ -1625,8 +1680,8 @@ class CMAESTester(ModelHandler):
         torch.manual_seed(seed)
 
         # load the best_from_val
-        best_from_val_file_path = os.path.join(self.test_save_dir,
-                                               'best_from_val.pth')
+        best_from_val_file_path = get_best_params_file_path(
+            'val', self.test_save_dir)
         if not os.path.exists(best_from_val_file_path):
             self.get_best_val_params()
         best_from_val = torch.load(best_from_val_file_path,
@@ -1640,8 +1695,8 @@ class CMAESTester(ModelHandler):
         print(datetime.datetime.now(), 'Start saving results...')
         save_dict['seed'] = seed
 
-        sim_on_test_file_path = os.path.join(
-            self.val_save_dir, 'best_from_train_sim_on_test.pth')
+        sim_on_test_file_path = get_best_params_sim_res_path(
+            'val', 'test', self.val_save_dir)
         torch.save(save_dict, sim_on_test_file_path)
         print("Successfully saved to:", sim_on_test_file_path)
 

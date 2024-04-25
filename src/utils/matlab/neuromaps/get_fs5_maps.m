@@ -1,0 +1,1 @@
+fs5_cbf = CBIG_MNI_to_fs5('/home/ftian/storage/projects/MFM_exploration/data/neuromaps/annotations/satterthwaite2014/meancbf/MNI152/source-satterthwaite2014_desc-meancbf_space-MNI152_res-1mm_feature.nii.gz', '/home/ftian/storage/projects/MFM_exploration/data/neuromaps/CBIG_fsaverage_10k/satterthwaite2014_meancbf.csv');

@@ -13,13 +13,14 @@ from src.scripts.Hybrid_CMA_ES import ModelHandler, CMAESValidator, CMAESTester,
 from src.utils import tzeng_func
 from src.utils.init_utils import set_torch_default
 from src.basic.constants import CONFIG_DIR, LOG_DIR
-from src.utils.file_utils import get_HCPYA_group_stats, get_sim_fig_path, get_run_dir, get_target_dir
-from multiprocessing import Pool, set_start_method
-
-DS_NAME = 'HCPYA'
+from src.utils.file_utils import get_HCPYA_group_stats, get_best_params_file_path, get_sim_res_dir, get_sim_res_path, get_run_dir, get_target_dir  # noqa
+from multiprocessing import Pool, set_start_method  # noqa: F401
 
 
 def apply_on_all_participants(phase, trial_idx, seed_idx):
+    DS_NAME = 'HCPYA'
+    set_torch_default()
+
     config = configparser.ConfigParser()
     config.read(os.path.join(CONFIG_DIR, 'model', 'config_hcpya.ini'))
 
@@ -47,7 +48,7 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
                                     dl_rfic_range=[],
                                     euler_rfic_range=[],
                                     query_wei_range='Uniform',
-                                    opportunities=1,
+                                    opportunities=10,
                                     next_epoch=0,
                                     seed=seed)
         print("Exit state: ", state)
@@ -59,17 +60,16 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
                                      seed_idx)
         val_save_dir = get_run_dir(DS_NAME, TARGET, 'val', trial_idx, seed_idx)
         group_stats = get_HCPYA_group_stats(343, 686)
-        mfm_trainer = CMAESValidator(config, train_save_dir, val_save_dir,
-                                     group_stats['sc_euler'],
-                                     group_stats['emp_fc'],
-                                     group_stats['emp_fcd_cum'], num_epochs)
-        # mfm_validator.get_best_train_params()
-        mfm_trainer.validate()
+        mfm_validator = CMAESValidator(config, train_save_dir, val_save_dir,
+                                       group_stats['sc_euler'],
+                                       group_stats['emp_fc'],
+                                       group_stats['emp_fcd_cum'], num_epochs)
+
+        mfm_validator.validate()
 
     elif phase == 'test':
-        group_stats = get_HCPYA_group_stats(686, 1029)
-
         USE_ALL_SEEDS = False
+
         seed_indices = np.arange(1, seed_idx +
                                  1) if USE_ALL_SEEDS else [seed_idx]
         val_save_dirs = [
@@ -82,6 +82,7 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
         test_save_dir = get_run_dir(DS_NAME, TARGET, 'test', trial_idx,
                                     seed_idx)
 
+        group_stats = get_HCPYA_group_stats(686, 1029)
         mfm_tester = CMAESTester(config,
                                  val_save_dirs,
                                  test_save_dir,
@@ -94,28 +95,32 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
     elif phase == 'best_from_train':
         # Mainly for simulating the best param with lowest train loss
         PHASE = 'train'
-        sim_res_file_path = get_sim_fig_path(
-            DS_NAME, TARGET, PHASE, trial_idx, seed_idx,
-            f'sim_results_on_{PHASE}_set.pth')
-
-        best_from_train_dir = get_run_dir(DS_NAME, TARGET, 'val', trial_idx,
-                                          seed_idx)
-        best_from_train_path = os.path.join(best_from_train_dir,
-                                            'best_from_train.pth')
+        sim_res_dir = get_sim_res_dir(DS_NAME, TARGET, PHASE, trial_idx,
+                                      seed_idx)
+        train_save_dir = get_run_dir(DS_NAME, TARGET, 'train', trial_idx,
+                                     seed_idx)
+        val_save_dir = get_run_dir(DS_NAME, TARGET, 'val', trial_idx, seed_idx)
+        best_from_train_path = get_best_params_file_path('train', val_save_dir)
         group_stats = get_HCPYA_group_stats(0, 343)
 
-        mfm_trainer = ModelHandler(config=config,
-                                   phase=PHASE,
-                                   sc_euler=group_stats['sc_euler'],
-                                   emp_fc=group_stats['emp_fc'],
-                                   emp_fcd_cum=group_stats['emp_fcd_cum'])
+        mfm_validator = CMAESValidator(config, train_save_dir, val_save_dir,
+                                       group_stats['sc_euler'],
+                                       group_stats['emp_fc'],
+                                       group_stats['emp_fcd_cum'], num_epochs)
+        mfm_validator.get_best_train_params()
 
-        mfm_trainer.sim_first_param_multi_times(best_from_train_path,
-                                                sim_res_file_path,
-                                                10,
-                                                get_FCD_matrix=True,
-                                                get_bold=True,
-                                                seed=None)
+        mfm_validator = ModelHandler(config=config,
+                                     phase=PHASE,
+                                     sc_euler=group_stats['sc_euler'],
+                                     emp_fc=group_stats['emp_fc'],
+                                     emp_fcd_cum=group_stats['emp_fcd_cum'])
+
+        mfm_validator.sim_first_param_multi_times(best_from_train_path,
+                                                  sim_res_dir,
+                                                  10,
+                                                  get_FCD_matrix=True,
+                                                  get_bold=True,
+                                                  seed=None)
 
     elif phase == 'val_best':
         # get the top 10 param vectors with the lowest validation loss
@@ -683,13 +688,12 @@ def apply_large_group_Yan100(mode, trial_nbr, seed_nbr, epoch=None):
 if __name__ == "__main__":
     print(datetime.datetime.now(), ': main program start'.upper(), flush=True)
 
-    set_torch_default()
     if torch.cuda.is_available():
         print("Current GPU: ",
               torch.cuda.get_device_name(torch.cuda.current_device()))
 
     # * lightweight tasks
-    # for trial_idx in [22]:
+    # for trial_idx in [31, 32, 33, 34]:
     #     for seed_idx in [3]:
     #         apply_on_all_participants(phase='best_from_train',
     #                                   trial_idx=trial_idx,
@@ -697,7 +701,7 @@ if __name__ == "__main__":
 
     # * heavy tasks to be submitted to the scheduler
     USE_MULTIPROC = False
-    phases = ['train']
+    phases = ['train', 'best_from_train']
     for phase in phases:
         if USE_MULTIPROC:
             set_start_method('spawn')

@@ -22,7 +22,7 @@ def get_emp_fig_dir(ds_name, target, fig_type):
     return emp_fig_dir
 
 
-def get_sim_fig_dir(ds_name, target, phase, trial_idx, seed_idx):
+def get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx):
     sim_fig_dir = get_fig_dir_in_logs(ds_name, target,
                                       f'best_from_{phase}_simulation',
                                       trial_idx, seed_idx)
@@ -30,10 +30,8 @@ def get_sim_fig_dir(ds_name, target, phase, trial_idx, seed_idx):
     return sim_fig_dir
 
 
-def get_sim_fig_path(ds_name, target, phase, trial_idx, seed_idx, fig_name):
-    sim_fig_dir = get_fig_dir_in_logs(ds_name, target,
-                                      f'best_from_{phase}_simulation',
-                                      trial_idx, seed_idx)
+def get_sim_res_path(ds_name, target, phase, trial_idx, seed_idx, fig_name):
+    sim_fig_dir = get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx)
     return os.path.join(sim_fig_dir, fig_name)
 
 
@@ -69,6 +67,15 @@ def get_fig_dir_in_logs(ds_name, target, fig_type, trial_idx, seed_idx):
 
 def get_train_file_path(train_save_dir, epoch_idx):
     return os.path.join(train_save_dir, f'param_save_epoch{epoch_idx}.pth')
+
+
+def get_best_params_file_path(phase, save_dir):
+    return os.path.join(save_dir, f'best_from_{phase}.pth')
+
+
+def get_best_params_sim_res_path(param_phase, sim_phase, save_dir):
+    return os.path.join(save_dir,
+                        f'best_from_{param_phase}_sim_on_{sim_phase}.pth')
 
 
 def get_val_file_path(val_dir, epoch_idx):
@@ -409,8 +416,7 @@ def get_HCPYA_emp_TC(subject_id):
     Get the empirical time course data for the given subject ID in the HCPYA dataset.
     """
     subject_id = int(subject_id)
-    # TODO: change TC_old back to TC
-    TC_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC_old')
+    TC_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC')
     TC_file_path = os.path.join(TC_dir, f'{subject_id}_bold_4_runs.mat')
     TC_file_path_after_GSR = os.path.join(TC_dir,
                                           f'{subject_id}_bold_valid_runs.mat')
@@ -451,7 +457,7 @@ def get_HCPYA_group_emp_TC(range_start: int,
     subject_ids_path = os.path.join(HCPYA_1029_DATA_DIR, 'subject_1029.csv')
     subject_ids = pd.read_csv(subject_ids_path, header=None).values.flatten()
 
-    group_TC_save_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC_old', 'group_TC')
+    group_TC_save_dir = os.path.join(HCPYA_1029_DATA_DIR, 'TC', 'group_TC')
     os.makedirs(group_TC_save_dir, exist_ok=True)
 
     group_TC_save_path = os.path.join(

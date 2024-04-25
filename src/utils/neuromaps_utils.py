@@ -179,8 +179,8 @@ def get_mean_of_neuromaps_under(dir: str,
 
 def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
                       PCs: int | list[int] = 3,
-                      use_mean_map=False,
-                      use_unit_vector=True):
+                      use_mean_map=True,
+                      use_standardizing=True):
     """
     Get the concatenated matrix formed by PCs and mean of neuromaps.
     We will parameterize wEE and wEI using the mean of neuromaps and the first few PCs along with a bias term.
@@ -189,12 +189,13 @@ def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
         The concatenated matrix of shape (N, p), where N is the num of ROIs and p is the num of PCs + 2
     """
     one_array = np.ones(68)
+    concat_matrix = [one_array]
     if use_mean_map:
         mean_map = pd.read_csv(os.path.join(dir, 'mean_map.csv'),
                                header=None).values.flatten()
-        concat_matrix = [one_array, mean_map]
-    else:
-        concat_matrix = [one_array]
+        if use_standardizing:
+            mean_map = (mean_map - np.mean(mean_map)) / np.std(mean_map)
+        concat_matrix.append(mean_map)
 
     if isinstance(PCs, int):
         PCs = list(range(1, PCs + 1))
@@ -202,8 +203,8 @@ def get_concat_matrix(dir: str = DESIKAN_NEUROMAPS_DIR,
     for i in PCs:
         PC = pd.read_csv(os.path.join(dir, f'pc{i}.csv'),
                          header=None).values.flatten()
-        if use_unit_vector:
-            PC = PC / np.linalg.norm(PC)
+        if use_standardizing:
+            PC = (PC - np.mean(PC)) / np.std(PC)
         concat_matrix.append(PC)
     return torch.as_tensor(np.stack(
         concat_matrix, axis=1)).to(DEFAULT_DTYPE).to(device=get_device())
@@ -213,7 +214,7 @@ def reconstruct(num_of_PCs,
                 target_stat,
                 target_name,
                 visualize_recon=False,
-                use_mean_map=False):
+                use_mean_map=True):
     X = get_concat_matrix(PCs=num_of_PCs)
     N = X.shape[0]
 
@@ -259,7 +260,8 @@ def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
     visualize_stats(recon_res['target_stat'], target_name,
-                    os.path.join(fig_dir, f"{target_name}_surf_map.png"))
+                    os.path.join(fig_dir, f"{target_name}_surf_map.png"),
+                    f'Ground truth {target_name}')
     suffix = f"_using_{recon_res['num_of_PCs']}_PCs"
     if not use_mean_map:
         suffix += "_without_mean_map"
@@ -267,7 +269,8 @@ def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
     visualize_stats(
         recon_res['projections'], 'projections',
         os.path.join(fig_dir,
-                     f"{target_name}_projections_surf_map{suffix}.png"))
+                     f"{target_name}_projections_surf_map{suffix}.png"),
+        f'Projections of {target_name}')
 
     residuals = convert_to_numpy(recon_res['target_stat']) - convert_to_numpy(
         recon_res['projections'])
@@ -276,7 +279,8 @@ def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
         residuals, 'residuals',
         os.path.join(
             fig_dir,
-            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png"))
+            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png"),
+        f'Residuals for {target_name} reconstruction')
 
     # Then merge the 3 png images into one png image by laying out this way: target_stat, projection, residual
     concat_n_images([

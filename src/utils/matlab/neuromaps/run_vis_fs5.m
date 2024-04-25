@@ -1,0 +1,2 @@
+vis_param_in_fs5('/home/ftian/storage/projects/MFM_exploration/data/neuromaps/fsaverage_10k/satterthwaite2014_meancbf.csv', '/home/ftian/storage/projects/MFM_exploration/data/neuromaps/fsaverage_10k/satterthwaite2014_meancbf.png', 'satterthwaite2014 CBF (neuromaps pkg)');
+vis_param_in_fs5('/home/ftian/storage/projects/MFM_exploration/data/neuromaps/fsaverage_10k/hcps1200_myelinmap.csv', '/home/ftian/storage/projects/MFM_exploration/data/neuromaps/fsaverage_10k/hcps1200_myelinmap.png', 'HCP myelin (neuromaps pkg)');

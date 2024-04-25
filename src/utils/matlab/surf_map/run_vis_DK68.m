@@ -1,0 +1,3 @@
+% load('/home/ftian/storage/projects/MFM_exploration/tmp/myelin.mat', 'myelin'); vis_DK68_param(myelin, '/home/ftian/storage/projects/MFM_exploration/reports/figures/neuromaps/myelin_surf_map.png', 'Ground truth myelin');
+cbf_DK68 = csvread('/home/ftian/storage/projects/MFM_exploration/data/neuromaps/desikan/satterthwaite2014_meancbf.csv'); vis_DK68_param(cbf_DK68, '/home/ftian/storage/projects/MFM_exploration/data/neuromaps/desikan/satterthwaite2014_meancbf.png', 'satterthwaite2014 mean cbf');
+myelin_DK68 = csvread('/home/ftian/storage/projects/MFM_exploration/data/neuromaps/desikan/hcps1200_myelinmap.csv'); vis_DK68_param(myelin_DK68, '/home/ftian/storage/projects/MFM_exploration/data/neuromaps/desikan/hcps1200_myelinmap.png', 'hcps1200 myelin');

@@ -33,7 +33,7 @@ class NeuroMap:
                                str] = eval(self.info["annotation"])
         self.intermediate_space = intermediate_space
         if self.intermediate_space is None:
-            self.intermediate_space = ['fsaverage', '41k']
+            self.intermediate_space = ['fsaverage', '10k']
         self.target_space, self.target_resolution = self.intermediate_space
 
         self.data_path: str | list[str, str] = fetch_annotation(
@@ -175,7 +175,7 @@ class NeuroMap:
     def convert_to_desikan(self, save_converted: bool = True) -> np.ndarray:
         """
         Convert the converted neuro map to Desikan-Killiany atlas.
-        The default intermediate space is fsaverage 41k (fsaverage6).
+        The default intermediate space is fsaverage 10k (fsaverage6).
         """
 
         if not hasattr(self, 'intermediate_map'):
@@ -210,12 +210,16 @@ class NeuroMap:
         return f"{self.source}_{self.descriptor}"
 
 
-def get_all_maps(subfolder_name: str = 'desikan') -> list[NeuroMap]:
+def get_all_maps(
+    space_and_res: str | list[str, str] = ['fsaverage',
+                                           '10k']) -> list[NeuroMap]:
     """
     Get all the neuro maps in the Desikan-Killiany atlas.
     If all the maps are already processed and saved, we can directly read it,
     Otherwise, we will process all the maps and save them using pickle.
     """
+    subfolder_name = space_and_res if isinstance(
+        space_and_res, str) else '_'.join(space_and_res)
     used_neuromaps_info = pd.read_csv(
         os.path.join(NEUROMAPS_SRC_DIR, 'used_neuromaps_info.csv'))
     all_maps_file_path = os.path.join(NEUROMAPS_DATA_DIR, subfolder_name,
@@ -227,8 +231,12 @@ def get_all_maps(subfolder_name: str = 'desikan') -> list[NeuroMap]:
             all_maps = pickle.load(f)
         return all_maps
 
+    intermediate_space = space_and_res if isinstance(space_and_res,
+                                                     list) else None
     all_maps = [
-        NeuroMap(map_info, convert_to_desikan=True)
+        NeuroMap(map_info,
+                 convert_to_desikan=True,
+                 intermediate_space=intermediate_space)
         for _, map_info in used_neuromaps_info.iterrows()
     ]
 
@@ -238,13 +246,17 @@ def get_all_maps(subfolder_name: str = 'desikan') -> list[NeuroMap]:
     return all_maps
 
 
-def get_all_maps_data(subfolder_name: str = 'fsaverage_41k',
+def get_all_maps_data(space_and_res: str
+                      | list[str, str] = ['fsaverage', '10k'],
                       save_mean_map: bool = True) -> pd.DataFrame:
     """
     Get the data of all neuro maps in the Desikan-Killiany atlas.
     If the data of all the maps are already processed and saved, we can directly read it,
     Otherwise, we will get the data of all the maps and save them to a csv.
     """
+    subfolder_name = space_and_res if isinstance(
+        space_and_res, str) else '_'.join(space_and_res)
+
     all_maps_data_file_path = os.path.join(NEUROMAPS_DATA_DIR, subfolder_name,
                                            'all_maps_data.csv')
     # load the data if the file exists, and get all the data if not
@@ -252,8 +264,8 @@ def get_all_maps_data(subfolder_name: str = 'fsaverage_41k',
         all_maps_data = pd.read_csv(all_maps_data_file_path)
         return all_maps_data
 
-    all_maps = get_all_maps(subfolder_name)
-    if subfolder_name == 'desikan':
+    all_maps = get_all_maps(space_and_res)
+    if space_and_res == 'desikan':
         all_maps_data = np.stack([map.map_in_desikan for map in all_maps],
                                  axis=1)
     else:

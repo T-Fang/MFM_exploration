@@ -17,16 +17,16 @@ target_list=('all_participants')
 # ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-ncpus=5
+ncpus=1
 need_gpu=1
-mem=10G
+mem=4G
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(31)
-seed_list=(5)
-# seed_list=($(seq 3 1 5))
+trial_list=(37)
+# seed_list=(1 2)
+seed_list=($(seq 1 1 5))
 # seed_list=($(seq 2 1 1000))
 
 for target in "${target_list[@]}"; do
@@ -53,10 +53,10 @@ for target in "${target_list[@]}"; do
                     log_out="se${seed_nbr}_out.log"
                     if [ ${need_gpu} = 1 ]; then
                         cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 16:00:00 -ncpus $ncpus -ngpus 1 -mem $mem -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 18:00:00 -ncpus $ncpus -ngpus 1 -mem $mem -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 5:00:00 -ncpus $ncpus -mem 5G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -ncpus $ncpus -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     fi
                 done
             done

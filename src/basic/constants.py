@@ -44,4 +44,4 @@ NUM_GROUP_IN_SPLIT = {'train': 57, 'validation': 14, 'test': 17}
 SPLIT_NAMES = ['train', 'validation', 'test']
 
 # torch related
-DEFAULT_DTYPE = torch.float32
+DEFAULT_DTYPE = torch.float64
