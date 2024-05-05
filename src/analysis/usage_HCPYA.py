@@ -326,7 +326,7 @@ def group_sim_fc_fcd_to_individual(sub_nbr, group_same_fc_fcd):
 
     fc_sim = group_same_fc_fcd['fc']
     fcd_pdf = group_same_fc_fcd['fcd_pdf']
-    total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
+    total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.calc_all_loss_from_fc_fcd(
         fc_sim, fcd_pdf, emp_fc, emp_fcd_cum)
     save_loss = torch.hstack(
         (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1), ks_loss.unsqueeze(1)))
@@ -423,13 +423,12 @@ def simulate_results_loss_analysis():
     fc_sim = sim_res['fc']
     fc_losses = np.zeros((10, 3))
     for i in range(10):
-        _, fc_losses[i] = MfmModel2014.FC_correlation_n_L1_cost(
-            fc_sim[i], emp_fc)
+        _, fc_losses[i] = MfmModel2014.calc_FC_losses(fc_sim[i], emp_fc)
     print(fc_losses)
     # fcd_pdf_sim  = sim_res['fcd_pdf']
     # fcd_losses = np.zeros((10, 3))
     # for i in range(10):
-    #     fcd_losses[i] = MfmModel2014.KS_cost(fcd_pdf_sim[i], emp_fcd_cum)
+    #     fcd_losses[i] = MfmModel2014.calc_FCD_losses(fcd_pdf_sim[i], emp_fcd_cum)
     # print(fcd_losses)
 
 

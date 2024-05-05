@@ -117,7 +117,7 @@ def group_sim_fc_fcd_to_individual(subject_id):
 
     fc_sim = group_same_fc_fcd['fc']
     fcd_pdf = group_same_fc_fcd['fcd_pdf']
-    total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.all_loss_calculate_from_fc_fcd(
+    total_loss, corr_loss, L1_loss, ks_loss = MfmModel2014.calc_all_loss_from_fc_fcd(
         fc_sim, fcd_pdf, emp_fc, emp_fcd_cum)
     save_loss = torch.hstack(
         (corr_loss.unsqueeze(1), L1_loss.unsqueeze(1), ks_loss.unsqueeze(1)))

@@ -291,41 +291,18 @@ class MfmModel2014:
             return bold[:, :, burn_in_bold + 1:], valid_M_mask, r_E_ave
 
     @staticmethod
-    def all_loss_calculate_from_fc_fcd(fc_sim, fcd_hist, emp_fc, emp_fcd_cum):
+    def calc_all_loss_from_fc_fcd(fc_sim, fcd_hist, emp_fc, emp_fcd_cum):
         """
         Calculate corr_loss, l1_loss and KS_loss from simulated FC matrix and FCD histogram
         :param fc_sim: [M, N, N]
-        :param fcd_hist: [10000, M], no need to cumsum or normalize. Will do automatically in KS_cost
+        :param fcd_hist: [10000, M], no need to cumsum or normalize. Will do automatically in ks_loss
         :param emp_fc: [N, N]
         :param emp_fcd_cum: [10000, 1]
         :return: [M]
         """
-        corr, l1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, emp_fc)
-        corr_loss = 1 - corr
-        ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
-        # * TODO: Modify losses
-        total_loss = corr_loss + l1_loss + ks_loss
-        # total_loss = corr_loss + l1_loss
-        # total_loss = l1_loss + ks_loss
-        # * TODO: Modify losses
-        return total_loss, corr_loss, l1_loss, ks_loss
-
-    @staticmethod
-    def all_loss_calculate_from_bold(bold, emp_fc, emp_fcd_cum):
-        """
-        Calculate corr_loss, L1_loss and KS_loss from BOLD signals
-        :param bold: [N, M, len], the simulated BOLD signals
-        :param emp_fc: [N, N], the empirical FC matrix
-        :param emp_fcd_cum: [10000, 1]. Has been done cumulative summation and normalization (dividing by emp_fcd_cum[-1:, :])
-        :return: total_loss: [M]
-        """
-        fc_sim = MfmModel2014.FC_calculate(bold)
-        corr, L1_loss = MfmModel2014.FC_correlation_n_L1_cost(fc_sim, emp_fc)
-        corr_loss = 1 - corr
-        _, fcd_hist = MfmModel2014.FCD_calculate(bold)
-        ks_loss = MfmModel2014.KS_cost(fcd_hist, emp_fcd_cum)
-        total_loss = corr_loss + L1_loss + ks_loss
-        return total_loss
+        losses = MfmModel2014.calc_FC_losses(fc_sim, emp_fc)
+        losses.update(MfmModel2014.calc_FCD_losses(fcd_hist, emp_fcd_cum))
+        return losses
 
     @staticmethod
     def FC_calculate(bold):
@@ -342,7 +319,7 @@ class MfmModel2014:
         return fc_mat
 
     @staticmethod
-    def FC_correlation_n_L1_cost(fc_sim, emp_fc):
+    def calc_FC_losses(fc_sim, emp_fc):
         """
         Compute the FC correlation and L1 cost for all M sets.
         [ATTENTION] here L1 is not the real L1 (subtraction of values and get the mean), but the subtraction of two mean values.
@@ -360,28 +337,38 @@ class MfmModel2014:
         vec_emp = vec_emp.unsqueeze(0).expand(M, -1)  # [M, len]
         vec_sim = fc_sim[:, mask]
 
-        # * TODO: experiment with different L1 cost
+        # * TODO: experiment with different l1 cost
 
         # L1 version 1: abs(mean)
-        # L1_cost = torch.abs(
-        #     torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
+        old_l1_loss = torch.abs(
+            torch.mean(vec_emp, dim=1) - torch.mean(vec_sim, dim=1))
 
         # L1 version 2: mean(abs) or MAE
-        L1_cost = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
+        MAE_l1_loss = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
-        # * TODO: experiment with different L1 cost
+        # l1_loss = old_l1_loss
+        l1_loss = MAE_l1_loss
+        # * TODO: experiment with different l1 cost
         # L2 or MSE
-        # L1_cost = torch.mean(torch.square(vec_emp - vec_sim), dim=1)
+        # l1_loss = torch.mean(torch.square(vec_emp - vec_sim), dim=1)
 
         # sqrt(L2) or RMSE
-        # L1_cost = torch.sqrt(torch.mean(torch.square(vec_emp - vec_sim), dim=1))
+        # l1_loss = torch.sqrt(torch.mean(torch.square(vec_emp - vec_sim), dim=1))
 
         vec_3d = torch.zeros(M, 2, vec_emp.shape[1])
         vec_3d[:, 0, :] = vec_sim
         vec_3d[:, 1, :] = vec_emp
 
         corr = torch_corr_3D(vec_3d)
-        return corr, L1_cost
+        corr_loss = 1 - corr
+
+        losses = {
+            'corr_loss': corr_loss,
+            'l1_loss': l1_loss,
+            'old_l1_loss': old_l1_loss,
+            'MAE_l1_loss': MAE_l1_loss
+        }
+        return losses
 
     @staticmethod
     def FC_correlation_single(fc_1, fc_2):
@@ -462,20 +449,21 @@ class MfmModel2014:
         return fcd_mat, fcd_hist
 
     @staticmethod
-    def KS_cost(sim_fcd_hist, emp_fcd_cum):
+    def calc_FCD_losses(sim_fcd_hist, emp_fcd_cum):
         """
         Calculate the KS cost between simulated FCD matrix and empirical FCD matrix
-        :param sim_fcd_hist: [10000, M]
-        :param emp_fcd_cum: [10000, 1]. Has been done cumulative summation and normalization (divided by emp_fcd_cum[-1:, :])
-        :return: KS_cost: [M]
+        :param sim_fcd_hist: (10000, M)
+        :param emp_fcd_cum: (10000, 1). Has been done cumulative summation and normalization (divided by emp_fcd_cum[-1:, :])
+        :return: a loss dict containing the ks_loss: (M, )
         """
         M = sim_fcd_hist.shape[1]
         sim_fcd_cum = torch.cumsum(sim_fcd_hist, dim=0)
         sim_fcd_cum = sim_fcd_cum / sim_fcd_cum[-1:, :]
         emp_fcd_cum_expand = emp_fcd_cum.expand(-1, M)
         ks_dif = torch.abs(sim_fcd_cum - emp_fcd_cum_expand)
-        ks_cost = torch.max(ks_dif, dim=0)[0]
-        return ks_cost
+        ks_loss = torch.max(ks_dif, dim=0)[0]
+        losses = {'ks_loss': ks_loss}
+        return losses
 
     def _synaptic_dynamical_equations_2014(self, S_E_t, S_I_t):
         """
