@@ -1,4 +1,4 @@
-function vis_param_in_fs5(parameter, save_fig_path, fig_title, threshold)
+function vis_fs5_param(parameter, save_fig_path, fig_title, threshold)
     % parameter: [20484, 1]
 
     % load the parameter if it is a string path
@@ -6,9 +6,14 @@ function vis_param_in_fs5(parameter, save_fig_path, fig_title, threshold)
         parameter = csvread(parameter);
     end
 
+    cortex_label = csvread('/home/ftian/storage/projects/MFM_exploration/src/utils/matlab/labels/cortex_fs5_label.csv');
+    cortex_label = cast(cortex_label, 'int32');
+    cortex_mask = cortex_label == 2;
+    cortex_param = parameter(cortex_mask);
+
     % get the threshold if not provided
     if ~exist('threshold', 'var')
-        threshold = get_colormap_threshold(parameter);
+        threshold = get_colormap_threshold(cortex_param);
     end
 
     parameter(parameter < threshold(1)) = threshold(1);

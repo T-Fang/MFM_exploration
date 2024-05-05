@@ -4,9 +4,13 @@ import pandas as pd
 import torch
 import scipy.io as sio
 
-from src.basic.constants import DEFAULT_DTYPE, LOG_DIR, TMP_DIR, HCPYA_1029_DATA_DIR, FIGURES_DIR
+from src.basic.constants import DEFAULT_DTYPE, LOG_DIR, MATLAB_SCRIPT_DIR, TMP_DIR, HCPYA_1029_DATA_DIR, FIGURES_DIR
 from src.utils.SC_utils import group_SC_matrices
 from src.utils.FC_utils import fisher_average
+
+############################################################
+# Files and directories
+############################################################
 
 
 def get_fig_dir(ds_name, target):
@@ -28,6 +32,14 @@ def get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx):
                                       trial_idx, seed_idx)
 
     return sim_fig_dir
+
+
+def get_vis_param_dir(ds_name, target, phase, trial_idx, seed_idx):
+    vis_param_dir = get_fig_dir_in_logs(ds_name, target,
+                                        f'best_from_{phase}_vis_param',
+                                        trial_idx, seed_idx)
+
+    return vis_param_dir
 
 
 def get_sim_res_path(ds_name, target, phase, trial_idx, seed_idx, fig_name):
@@ -95,6 +107,11 @@ def get_fig_path_in_logs(ds_name, target, fig_type, trial_idx, seed_idx,
     fig_dir = get_fig_dir_in_logs(ds_name, target, fig_type, trial_idx,
                                   seed_idx)
     return os.path.join(fig_dir, fig_name)
+
+
+############################################################
+# Load intermediate files
+############################################################
 
 
 def load_train_dict(ds_name,
@@ -201,14 +218,13 @@ def get_first_k_values(values, k=None):
     if not torch.is_tensor(values):
         values = torch.as_tensor(values)
 
-    if k is None:
-        return values if values.ndim == 2 else values.unsqueeze(1)
-
     if values.ndim == 1:
-        values = values[:k]
-        values = values.unsqueeze(1)
+        if k is not None:
+            values = values[:k]
+        values = values.unsqueeze(0)
     elif values.ndim == 2:
-        values = values[:, :k]
+        if k is not None:
+            values = values[:, :k]
     else:
         raise Exception("The input `values` is not a 1D or 2D tensor")
 
@@ -217,7 +233,8 @@ def get_first_k_values(values, k=None):
 
 def combine_all_param_dicts(paths_to_dicts: list[str],
                             top_k_per_dict: int = None,
-                            top_k_among_all_dicts: int = None):
+                            top_k_among_all_dicts: int = None,
+                            combined_dict_save_path: str = None):
     """
     Combine all param vector dictionaries in the given list of paths to a single dictionary.
     """
@@ -226,12 +243,13 @@ def combine_all_param_dicts(paths_to_dicts: list[str],
         if not os.path.exists(path_to_dict):
             raise Exception("save file doesn't exist:", path_to_dict)
         d = torch.load(path_to_dict, map_location='cpu')
-        d['parameter'] = d['parameter'][:, d['valid_param_indices']]
+        # d['parameter'] = d['parameter'][:, d[
+        #     'valid_param_indices']]  # Now the param_vectors are sorted by default
         for key, value in d.items():
             if key not in combined_dict:
                 combined_dict[key] = []
 
-            value = get_first_k_values(value, top_k_per_dict)
+            value = get_first_k_values(value, k=top_k_per_dict)
             combined_dict[key].append(value)
 
     for key, value in combined_dict.items():
@@ -239,6 +257,10 @@ def combine_all_param_dicts(paths_to_dicts: list[str],
 
     combined_dict = sort_dict_by_total_loss(combined_dict,
                                             top_k_among_all_dicts)
+    if combined_dict_save_path is not None:
+        torch.save(combined_dict, combined_dict_save_path)
+        print(f"Combined dict saved to {combined_dict_save_path}")
+
     return combined_dict
 
 
@@ -360,6 +382,23 @@ def get_HCPYA_group_stats(range_start: int, range_end: int):
     }
 
     return group_stats
+
+
+def get_HCPYA_group_stats_for_phase(phase):
+    if phase == 'train':
+        range_start = 0
+        range_end = 343
+    elif phase == 'val':
+        range_start = 343
+        range_end = 686
+    elif phase == 'test':
+        range_start = 686
+        range_end = 1029
+    else:
+        raise ValueError(
+            "The given phase must be either 'train', 'val', or 'test")
+
+    return get_HCPYA_group_stats(range_start, range_end)
 
 
 def get_HCPYA_group_myelin(range_start: int, range_end: int):
@@ -484,3 +523,14 @@ def get_HCPYA_group_emp_TC(range_start: int,
             f'Group empirical time course for subjects {range_start} to {range_end} saved to {group_TC_save_path}'
         )
     return group_TC
+
+
+############################################################
+# Get labels
+############################################################
+
+
+def get_cortex_fs5_label():
+    return pd.read_csv(os.path.join(MATLAB_SCRIPT_DIR, 'labels',
+                                    'cortex_fs5_label.csv'),
+                       header=None).values.flatten()

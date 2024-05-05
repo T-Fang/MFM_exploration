@@ -12,8 +12,8 @@ sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.basic.constants import SUBJECT_ID_RANGE
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import boxplot_train_r_E, compare_fc, compare_fcd, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap, plot_sim_fc_fcd  # noqa
-from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_emp_fig_dir, get_sim_res_path
+from src.utils.analysis_utils import vis_best_param_vector, boxplot_train_r_E, compare_fc, compare_fcd, plot_test_losses, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap, plot_sim_fc_fcd  # noqa
+from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_best_params_file_path, get_emp_fig_dir, get_run_dir, get_sim_res_path, get_vis_param_dir  # noqa
 from src.models.mfm_2014 import MfmModel2014
 
 sub_109 = [
@@ -454,7 +454,7 @@ def analyze_run(target, trial_idx, seed_idx):
                                          None, N_EPOCHS, 2, 3)
 
 
-def analyze_phase(target, trial_idx, seed_idx, phase):
+def analyze_sim_res(target, trial_idx, seed_idx, phase):
     plot_sim_fc_fcd(DS_NAME, target, phase, trial_idx, seed_idx, 0)
     sim_fc_path = get_sim_res_path(DS_NAME, target, phase, trial_idx, seed_idx,
                                    'sim_fc.csv')
@@ -474,6 +474,29 @@ def analyze_phase(target, trial_idx, seed_idx, phase):
     # TODO: Compare TC
 
 
+def analyze_phase(target, trial_idx, seed_idx, phase):
+    analyze_sim_res(target, trial_idx, seed_idx, phase)
+
+    # visualize the best param vector
+    best_from_phase_dir = get_run_dir(DS_NAME, target, phase, trial_idx,
+                                      seed_idx)
+    best_from_phase_path = get_best_params_file_path(phase,
+                                                     best_from_phase_dir)
+    vis_param_dir = get_vis_param_dir(DS_NAME, target, phase, trial_idx,
+                                      seed_idx)
+    vis_best_param_vector(best_from_phase_path, vis_param_dir)
+
+
+def analyze_target(target):
+    plot_test_losses(DS_NAME,
+                     target,
+                     trial_indices=[31, 32, 33, 34, 36, 37],
+                     trial_names=[
+                         'baseline', 'free rE', 'MAE l1', 'fixed sigma',
+                         'MAE l1+free rE', 'MAE l1+free rE\n+neuromaps'
+                     ])
+
+
 if __name__ == "__main__":
     ALL_TARGETS = ['all_participants']
     # * Epoch-level analysis
@@ -487,15 +510,16 @@ if __name__ == "__main__":
 
     # * phase-level analysis
     for target in ALL_TARGETS:
-        for trial_idx in range(31, 35):
-            for seed_idx in range(2, 4):
-                for phase in ['train']:
+        for trial_idx in range(31, 38):
+            # for seed_idx in range(1, 6):
+            for seed_idx in ['_best_among_all']:
+                for phase in ['val']:
                     analyze_phase(target, trial_idx, seed_idx, phase)
 
     # # * Run-level analysis
     # for target in ALL_TARGETS:
-    #     for trial_idx in range(31, 35):
-    #         for seed_idx in range(5, 6):
+    #     for trial_idx in range(32, 33):
+    #         for seed_idx in range(1, 2):
     #             analyze_run(target, trial_idx, seed_idx)
 
     # * Trial-level analysis

@@ -5,11 +5,11 @@ from pca import pca
 from matplotlib import pyplot as plt
 import torch
 
-from src.basic.constants import NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED, \
+from src.basic.constants import NEUROMAPS_DATA_DIR, NEUROMAPS_SRC_DIR, NUM_DESIKAN_ROI, NUM_ROI, IGNORED_DESIKAN_ROI_ZERO_BASED, \
     DESIKAN_NEUROMAPS_DIR, FIGURES_DIR, DEFAULT_DTYPE
 from src.utils.init_utils import get_device
-from src.utils.analysis_utils import visualize_stats, concat_n_images
-from src.utils.file_utils import convert_to_numpy
+from src.utils.analysis_utils import plot_scatter, visualize_stats, concat_n_images
+from src.utils.file_utils import convert_to_numpy, get_HCPYA_group_myelin, get_HCPYA_group_rsfc_gradient, get_cortex_fs5_label
 
 
 ##################################################
@@ -250,45 +250,237 @@ def reconstruct(num_of_PCs,
     }
 
     if visualize_recon:
-        visualize_reconstruction(recon_res, target_name)
+        vis_recon(recon_res, target_name, use_mean_map)
 
     return recon_res
 
 
-def visualize_reconstruction(recon_res, target_name, use_mean_map=False):
-    fig_dir = os.path.join(FIGURES_DIR, 'neuromaps')
+def vis_recon(recon_res, target_name, use_mean_map=True):
+    fig_dir = os.path.join(FIGURES_DIR, 'neuromaps', 'reconstruction')
     if not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
-    visualize_stats(recon_res['target_stat'], target_name,
-                    os.path.join(fig_dir, f"{target_name}_surf_map.png"),
-                    f'Ground truth {target_name}')
+    fig_target_name = target_name.replace('_', ' ')
+    ground_truth_path = os.path.join(fig_dir, f"{target_name}_surf_map.png")
+    visualize_stats(recon_res['target_stat'], target_name, ground_truth_path,
+                    f'Ground truth {fig_target_name}')
     suffix = f"_using_{recon_res['num_of_PCs']}_PCs"
     if not use_mean_map:
         suffix += "_without_mean_map"
 
-    visualize_stats(
-        recon_res['projections'], 'projections',
-        os.path.join(fig_dir,
-                     f"{target_name}_projections_surf_map{suffix}.png"),
-        f'Projections of {target_name}')
+    projection_path = os.path.join(
+        fig_dir, f"{target_name}_projections_surf_map{suffix}.png")
+    visualize_stats(recon_res['projections'], 'projections', projection_path,
+                    f'Projections of {fig_target_name}')
 
     residuals = convert_to_numpy(recon_res['target_stat']) - convert_to_numpy(
         recon_res['projections'])
+    residual_path = os.path.join(
+        fig_dir,
+        f"{target_name}_reconstruction_residuals_surf_map{suffix}.png")
+    visualize_stats(residuals, 'residuals', residual_path,
+                    f'Residuals for {fig_target_name} reconstruction')
 
-    visualize_stats(
-        residuals, 'residuals',
-        os.path.join(
-            fig_dir,
-            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png"),
-        f'Residuals for {target_name} reconstruction')
-
+    merged_img_path = os.path.join(
+        fig_dir, f"{target_name}_reconstruction{suffix}.png")
     # Then merge the 3 png images into one png image by laying out this way: target_stat, projection, residual
+    concat_n_images([ground_truth_path, projection_path, residual_path], 1, 3,
+                    merged_img_path)
+
+
+def vis_myelin_diff():
+    HCP_myelin = get_HCPYA_group_myelin(0, 1029).flatten().numpy()
+    pkg_myelin_path = os.path.join(DESIKAN_NEUROMAPS_DIR,
+                                   'hcps1200_myelinmap.csv')
+    # load myelin in the neuromaps pkgs
+    pkg_myelin = pd.read_csv(pkg_myelin_path, header=None).values.flatten()
+    save_fig_dir = os.path.join(FIGURES_DIR, 'neuromaps', 'compare_myelin')
+    os.makedirs(save_fig_dir, exist_ok=True)
+
+    pkg_myelin_fig_path = pkg_myelin_path.replace('.csv', '.png')
+    HCP_myelin_fig_path = os.path.join(save_fig_dir, "myelin_HCPYA.png")
+    diff_path = os.path.join(save_fig_dir, "myelin_diff.png")
+
+    scatter_plot_path = os.path.join(save_fig_dir, "myelin_scatter.png")
+    merged_img_path = os.path.join(save_fig_dir, "myelin_compare_merged.png")
+
+    res_diff = pkg_myelin - HCP_myelin
+    stats_list = [pkg_myelin, HCP_myelin, res_diff]
+    stats_names = ['myelin_pkg', 'myelin_HCPYA', 'myelin_diff']
+    fig_file_paths = [pkg_myelin_fig_path, HCP_myelin_fig_path, diff_path]
+    fig_titles = [
+        'Myelin in neuromaps pkg', 'Myelin in HCPYA', 'Myelin difference'
+    ]
+    visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles)
+
+    # additionally, scatter plot pkg_myelin and HCP_myelin as well as the regression line
+    plot_scatter(pkg_myelin, HCP_myelin, 'Myelin in neuromaps pkg',
+                 'Myelin in HCPYA', 'Myelin comparison', scatter_plot_path,
+                 False, True, True)
+
     concat_n_images([
-        os.path.join(fig_dir, f"{target_name}_surf_map.png"),
-        os.path.join(fig_dir,
-                     f"{target_name}_projections_surf_map{suffix}.png"),
-        os.path.join(
-            fig_dir,
-            f"{target_name}_reconstruction_residuals_surf_map{suffix}.png")
-    ], 1, 3, os.path.join(fig_dir,
-                          f"{target_name}_reconstruction{suffix}.png"))
+        pkg_myelin_fig_path, HCP_myelin_fig_path, diff_path, scatter_plot_path
+    ], 2, 2, merged_img_path)
+
+
+def vis_rsfc_gradient_diff():
+    HCP_rsfc_gradient = get_HCPYA_group_rsfc_gradient(0,
+                                                      1029).flatten().numpy()
+    pkg_rsfc_gradient_path = os.path.join(DESIKAN_NEUROMAPS_DIR,
+                                          'margulies2016_fcgradient01.csv')
+    # load rsfc gradient in the neuromaps pkgs
+    pkg_rsfc_gradient = pd.read_csv(pkg_rsfc_gradient_path,
+                                    header=None).values.flatten()
+    save_fig_dir = os.path.join(FIGURES_DIR, 'neuromaps',
+                                'compare_rsfc_gradient')
+    os.makedirs(save_fig_dir, exist_ok=True)
+
+    pkg_rsfc_gradient_fig_path = pkg_rsfc_gradient_path.replace('.csv', '.png')
+    HCP_rsfc_gradient_fig_path = os.path.join(save_fig_dir,
+                                              "rsfc_gradient_HCPYA.png")
+    diff_path = os.path.join(save_fig_dir, "rsfc_gradient_diff.png")
+
+    scatter_plot_path = os.path.join(save_fig_dir, "rsfc_gradient_scatter.png")
+    merged_img_path = os.path.join(save_fig_dir,
+                                   "rsfc_gradient_compare_merged.png")
+
+    res_diff = pkg_rsfc_gradient - HCP_rsfc_gradient
+
+    stats_list = [pkg_rsfc_gradient, HCP_rsfc_gradient, res_diff]
+    stats_names = [
+        'rsfc_gradient_pkg', 'rsfc_gradient_HCPYA', 'rsfc_gradient_diff'
+    ]
+    fig_file_paths = [
+        pkg_rsfc_gradient_fig_path, HCP_rsfc_gradient_fig_path, diff_path
+    ]
+    fig_titles = [
+        'rsfc gradient in neuromaps pkg', 'rsfc gradient in HCPYA',
+        'rsfc gradient difference'
+    ]
+    visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles)
+
+    # additionally, scatter plot pkg_rsfc_gradient and HCP_rsfc_gradient as well as the regression line
+    plot_scatter(pkg_rsfc_gradient, HCP_rsfc_gradient,
+                 'rsfc gradient in neuromaps pkg', 'rsfc gradient in HCPYA',
+                 'rsfc gradient comparison', scatter_plot_path, False, True,
+                 True)
+
+    concat_n_images([
+        pkg_rsfc_gradient_fig_path, HCP_rsfc_gradient_fig_path, diff_path,
+        scatter_plot_path
+    ], 2, 2, merged_img_path)
+
+
+def vis_PC_myelin_gradient_corr(num_of_PCs=3):
+    train_myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
+    train_rsfc_gradient = get_HCPYA_group_rsfc_gradient(0,
+                                                        343).flatten().numpy()
+    save_fig_dir = os.path.join(FIGURES_DIR, 'neuromaps',
+                                'corr_PC_with_myelin_gradient')
+    os.makedirs(save_fig_dir, exist_ok=True)
+    train_myelin_fig_path = os.path.join(save_fig_dir, "myelin_train.png")
+    train_rsfc_gradient_fig_path = os.path.join(save_fig_dir,
+                                                "rsfc_gradient_train.png")
+    stats_list = [train_myelin, train_rsfc_gradient]
+    stats_names = ['myelin_train', 'rsfc_gradient_train']
+    fig_file_paths = [train_myelin_fig_path, train_rsfc_gradient_fig_path]
+    fig_titles = ['myelin in train', 'rsfc gradient in train']
+    pc_fig_paths = []
+    myelin_pc_scatter_paths = []
+    rsfc_gradient_pc_scatter_paths = []
+    for i in range(num_of_PCs):
+        pc_path = os.path.join(DESIKAN_NEUROMAPS_DIR, f'pc{i+1}.csv')
+        pc = pd.read_csv(pc_path, header=None).values.flatten()
+        stats_list.append(pc)
+        stats_names.append(f'pc{i+1}')
+        pc_fig_path = pc_path.replace('.csv', '_surf_map.png')
+        fig_file_paths.append(pc_fig_path)
+        pc_fig_paths.append(pc_fig_path)
+        fig_titles.append(f'PC{i+1} of neuromaps')
+        # Additionally, scatter plot myelin and rsfc gradient with PC
+        myelin_pc_scatter_paths.append(
+            os.path.join(save_fig_dir, f"myelin_PC{i+1}_scatter.png"))
+        plot_scatter(pc, train_myelin, f'PC{i+1}', 'myelin in train',
+                     f'myelin in train vs. PC{i+1}',
+                     myelin_pc_scatter_paths[-1], False, True, True)
+        rsfc_gradient_pc_scatter_paths.append(
+            os.path.join(save_fig_dir, f"rsfc_gradient_PC{i+1}_scatter.png"))
+        plot_scatter(pc, train_rsfc_gradient, f'PC{i+1}',
+                     'rsfc gradient in train',
+                     f'rsfc gradient in train vs. PC{i+1}',
+                     rsfc_gradient_pc_scatter_paths[-1], False, True, True)
+
+    visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles)
+
+    image_path_list = [None] + pc_fig_paths + [train_myelin_fig_path] + myelin_pc_scatter_paths + \
+                      [train_rsfc_gradient_fig_path] + rsfc_gradient_pc_scatter_paths
+
+    merged_img_path = os.path.join(save_fig_dir,
+                                   "corr_PC_with_myelin_gradient.png")
+
+    concat_n_images(image_path_list, 3, num_of_PCs + 1, merged_img_path)
+
+
+def vis_transform_diff(author,
+                       map_name,
+                       save_fig_dir='',
+                       space='fsaverage',
+                       res='10k'):
+    space_and_res = f"{space}_{res}"
+    neuromaps_pkg_res_dir = os.path.join(NEUROMAPS_DATA_DIR, space_and_res)
+    CBIG_res_dir = os.path.join(NEUROMAPS_DATA_DIR, f'CBIG_{space_and_res}')
+
+    file_name = f"{author}_{map_name}"
+    # fig_title = f'{author} {map_name}'
+    fig_title = f'{map_name}'
+    neuromaps_pkg_res_path = os.path.join(neuromaps_pkg_res_dir,
+                                          f"{file_name}.csv")
+    CBIG_res_path = os.path.join(CBIG_res_dir, f"{file_name}.csv")
+
+    neuromaps_pkg_res = pd.read_csv(neuromaps_pkg_res_path,
+                                    header=None).values.flatten()
+    CBIG_res = pd.read_csv(CBIG_res_path, header=None).values.flatten()
+
+    if save_fig_dir == '':
+        save_fig_dir = os.path.join(FIGURES_DIR, 'neuromaps',
+                                    'compare_transform')
+
+    os.makedirs(save_fig_dir, exist_ok=True)
+
+    neuromaps_pkg_res_fig_path = neuromaps_pkg_res_path.replace('.csv', '.png')
+    CBIG_res_fig_path = CBIG_res_path.replace('.csv', '.png')
+    diff_path = os.path.join(save_fig_dir, f"{file_name}_diff.png")
+    scatter_plot_path = os.path.join(save_fig_dir, f"{file_name}_scatter.png")
+    merged_img_path = os.path.join(save_fig_dir,
+                                   f"{file_name}_compare_transform.png")
+
+    cortex_fs5_label = get_cortex_fs5_label()
+    res_diff = neuromaps_pkg_res - CBIG_res
+    res_diff[cortex_fs5_label == 1] = 0
+
+    # visualize the neuromaps pkg's transform outcome and CBIG's transform outcome
+    stats_list = [neuromaps_pkg_res, CBIG_res, res_diff]
+    stats_names = [
+        f'{file_name}_neuromaps_pkg', f'{file_name}_CBIG', f'{file_name}_diff'
+    ]
+    fig_file_paths = [neuromaps_pkg_res_fig_path, CBIG_res_fig_path, diff_path]
+    fig_titles = [
+        f'{fig_title} (neuromaps pkg)', f'{fig_title} (CBIG)',
+        f'{fig_title} difference'
+    ]
+    visualize_stats(stats_list,
+                    stats_names,
+                    fig_file_paths,
+                    fig_titles,
+                    space='fs5')
+    neuromaps_pkg_res_cortex = neuromaps_pkg_res[cortex_fs5_label == 2]
+    CBIG_res_cortex = CBIG_res[cortex_fs5_label == 2]
+
+    # additionally, scatter plot neuromaps_pkg_res and CBIG_res as well as the regression line
+    plot_scatter(neuromaps_pkg_res_cortex, CBIG_res_cortex,
+                 f'{fig_title} (neuromaps pkg)', f'{fig_title} (CBIG)',
+                 f'{fig_title} compare', scatter_plot_path, False, True, True)
+
+    concat_n_images([
+        neuromaps_pkg_res_fig_path, CBIG_res_fig_path, diff_path,
+        scatter_plot_path
+    ], 2, 2, merged_img_path)

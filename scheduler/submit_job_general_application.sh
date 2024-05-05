@@ -15,19 +15,17 @@ main_py="${scripts_dir}/main_${dataset_name}.py"
 
 target_list=('all_participants')
 # ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
-mode='train'
+mode='validation'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-ncpus=1
 need_gpu=1
-mem=4G
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(37)
-# seed_list=(1 2)
-seed_list=($(seq 1 1 5))
-# seed_list=($(seq 2 1 1000))
+trial_list=(31 32 34)
+# trial_list=($(seq 31 1 37))
+seed_list=(5)
+# seed_list=($(seq 1 1 5))
 
 for target in "${target_list[@]}"; do
     # For group
@@ -53,44 +51,36 @@ for target in "${target_list[@]}"; do
                     log_out="se${seed_nbr}_out.log"
                     if [ ${need_gpu} = 1 ]; then
                         cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 18:00:00 -ncpus $ncpus -ngpus 1 -mem $mem -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 18:00:00 -ncpus 1 -ngpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -ncpus $ncpus -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -ncpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     fi
                 done
             done
 
         elif [ ${mode} = 'validation' ]; then
 
-            # trial_list=($(seq 2 1 5))
-            trial_list=(1)
-            seed_list=($(seq 8 1 50))
-            epoch_list=($(seq 0 1 99))
+            # trial_list=($(seq 1 1 1))
+            # trial_list=(4)
+            # seed_list=($(seq 2 1 10))
+            # seed_list=(1)
 
+            # Make up log directories for different trials
             for trial_nbr in "${trial_list[@]}"; do
-
                 logdir="${logpath}/trial${trial_nbr}"
                 mkdir -p ${logdir}
 
                 for seed_nbr in "${seed_list[@]}"; do
-                    # final_state=/home/ftian/storage/projects/MFM_exploration/logs/HCPYA/group_340/train/trial${trial_nbr}/seed${seed_nbr}/final_state.pth
-                    # if [ ! -f "${final_state}" ]; then
-                    #     echo "t${trial_nbr} se${seed_nbr} no final state."
-                    #     continue
-                    # fi
-
-                    for epoch in "${epoch_list[@]}"; do
-                        logerror="se${seed_nbr}_e${epoch}_error.log"
-                        log_out="se${seed_nbr}_e${epoch}_out.log"
-                        cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} ${trial_nbr} ${seed_nbr} ${epoch}"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 00:45:00 -mem 4G -name "e${epoch}se${seed_nbr}t${trial_nbr}_val" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
-
-                        if [ ${epoch} == '0' ]; then # For tackling conflicts of directory making
-                            sleep 5
-                        fi
-
-                    done
+                    logerror="se${seed_nbr}_error.log"
+                    log_out="se${seed_nbr}_out.log"
+                    if [ ${need_gpu} = 1 ]; then
+                        cmd="module load cuda/11.7; source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 6:00:00 -ncpus 1 -ngpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_val" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    elif [ ${need_gpu} = 0 ]; then
+                        cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 25:00:00 -ncpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_val" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                    fi
                 done
             done
 

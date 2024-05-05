@@ -14,8 +14,8 @@ set(gca,'LineWidth',2)
 set(gca,'box','off')
 set(gca, 'ytick', [0, 0.5, 1])
 set(gca, 'xtick', [0, 0.5, 1])
-xlabel('empirical FC')
-ylabel('simulated FC')
+xlabel('empirical FC', 'FontSize', 24)
+ylabel('simulated FC', 'FontSize', 24)
 coefficients = polyfit(FC_test(triu(true(68), 1)), FC(triu(true(68), 1)), 1);
 xFit = linspace(-0.2, 1, 1000);
 yFit = polyval(coefficients , xFit);

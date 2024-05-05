@@ -141,7 +141,7 @@ function CBIG_DrawSurfaceMapsWithBoundary_mod(lh_data, rh_data, ...
             shading('FLAT')
             view(-90, 0);
             axis off; 
-            title(fig_title, 'Units', 'normalized', 'Position', [1, 1, 0], 'FontSize', 16)
+            title(fig_title, 'Units', 'normalized', 'Position', [1, 1, 0], 'FontSize', 28)
             
             subplot('Position', pos(2, :));
             s = TrisurfMeshData(mesh, data);
@@ -222,6 +222,6 @@ function CBIG_DrawSurfaceMapsWithBoundary_mod(lh_data, rh_data, ...
     colormap(ax1, 'cool');
     set(gca, 'CLim', [min(parameter), max(parameter)])
     % colorbar(ax1, 'horiz', 'Position', [0.28 0.5 0.2 0.02], 'XTick', [min(parameter), max(parameter)],'XTickLabel', {num2str(min(parameter), '%0.2g'), num2str(max(parameter), '%0.2g')}); 
-    cbar = colorbar(ax1, 'horiz', 'Position', [0.35 0.5 0.2 0.02], 'XTick', [min(parameter), max(parameter)],'XTickLabel', {num2str(min(parameter), '%0.2g'), num2str(max(parameter), '%0.2g')}); 
+    cbar = colorbar(ax1, 'horiz', 'Position', [0.35 0.5 0.2 0.02], 'XTick', [min(parameter), max(parameter)],'XTickLabel', {num2str(min(parameter), '%0.3g'), num2str(max(parameter), '%0.3g')}); 
     cbar.FontSize = 28;
 end

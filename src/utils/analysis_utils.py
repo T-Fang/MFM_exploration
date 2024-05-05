@@ -8,8 +8,9 @@ import torch
 import cv2
 
 from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
-from src.utils.file_utils import convert_to_mat, get_best_params_sim_res_path, get_fig_dir_in_logs, get_fig_path_in_logs, get_losses_fig_dir, \
-    get_run_dir, get_sim_res_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_res_path
+from src.utils.file_utils import convert_to_mat, get_HCPYA_group_myelin, get_HCPYA_group_rsfc_gradient, \
+    get_best_params_sim_res_path, get_emp_fig_dir, get_fig_dir_in_logs, get_fig_path_in_logs, \
+    get_losses_fig_dir, get_run_dir, get_sim_res_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_res_path
 
 ############################################################
 # Visualization related
@@ -34,7 +35,13 @@ def concat_n_images(image_path_list, rows, cols, save_file_path=None):
     if len(image_path_list) != rows * cols:
         raise ValueError("Number of images does not match the grid dimensions")
 
-    first_image = plt.imread(image_path_list[0])[:, :, :3]
+    # get the first image that is not None
+    first_image_path = next(
+        (image_path for image_path in image_path_list if image_path), None)
+    if first_image_path is None:
+        raise ValueError("No valid image paths found")
+
+    first_image = plt.imread(first_image_path)[:, :, :3]
     first_image_height, first_image_width, _ = first_image.shape
 
     output = []
@@ -42,10 +49,15 @@ def concat_n_images(image_path_list, rows, cols, save_file_path=None):
         row_images = []
         for c in range(cols):
             img_path = image_path_list[r * cols + c]
-            img = plt.imread(img_path)[:, :, :3]
-            img_height, img_width, _ = img.shape
-            if img_height != first_image_height or img_width != first_image_width:
-                img = resize_image(img, first_image_height, first_image_width)
+            # if img_path is None, fill with white image
+            if img_path is None:
+                img = np.ones((first_image_height, first_image_width, 3))
+            else:
+                img = plt.imread(img_path)[:, :, :3]
+                img_height, img_width, _ = img.shape
+                if img_height != first_image_height or img_width != first_image_width:
+                    img = resize_image(img, first_image_height,
+                                       first_image_width)
             row_images.append(img)
         output.append(np.hstack(row_images))
     output = np.vstack(output)
@@ -71,11 +83,11 @@ def resize_image(image, target_height, target_width):
     return resized_image
 
 
-def vis_fsaverage6():
-    pass
-
-
-def visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles):
+def visualize_stats(stats_list,
+                    stats_names,
+                    fig_file_paths,
+                    fig_titles,
+                    space='DK68'):
     """
     Visualize the stats using MATLAB script.
     Firstly, load the [68, 1] statistic (one scalar for each ROI).
@@ -86,6 +98,7 @@ def visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles):
         stats_names (Union[str, List[str]]): The list of names of the statistics.
         fig_file_paths (Union[str, List[str]]): The list of file paths to save the visualizations.
         fig_titles (Union[str, List[str]]): The list of titles of the visualizations.
+        space (str, optional): The space of the statistics. Can be one of ['DK68', 'fs5'] Defaults to 'DK68'.
 
     Raises:
         Exception: If MATLAB encounters an error or terminates.
@@ -107,7 +120,8 @@ def visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles):
             f"load('{convert_to_mat(stats_data, stats_name)}', '{stats_name}')"
         )
         commands.append(
-            f"vis_DK68_param({stats_name}, '{fig_file_path}', '{fig_title}')")
+            f"vis_{space}_param({stats_name}, '{fig_file_path}', '{fig_title}')"
+        )
 
     run_matlab_commands(commands)
     print("Visualizations saved to:", fig_file_paths)
@@ -159,7 +173,7 @@ def plot_sim_fc_fcd(
         param_idx (int): Index of the parameter to plot.
     """
     sim_res_dir = get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx)
-    sim_res_path = get_best_params_sim_res_path('train', 'train', sim_res_dir)
+    sim_res_path = get_best_params_sim_res_path(phase, phase, sim_res_dir)
 
     sim_res = torch.load(sim_res_path, map_location='cpu')
     fc_sim = sim_res['fc_sim'][param_idx]
@@ -315,6 +329,90 @@ def ttest_1samp_n_plot(list_1,
         plt.close()
         print("Boxplot figure saved.")
     return 0
+
+
+############################################################
+# Visualize param vector
+############################################################
+def vis_best_param_vector(save_dict_path: str,
+                          save_fig_dir: str,
+                          corr_with_myelin_gradient: bool = True):
+    save_dict = torch.load(save_dict_path, map_location='cpu')
+    param_vector = save_dict['parameter'][:, 0]
+    wEE = param_vector[:NUM_ROI]
+    wEI = param_vector[NUM_ROI:2 * NUM_ROI]
+    sigma = param_vector[2 * NUM_ROI + 1:]
+    param_dict = {'wEE': wEE, 'wEI': wEI, 'sigma': sigma}
+
+    os.makedirs(save_fig_dir, exist_ok=True)
+
+    train_myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
+    train_rsfc_gradient = get_HCPYA_group_rsfc_gradient(0,
+                                                        343).flatten().numpy()
+
+    train_myelin_fig_dir = get_emp_fig_dir('HCPYA', 'all_participants',
+                                           'myelin')
+    train_myelin_fig_path = os.path.join(train_myelin_fig_dir,
+                                         "myelin_train.png")
+    train_rsfc_gradient_fig_dir = get_emp_fig_dir('HCPYA', 'all_participants',
+                                                  'rsfc_gradient')
+    train_rsfc_gradient_fig_path = os.path.join(train_rsfc_gradient_fig_dir,
+                                                "rsfc_gradient_train.png")
+
+    stats_list = [train_myelin, train_rsfc_gradient]
+    stats_names = ['myelin_train', 'rsfc_gradient_train']
+    fig_file_paths = [train_myelin_fig_path, train_rsfc_gradient_fig_path]
+    fig_titles = ['myelin in train', 'rsfc gradient in train']
+    param_fig_paths = []
+    myelin_param_scatter_paths = []
+    rsfc_gradient_param_scatter_paths = []
+
+    param_names = ['wEE', 'wEI', 'sigma']
+    if torch.all(sigma == sigma[0]):
+        # ignore sigma if all sigma are the same
+        param_names = ['wEE', 'wEI']
+
+    for param_name in param_names:
+        param = param_dict[param_name]
+        stats_list.append(param)
+        stats_names.append(f'{param_name}')
+        param_fig_path = os.path.join(save_fig_dir,
+                                      f"{param_name}_surf_map.png")
+        fig_file_paths.append(param_fig_path)
+        param_fig_paths.append(param_fig_path)
+        fig_titles.append(f'{param_name}')
+
+        if corr_with_myelin_gradient:
+            # scatter plot myelin and rsfc gradient with the param
+            myelin_param_scatter_paths.append(
+                os.path.join(save_fig_dir, f"myelin_{param_name}_scatter.png"))
+            plot_scatter(param, train_myelin, param_name, 'myelin in train',
+                         f'myelin in train vs. {param_name}',
+                         myelin_param_scatter_paths[-1], False, True, True)
+            rsfc_gradient_param_scatter_paths.append(
+                os.path.join(save_fig_dir,
+                             f"rsfc_gradient_{param_name}_scatter.png"))
+            plot_scatter(param, train_rsfc_gradient, param_name,
+                         'rsfc gradient in train',
+                         f'rsfc gradient in train vs. {param_name}',
+                         rsfc_gradient_param_scatter_paths[-1], False, True,
+                         True)
+
+    visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles)
+
+    if corr_with_myelin_gradient:
+        image_path_list = [None] + param_fig_paths + [train_myelin_fig_path] + myelin_param_scatter_paths + \
+                          [train_rsfc_gradient_fig_path] + rsfc_gradient_param_scatter_paths
+        merged_img_path = os.path.join(
+            save_fig_dir,
+            "vis_best_param_vector_corr_with_myelin_gradient.png")
+        concat_n_images(image_path_list, 3,
+                        len(param_names) + 1, merged_img_path)
+    else:
+        image_path_list = param_fig_paths
+        merged_img_path = os.path.join(save_fig_dir,
+                                       "vis_best_param_vector.png")
+        concat_n_images(image_path_list, 1, len(param_names), merged_img_path)
 
 
 ############################################################
@@ -548,7 +646,7 @@ def plot_train_loss(ds_name,
                             seed_idx,
                             group_idx,
                             epoch_idx,
-                            apply_sort=True)
+                            apply_sort=False)
 
         corr_losses = d['corr_loss'][:lowest_top_k]
         corr_list.append(torch.mean(corr_losses).item())
@@ -593,6 +691,52 @@ def plot_train_loss(ds_name,
     plt.savefig(save_fig_path)
     plt.close()
     print('Saved to:', save_fig_path)
+
+
+def plot_test_losses(ds_name,
+                     target,
+                     trial_indices,
+                     trial_names,
+                     loss_types=[
+                         'total_loss', 'corr_loss', 'old_l1_loss',
+                         'MAE_l1_loss', 'ks_loss'
+                     ]):
+    """
+    Plot the test losses of different trails
+
+    For each loss from loss_types, draw a box plot, where each box represents a trial,
+    and every dot in a box represents 1 of the 10 param vectors selected for testing under the setup of the trial.
+
+    This function assumes that the target's directory contains
+    pth files at f'test/trial{trial_idx}/seed_best_among_all/best_from_test.pth'.
+    Each of the file contains a dictionary, with keys ['corr_loss', 'l1_loss', 'old_l1_loss', 'MAE_l1_loss', 'ks_loss']
+
+    Args:
+        ds_name (str): The dataset name.
+        target (str): The target name.
+        trial_indices (list): The list of trial indices.
+        trial_names (list): The list of trial names.
+        loss_types (list, optional): The list of loss types to plot.
+    """
+    for loss_type in loss_types:
+        fig_save_dir = get_losses_fig_dir(ds_name, target)
+        fig_save_path = os.path.join(fig_save_dir, f'test_{loss_type}.png')
+
+        plt.figure()
+        all_trials_losses = []
+        for trial_idx in trial_indices:
+            save_dict_dir = get_run_dir(ds_name, target, 'test', trial_idx,
+                                        '_best_among_all')
+            save_dict = torch.load(os.path.join(save_dict_dir,
+                                                'best_from_test.pth'),
+                                   map_location='cpu')
+            losses = save_dict[loss_type]
+            all_trials_losses.append(losses.numpy())
+        plt.boxplot(all_trials_losses, labels=trial_names)
+        plt.xlabel('Setups')
+        plt.ylabel(loss_type)
+        plt.savefig(fig_save_path)
+        plt.close()
 
 
 ############################################################
@@ -704,7 +848,7 @@ def boxplot_train_r_E(ds_name,
                                      seed_idx,
                                      group_idx,
                                      epoch_idx,
-                                     apply_sort=True)
+                                     apply_sort=False)
         # extract the r_E for each of the top_k children at each ROI at each epoch from the 'r_E_for_valid_params' tensor
         ROI_r_E_at_epoch = saved_dict['r_E_for_valid_params']
         if top_k is not None:
@@ -757,7 +901,7 @@ def export_train_r_E(ds_name,
                                  seed_idx,
                                  group_idx,
                                  epoch_idx,
-                                 apply_sort=True)
+                                 apply_sort=False)
 
     # extract the r_E at each ROI at each epoch for the best child from the 'r_E_for_valid_params' tensor
     r_E_at_epoch = saved_dict[
@@ -866,20 +1010,40 @@ def merge_train_dict_across_seed(ds_name,
     return merged_dict
 
 
-def plot_scatter(x, y, xlabel, ylabel, title, fig_file_path):
+def plot_scatter(x: np.ndarray,
+                 y: np.ndarray,
+                 xlabel,
+                 ylabel,
+                 title,
+                 fig_file_path,
+                 show_mean=True,
+                 show_corr=True,
+                 show_reg_line=True):
     plt.figure()
     plt.scatter(x, y)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
+    plt.xlabel(xlabel, fontsize=14)
+    plt.ylabel(ylabel, fontsize=14)
+    plt.title(title, fontsize=14)
 
     # Add mean values as labels
-    x_mean = torch.mean(x).item()
-    y_mean = torch.mean(y).item()
-    plt.text(x_mean,
-             y_mean,
-             f'Mean: ({x_mean:.3f}, {y_mean:.3f})',
-             color='red')
+    if show_mean:
+        x_mean = np.mean(x)
+        y_mean = np.mean(y)
+        plt.text(x_mean,
+                 y_mean,
+                 f'Mean: ({x_mean:.3f}, {y_mean:.3f})',
+                 color='red')
+
+    # Add correlation coefficient in the title
+    if show_corr:
+        corr = np.corrcoef(x, y)[0, 1]
+        plt.title(f'{title} (r={corr:.3f})', fontsize=14)
+
+    # Add regression line
+    if show_reg_line:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        plt.plot(x, slope * x + intercept, 'r', label='fitted line')
+        # plt.legend()
 
     plt.savefig(fig_file_path)
     plt.close()
@@ -936,7 +1100,8 @@ def scatter_loss_vs_r_E(ds_name,
         plot_scatter(
             mean_r_E, loss_dict[cost_type], 'mean r_E', f'{cost_type} loss',
             f'{target_str} {group_idx_str} {cost_type} loss vs r_E {title_postfix}',
-            os.path.join(fig_dir, f'{cost_type}{fig_file_postfix}'))
+            os.path.join(fig_dir,
+                         f'{cost_type}{fig_file_postfix}'), True, False, False)
 
     scatter_helper('total')
     scatter_helper('corr')

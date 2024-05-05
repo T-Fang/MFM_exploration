@@ -17,7 +17,9 @@ set(gca, 'XTickLabel', [])
 set(gca, 'LineWidth', 2)
 set(gca,'xtick',[])
 set(gca,'ytick',[])
-set(get(gca, 'title'), 'string', title)
+% set(get(gca, 'title'), 'string', title)
+titleHandle = get(gca, 'title');
+set(titleHandle, 'string', title, 'FontSize', 24);
 % title(gca, title)
 
 % print(save_file_path, '-dsvg', '-r0')
