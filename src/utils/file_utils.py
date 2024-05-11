@@ -28,7 +28,7 @@ def get_emp_fig_dir(ds_name, target, fig_type):
 
 def get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx):
     sim_fig_dir = get_fig_dir_in_logs(ds_name, target,
-                                      f'best_from_{phase}_simulation',
+                                      f'best_from_prev_phase_sim_on_{phase}',
                                       trial_idx, seed_idx)
 
     return sim_fig_dir
@@ -85,9 +85,9 @@ def get_best_params_file_path(phase, save_dir):
     return os.path.join(save_dir, f'best_from_{phase}.pth')
 
 
-def get_best_params_sim_res_path(param_phase, sim_phase, save_dir):
+def get_best_params_sim_res_path(sim_phase, save_dir):
     return os.path.join(save_dir,
-                        f'best_from_{param_phase}_sim_on_{sim_phase}.pth')
+                        f'best_from_prev_phase_sim_on_{sim_phase}.pth')
 
 
 def get_val_file_path(val_dir, epoch_idx):
@@ -112,6 +112,22 @@ def get_fig_path_in_logs(ds_name, target, fig_type, trial_idx, seed_idx,
 ############################################################
 # Load intermediate files
 ############################################################
+def load_best_params(
+    ds_name: str,
+    target: str,
+    phase: int,
+    trial_idx: int,
+    seed_idx: int | str,
+):
+    """
+    Load the best parameters from the given phase.
+    """
+    save_dir = get_run_dir(ds_name, target, phase, trial_idx, seed_idx)
+    best_params_file_path = get_best_params_file_path(phase, save_dir)
+    if not os.path.exists(best_params_file_path):
+        return None
+    best_params = torch.load(best_params_file_path, map_location='cpu')
+    return best_params
 
 
 def load_train_dict(ds_name,
@@ -191,18 +207,32 @@ def load_train_dict(ds_name,
     return saved_dict
 
 
-def sort_dict_by_total_loss(saved_dict, top_k=None):
-    total_loss = saved_dict['total_loss']
-    sorted_index = torch.argsort(total_loss, descending=False)
-    for k, v in saved_dict.items():
-        if v.ndim == 1:
-            saved_dict[k] = v[sorted_index] if top_k is None else \
-                v[sorted_index][:top_k]
-        elif v.ndim == 2:
-            saved_dict[k] = v[:, sorted_index] if top_k is None else \
-                v[:, sorted_index][:, :top_k]
+def get_values_at_indices(saved_dict: dict, indices=None):
+    """
+    Get the values at the given indices from the given dictionary.
+    """
+    if indices is None:
+        return saved_dict
+    new_dict = {}
+    for key, value in saved_dict.items():
+        if not torch.is_tensor(value):
+            value = torch.as_tensor(value)
+
+        assert value.ndim == 1 or value.ndim == 2, f"The value for {key} is not a 1D or 2D tensor"
+        value = value[indices] if value.ndim == 1 else value[:, indices]
+        new_dict[key] = value
 
     return saved_dict
+
+
+def sort_dict_by_total_loss(saved_dict, top_k=None):
+    total_loss = saved_dict['total_loss']
+    sorted_indices = torch.argsort(total_loss, descending=False)
+    new_save_dict = get_values_at_indices(saved_dict, sorted_indices)
+    if top_k is not None:
+        new_save_dict = get_values_at_indices(new_save_dict, range(top_k))
+
+    return new_save_dict
 
 
 def get_first_k_values(values, k=None):
@@ -232,6 +262,7 @@ def get_first_k_values(values, k=None):
 
 
 def combine_all_param_dicts(paths_to_dicts: list[str],
+                            is_params_sorted: bool = True,
                             top_k_per_dict: int = None,
                             top_k_among_all_dicts: int = None,
                             combined_dict_save_path: str = None):
@@ -243,8 +274,8 @@ def combine_all_param_dicts(paths_to_dicts: list[str],
         if not os.path.exists(path_to_dict):
             raise Exception("save file doesn't exist:", path_to_dict)
         d = torch.load(path_to_dict, map_location='cpu')
-        # d['parameter'] = d['parameter'][:, d[
-        #     'valid_param_indices']]  # Now the param_vectors are sorted by default
+        if not is_params_sorted:
+            d['parameter'] = d['parameter'][:, d['valid_param_indices']]
         for key, value in d.items():
             if key not in combined_dict:
                 combined_dict[key] = []

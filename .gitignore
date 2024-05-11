@@ -4,3 +4,4 @@ tmp/
 *.annot
 data/
 reports/figures/
+src/utils/statannotations

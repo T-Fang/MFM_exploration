@@ -2,15 +2,20 @@ import os
 import subprocess
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
-from scipy import stats, io as sio
+import seaborn as sns
 import torch
 import cv2
+from matplotlib import pyplot as plt
+from scipy import stats, io as sio
+from itertools import combinations
 
-from src.basic.constants import MATLAB_SCRIPT_DIR, NUM_ROI
-from src.utils.file_utils import convert_to_mat, get_HCPYA_group_myelin, get_HCPYA_group_rsfc_gradient, \
+from src.basic.constants import HCPYA_1029_DATA_DIR, MATLAB_SCRIPT_DIR, NUM_ROI, SUBJECT_ID_RANGE
+from src.utils.file_utils import convert_to_mat, get_HCPYA_group_emp_TC, get_HCPYA_group_myelin, get_HCPYA_group_rsfc_gradient, \
     get_best_params_sim_res_path, get_emp_fig_dir, get_fig_dir_in_logs, get_fig_path_in_logs, \
-    get_losses_fig_dir, get_run_dir, get_sim_res_dir, get_target_dir, load_all_val_dicts, load_train_dict, get_sim_res_path
+    get_losses_fig_dir, get_run_dir, get_sim_res_dir, get_target_dir, get_vis_param_dir, load_all_val_dicts, \
+    load_best_params, load_train_dict, get_sim_res_path, get_values_at_indices
+from src.utils.val_utils import get_agg_seeds_range
+from statannotations.Annotator import Annotator
 
 ############################################################
 # Visualization related
@@ -156,13 +161,22 @@ def run_matlab_commands(commands):
         print(result.stdout)
 
 
+def load_sim_res(ds_name: str, target: str, phase: int, trial_idx: int,
+                 seed_idx: int | str):
+    sim_res_dir = get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx)
+    sim_res_path = get_best_params_sim_res_path(phase, sim_res_dir)
+
+    sim_res = torch.load(sim_res_path, map_location='cpu')
+    return sim_res
+
+
 # * Plot FC and FCD
 def plot_sim_fc_fcd(
     ds_name: str,
     target: str,
     phase: int,
     trial_idx: int,
-    seed_idx: int,
+    seed_idx: int | str,
     param_idx: int,
 ):
     """
@@ -172,10 +186,7 @@ def plot_sim_fc_fcd(
         sim_res_path (str): Path to the simulation result.
         param_idx (int): Index of the parameter to plot.
     """
-    sim_res_dir = get_sim_res_dir(ds_name, target, phase, trial_idx, seed_idx)
-    sim_res_path = get_best_params_sim_res_path(phase, phase, sim_res_dir)
-
-    sim_res = torch.load(sim_res_path, map_location='cpu')
+    sim_res = load_sim_res(ds_name, target, phase, trial_idx, seed_idx)
     fc_sim = sim_res['fc_sim'][param_idx]
     fcd_sim = sim_res['fcd_sim'][param_idx]
 
@@ -222,6 +233,24 @@ def compare_fcd(sim_fcd_path, emp_fcd_path):
                     sim_fcd_path.replace('.csv', '_compare_with_emp.png'))
 
 
+def compare_fc_fcd(ds_name, target, phase, trial_idx, seed_idx, param_idx):
+    plot_sim_fc_fcd(ds_name, target, phase, trial_idx, seed_idx, param_idx)
+    sim_fc_path = get_sim_res_path(ds_name, target, phase, trial_idx, seed_idx,
+                                   'sim_fc.csv')
+    sim_fcd_path = get_sim_res_path(ds_name, target, phase, trial_idx,
+                                    seed_idx, 'sim_fcd.csv')
+    emp_fc_fig_dir = get_emp_fig_dir(ds_name, target, 'FC')
+    emp_fcd_fig_dir = get_emp_fig_dir(ds_name, target, 'FCD')
+    range_start, range_end = SUBJECT_ID_RANGE[ds_name][phase]
+    emp_fc_path = os.path.join(emp_fc_fig_dir,
+                               f'group_emp_fc_{range_start}_{range_end}.csv')
+    emp_fcd_path = os.path.join(
+        emp_fcd_fig_dir, f'group_emp_fcd_{range_start}_{range_end}.csv')
+
+    compare_fc(sim_fc_path, emp_fc_path)
+    compare_fcd(sim_fcd_path, emp_fcd_path)
+
+
 def draw_heatmap(heatmap_data_paths, titles, save_file_paths):
     """
     Draw heatmaps from the heatmap data files.
@@ -249,6 +278,100 @@ def draw_heatmap(heatmap_data_paths, titles, save_file_paths):
 
     run_matlab_commands(commands)
     print("Heatmaps saved to:", save_file_paths)
+
+
+def plot_bold_TC(bold_TC: torch.Tensor | np.ndarray, fig_file_path: str):
+    """
+    Plot the time course of the given BOLD signal, which has the shape (num_ROI, num_time_points).
+    """
+    plt.rcParams.update({'font.size': 30})
+    plt.figure(figsize=(60, 15))
+    for i, bold_TC_ROI in enumerate(bold_TC):
+        # color = plt.cm.viridis(i / 68)  # Use a colormap for colors
+        # plt.plot(bold_TC[i], label=f"Time Series {i+1}", color=color)
+        plt.plot(bold_TC_ROI, label=f"Time Series {i+1}", linewidth=0.3)
+    plt.xlabel('Time points')
+    plt.ylabel('BOLD signal')
+    plt.title('BOLD time course')
+    plt.xlim(0, bold_TC.shape[1])  # Limit the x-axis range from 0 to 1200
+    plt.tight_layout()
+    plt.savefig(fig_file_path)
+    plt.close()
+    print("BOLD time course saved to:", fig_file_path)
+
+
+def plot_sim_bold_TC(ds_name: str,
+                     target: str,
+                     phase: int,
+                     trial_idx: int,
+                     seed_idx: int | str,
+                     param_idx: int = 0,
+                     fig_file_path: str = None):
+    """
+    Plot the time course of the simulated BOLD signal, which has the shape (num_ROI, num_time_points).
+    """
+    sim_res = load_sim_res(ds_name, target, phase, trial_idx, seed_idx)
+    bold_TC = sim_res['bold_TC_sim'][:, param_idx]
+
+    if fig_file_path is None:
+        fig_file_path = get_sim_res_path(ds_name, target, phase, trial_idx,
+                                         seed_idx, 'bold_TC_sim.png')
+    plot_bold_TC(bold_TC, fig_file_path)
+
+
+def plot_emp_bold_TC(range_start: int,
+                     range_end: int,
+                     fig_file_path: str = None):
+    """
+    Plot the time course of the simulated BOLD signal, which has the shape (num_ROI, num_time_points).
+    """
+
+    group_TC_save_path = os.path.join(
+        HCPYA_1029_DATA_DIR, 'TC', 'group_TC',
+        f'group_emp_TC_{range_start}_{range_end}.csv')
+
+    # if group_TC_save_path does not exist
+    if not os.path.exists(group_TC_save_path):
+        bold_TC = get_HCPYA_group_emp_TC(range_start=range_start,
+                                         range_end=range_end)
+    else:
+        bold_TC = pd.read_csv(group_TC_save_path, header=None).values
+
+    if fig_file_path is None:
+        fig_file_path = group_TC_save_path.replace('.csv', '.png')
+
+    plot_bold_TC(bold_TC, fig_file_path)
+
+
+def plot_corr_matrix_for_best_params(ds_name: str, target: str, phase: int,
+                                     trial_idx: int, seed_idx: int | str):
+    """
+    Plot the correlation matrix for the best parameters.
+    """
+    best_params_dict = load_best_params(ds_name, target, phase, trial_idx,
+                                        seed_idx)
+    best_params = best_params_dict['parameter']
+    wEEs = best_params[:NUM_ROI]
+    wEIs = best_params[NUM_ROI:2 * NUM_ROI]
+    sigmas = best_params[2 * NUM_ROI + 1:]
+
+    for param, param_name in zip([wEEs, wEIs, sigmas, best_params],
+                                 ['wEE', 'wEI', 'sigma', 'all_params']):
+        corr_matrix = np.corrcoef(param.T)
+        plt.figure()
+        heatmap = sns.heatmap(
+            corr_matrix, annot=True
+        )  # ! To have annotations, either downgrade matplotlib to 3.7 or upgrade seaborn to 0.13
+        heatmap.set_title(f'Correlation matrix for {param_name}')
+        # plt.matshow(corr_matrix, cmap='coolwarm', vmin=-1, vmax=1)
+        # plt.colorbar()
+        # plt.title(f'Correlation matrix for {param_name}')
+        fig_file_path = get_fig_path_in_logs(
+            ds_name, target, f'corr_matrix_for_best_{phase}_params', trial_idx,
+            seed_idx, f'corr_matrix_{param_name}.png')
+        plt.savefig(fig_file_path)
+        plt.close()
+        print(f"Correlation matrix for {param_name} saved to:", fig_file_path)
 
 
 def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
@@ -334,17 +457,23 @@ def ttest_1samp_n_plot(list_1,
 ############################################################
 # Visualize param vector
 ############################################################
-def vis_best_param_vector(save_dict_path: str,
-                          save_fig_dir: str,
+def vis_best_param_vector(ds_name: str,
+                          target: str,
+                          phase: int,
+                          trial_idx: int,
+                          seed_idx: int | str,
                           corr_with_myelin_gradient: bool = True):
-    save_dict = torch.load(save_dict_path, map_location='cpu')
+    vis_param_dir = get_vis_param_dir(ds_name, target, phase, trial_idx,
+                                      seed_idx)
+
+    save_dict = load_best_params(ds_name, target, phase, trial_idx, seed_idx)
     param_vector = save_dict['parameter'][:, 0]
     wEE = param_vector[:NUM_ROI]
     wEI = param_vector[NUM_ROI:2 * NUM_ROI]
     sigma = param_vector[2 * NUM_ROI + 1:]
     param_dict = {'wEE': wEE, 'wEI': wEI, 'sigma': sigma}
 
-    os.makedirs(save_fig_dir, exist_ok=True)
+    os.makedirs(vis_param_dir, exist_ok=True)
 
     train_myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
     train_rsfc_gradient = get_HCPYA_group_rsfc_gradient(0,
@@ -376,7 +505,7 @@ def vis_best_param_vector(save_dict_path: str,
         param = param_dict[param_name]
         stats_list.append(param)
         stats_names.append(f'{param_name}')
-        param_fig_path = os.path.join(save_fig_dir,
+        param_fig_path = os.path.join(vis_param_dir,
                                       f"{param_name}_surf_map.png")
         fig_file_paths.append(param_fig_path)
         param_fig_paths.append(param_fig_path)
@@ -385,12 +514,13 @@ def vis_best_param_vector(save_dict_path: str,
         if corr_with_myelin_gradient:
             # scatter plot myelin and rsfc gradient with the param
             myelin_param_scatter_paths.append(
-                os.path.join(save_fig_dir, f"myelin_{param_name}_scatter.png"))
+                os.path.join(vis_param_dir,
+                             f"myelin_{param_name}_scatter.png"))
             plot_scatter(param, train_myelin, param_name, 'myelin in train',
                          f'myelin in train vs. {param_name}',
                          myelin_param_scatter_paths[-1], False, True, True)
             rsfc_gradient_param_scatter_paths.append(
-                os.path.join(save_fig_dir,
+                os.path.join(vis_param_dir,
                              f"rsfc_gradient_{param_name}_scatter.png"))
             plot_scatter(param, train_rsfc_gradient, param_name,
                          'rsfc gradient in train',
@@ -404,13 +534,13 @@ def vis_best_param_vector(save_dict_path: str,
         image_path_list = [None] + param_fig_paths + [train_myelin_fig_path] + myelin_param_scatter_paths + \
                           [train_rsfc_gradient_fig_path] + rsfc_gradient_param_scatter_paths
         merged_img_path = os.path.join(
-            save_fig_dir,
+            vis_param_dir,
             "vis_best_param_vector_corr_with_myelin_gradient.png")
         concat_n_images(image_path_list, 3,
                         len(param_names) + 1, merged_img_path)
     else:
         image_path_list = param_fig_paths
-        merged_img_path = os.path.join(save_fig_dir,
+        merged_img_path = os.path.join(vis_param_dir,
                                        "vis_best_param_vector.png")
         concat_n_images(image_path_list, 1, len(param_names), merged_img_path)
 
@@ -693,14 +823,17 @@ def plot_train_loss(ds_name,
     print('Saved to:', save_fig_path)
 
 
-def plot_test_losses(ds_name,
-                     target,
-                     trial_indices,
-                     trial_names,
-                     loss_types=[
-                         'total_loss', 'corr_loss', 'old_l1_loss',
-                         'MAE_l1_loss', 'ks_loss'
-                     ]):
+# @DeprecationWarning
+def plot_test_losses_old(ds_name,
+                         target,
+                         trial_indices,
+                         trial_names,
+                         seed_idx,
+                         loss_types=[
+                             'total_loss', 'corr_loss', 'old_l1_loss',
+                             'MAE_l1_loss', 'ks_loss'
+                         ],
+                         use_old_total_loss: bool = True):
     """
     Plot the test losses of different trails
 
@@ -708,7 +841,7 @@ def plot_test_losses(ds_name,
     and every dot in a box represents 1 of the 10 param vectors selected for testing under the setup of the trial.
 
     This function assumes that the target's directory contains
-    pth files at f'test/trial{trial_idx}/seed_best_among_all/best_from_test.pth'.
+    pth files at f'test/trial{trial_idx}/seed{seed_idx}/best_from_test.pth'.
     Each of the file contains a dictionary, with keys ['corr_loss', 'l1_loss', 'old_l1_loss', 'MAE_l1_loss', 'ks_loss']
 
     Args:
@@ -716,27 +849,162 @@ def plot_test_losses(ds_name,
         target (str): The target name.
         trial_indices (list): The list of trial indices.
         trial_names (list): The list of trial names.
+        seed_idx (int): The seed index.
         loss_types (list, optional): The list of loss types to plot.
+        use_old_total_loss (bool, optional): Whether to use the old total loss, which is corr_loss+old_l1_loss+ks_loss.
     """
-    for loss_type in loss_types:
-        fig_save_dir = get_losses_fig_dir(ds_name, target)
-        fig_save_path = os.path.join(fig_save_dir, f'test_{loss_type}.png')
 
+    setup_losses = {'setup_name': []}
+    for loss_type in loss_types:
+        setup_losses[loss_type] = []
+
+    for trial_idx, trial_name in zip(trial_indices, trial_names):
+
+        save_dict = load_best_params(ds_name, target, 'test', trial_idx,
+                                     seed_idx)
+        if use_old_total_loss:
+            save_dict['total_loss'] = save_dict['corr_loss'] + save_dict[
+                'old_l1_loss'] + save_dict['ks_loss']
+
+        setup_losses['setup_name'] += [trial_name] * len(
+            save_dict['total_loss'])
+        for loss_type in loss_types:
+            setup_losses[loss_type] += save_dict[loss_type].tolist()
+
+    setup_losses_df = pd.DataFrame(setup_losses)
+
+    plot_setup_losses(setup_losses_df, get_losses_fig_dir(ds_name, target))
+
+
+def plot_setup_losses(setup_losses_df: pd.DataFrame, fig_save_dir: str):
+    columns = setup_losses_df.columns
+    # find columns that ends with '_loss'
+    trial_names = setup_losses_df['setup_name'].unique()
+    trial_pairs = list(combinations(trial_names, 2))
+    loss_columns = [col for col in columns if col.endswith('_loss')]
+    for loss_type in loss_columns:
         plt.figure()
-        all_trials_losses = []
-        for trial_idx in trial_indices:
-            save_dict_dir = get_run_dir(ds_name, target, 'test', trial_idx,
-                                        '_best_among_all')
-            save_dict = torch.load(os.path.join(save_dict_dir,
-                                                'best_from_test.pth'),
-                                   map_location='cpu')
-            losses = save_dict[loss_type]
-            all_trials_losses.append(losses.numpy())
-        plt.boxplot(all_trials_losses, labels=trial_names)
+        ax = sns.boxplot(data=setup_losses_df,
+                         x='setup_name',
+                         y=loss_type,
+                         order=trial_names,
+                         orient='v')
         plt.xlabel('Setups')
-        plt.ylabel(loss_type)
+        # plt.ylabel(loss_type)
+        plt.tight_layout()
+        fig_save_path = os.path.join(fig_save_dir, f'test_{loss_type}.png')
         plt.savefig(fig_save_path)
+        annotator = Annotator(ax,
+                              trial_pairs,
+                              data=setup_losses_df,
+                              x='setup_name',
+                              y=loss_type,
+                              order=trial_names)
+        annotator.configure(
+            test='t-test_ind',
+            text_format='full',
+            loc='inside',
+            comparisons_correction=None,
+            # text_offset=8,
+            show_test_name=False,
+            line_height=0.05)
+        annotator.apply_and_annotate()
+
+        plt.tight_layout()
+        plt.savefig(fig_save_path.replace('.png', '_with_p_value.png'))
+
         plt.close()
+
+
+def get_indices(lst, targets):
+    """
+    Get the indices of the targets in the list.
+    # Example usage:
+    my_list = [1, 'apple', 3, 'banana', 2, 'orange']
+    target = ['apple', 2]
+    result = get_indices(my_list, target)
+    print(result)  # [1, 4]
+    """
+    indices = []
+    for target in targets:
+        if target in lst:
+            indices.append(lst.index(target))
+    return indices
+
+
+def get_best_val_param_in_test(test_save_dict, top_k_val_params: int = 1):
+    """
+    Get the saved test results for the best param vector with the lowest validation loss in the test save dict
+
+    Args:
+        test_save_dict (dict): The test save dictionary.
+    """
+    # find the indices for top k param vectors with the lowest validation loss in the test save dict
+    val_indices_in_test = get_indices(test_save_dict['valid_param_indices'],
+                                      range(top_k_val_params))
+    best_val_param_dict = get_values_at_indices(test_save_dict,
+                                                val_indices_in_test)
+    return best_val_param_dict
+
+
+def plot_test_losses(ds_name: str,
+                     target: str,
+                     trial_indices,
+                     trial_names: list[str],
+                     agg_seeds_num: int,
+                     loss_types=[
+                         'total_loss', 'corr_loss', 'old_l1_loss',
+                         'MAE_l1_loss', 'ks_loss'
+                     ],
+                     use_old_total_loss: bool = True):
+    """
+    Plot the test losses of different trails
+
+    For each loss from loss_types, draw a box plot, where each box represents a trial,
+    and every dot in a box represents 1 of the 10 param vectors selected for testing under the setup of the trial.
+
+    This function assumes that the target's directory contains
+    pth files at f'test/trial{trial_idx}/seed{seed_idx}/best_from_test.pth'.
+    Each of the file contains a dictionary, with keys ['corr_loss', 'l1_loss', 'old_l1_loss', 'MAE_l1_loss', 'ks_loss']
+
+    Args:
+        ds_name (str): The dataset name.
+        target (str): The target name.
+        trial_indices (list): The list of trial indices.
+        trial_names (list): The list of trial names.
+        seed_idx (int): The seed index.
+        loss_types (list, optional): The list of loss types to plot.
+        use_old_total_loss (bool, optional): Whether to use the old total loss, which is corr_loss+old_l1_loss+ks_loss.
+    """
+
+    setup_losses = {'setup_name': []}
+    for loss_type in loss_types:
+        setup_losses[loss_type] = []
+
+    for trial_idx, trial_name in zip(trial_indices, trial_names):
+        agg_seed_idx = 0
+        while True:
+            agg_seed_idx += 1
+            seeds_range, agg_seed_label = get_agg_seeds_range(
+                agg_seeds_num, agg_seed_idx)
+            save_dict = load_best_params(ds_name, target, 'test', trial_idx,
+                                         agg_seed_label)
+            if save_dict is None:
+                break
+
+            best_val_param_dict = get_best_val_param_in_test(
+                save_dict, top_k_val_params=1)
+            if use_old_total_loss:
+                best_val_param_dict['total_loss'] = best_val_param_dict['corr_loss'] \
+                    + best_val_param_dict['old_l1_loss'] + best_val_param_dict['ks_loss']
+
+            setup_losses['setup_name'].append(trial_name)
+            for loss_type in loss_types:
+                setup_losses[loss_type].append(
+                    best_val_param_dict[loss_type].item())
+
+    setup_losses_df = pd.DataFrame(setup_losses)
+    plot_setup_losses(setup_losses_df, get_losses_fig_dir(ds_name, target))
 
 
 ############################################################

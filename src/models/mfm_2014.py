@@ -346,8 +346,8 @@ class MfmModel2014:
         # L1 version 2: mean(abs) or MAE
         MAE_l1_loss = torch.mean(torch.abs(vec_emp - vec_sim), dim=1)
 
-        # l1_loss = old_l1_loss
-        l1_loss = MAE_l1_loss
+        l1_loss = old_l1_loss
+        # l1_loss = MAE_l1_loss
         # * TODO: experiment with different l1 cost
         # L2 or MSE
         # l1_loss = torch.mean(torch.square(vec_emp - vec_sim), dim=1)

@@ -8,16 +8,20 @@ import sys
 import datetime
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.scripts.Hybrid_CMA_ES import CMAESTrainer, ModelHandler, CMAESValidator, CMAESTester, \
+from src.scripts.Hybrid_CMA_ES import CMAESTrainer, CMAESValidator, CMAESTester, \
     simulate_fc_fcd, train_help_function, simulate_fc_fcd_mat
 from src.utils import tzeng_func
 from src.utils.init_utils import set_torch_default
 from src.basic.constants import CONFIG_DIR, LOG_DIR
 from src.utils.file_utils import get_HCPYA_group_stats, get_HCPYA_group_stats_for_phase, get_best_params_file_path, get_sim_res_dir, get_run_dir, get_target_dir, combine_all_param_dicts  # noqa
+from src.utils.val_utils import get_prev_phase_best_params_path, get_curr_phase_save_dir
 from multiprocessing import Pool, set_start_method  # noqa: F401
 
 
 def apply_on_all_participants(phase, trial_idx, seed_idx):
+    USE_AGG_SEEDS = True  # whether we want to aggregate seeds during validation and test
+    AGG_SEEDS_NUM = 2  # the number of seeds to aggregate
+
     DS_NAME = 'HCPYA'
     set_torch_default()
 
@@ -50,35 +54,25 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
         print("Exit state: ", state)
 
     elif phase == 'val' or phase == 'test':
-        USE_ALL_SEEDS = True
-        if USE_ALL_SEEDS:
-            num_seeds = seed_idx
-            seed_idx = '_best_among_all'
-        prev_phase = ModelHandler.get_prev_phase(phase)
-        prev_phase_save_dir = get_run_dir(DS_NAME, TARGET,
-                                          ModelHandler.get_prev_phase(phase),
-                                          trial_idx, seed_idx)
-        prev_phase_best_params_path = get_best_params_file_path(
-            prev_phase, prev_phase_save_dir)
-        curr_phase_save_dir = get_run_dir(DS_NAME, TARGET, phase, trial_idx,
-                                          seed_idx)
-        # if we haven't saved best params from previous phase, get it from all seeds
-        print(prev_phase_best_params_path)
-        print(not os.path.exists(prev_phase_best_params_path))
-        if USE_ALL_SEEDS and not os.path.exists(prev_phase_best_params_path):
-            prev_phase_all_seeds_save_dir = [
-                get_run_dir(DS_NAME, TARGET, prev_phase, trial_idx, seed_i)
-                for seed_i in np.arange(1, num_seeds + 1)
-            ]
-            prev_phase_all_seeds_best_params_path = [
-                get_best_params_file_path(prev_phase, prev_phase_save_dir)
-                for prev_phase_save_dir in prev_phase_all_seeds_save_dir
-            ]
-            combine_all_param_dicts(
-                paths_to_dicts=prev_phase_all_seeds_best_params_path,
-                combined_dict_save_path=prev_phase_best_params_path)
+        prev_phase_best_params_path = get_prev_phase_best_params_path(
+            ds_name=DS_NAME,
+            target=TARGET,
+            phase=phase,
+            trial_idx=trial_idx,
+            seed_idx=seed_idx,
+            use_agg_seeds=USE_AGG_SEEDS,
+            agg_seeds_num=AGG_SEEDS_NUM)
 
         emp_stats = get_HCPYA_group_stats_for_phase(phase)
+        curr_phase_save_dir = get_curr_phase_save_dir(
+            ds_name=DS_NAME,
+            target=TARGET,
+            phase=phase,
+            trial_idx=trial_idx,
+            seed_idx=seed_idx,
+            use_agg_seeds=USE_AGG_SEEDS,
+            agg_seeds_num=AGG_SEEDS_NUM)
+
         if phase == 'val':
             model_handler = CMAESValidator(config, emp_stats,
                                            prev_phase_best_params_path,
@@ -90,33 +84,41 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
                                         curr_phase_save_dir)
             model_handler.test()
 
-    # check if phase starts with best_from
-    elif phase.startswith('best_from'):
-        USE_ALL_SEEDS = True
+    elif phase == 'best_from_train':
+        PHASE = 'train'
 
-        PHASE = phase.split('_')[-1]
-
-        if USE_ALL_SEEDS and (PHASE == 'val' or PHASE == 'test'):
-            seed_idx = '_best_among_all'
-
-        # Mainly for simulating the best param with the lowest {PHASE} loss
-        sim_res_dir = get_sim_res_dir(DS_NAME, TARGET, PHASE, trial_idx,
-                                      seed_idx)
-        prev_phase = ModelHandler.get_prev_phase(PHASE)
-        prev_phase_save_dir = get_run_dir(DS_NAME, TARGET, prev_phase,
-                                          trial_idx, seed_idx)
-        prev_phase_best_params_path = get_best_params_file_path(
-            prev_phase, prev_phase_save_dir)
         curr_phase_save_dir = get_run_dir(DS_NAME, TARGET, PHASE, trial_idx,
                                           seed_idx)
         emp_stats = get_HCPYA_group_stats_for_phase(PHASE)
 
-        if PHASE == 'train':
-            model_handler = CMAESTrainer(config=config,
-                                         emp_stats=emp_stats,
-                                         train_save_dir=curr_phase_save_dir)
-            model_handler.get_best_train_params(top_k_for_each_epoch=1)
-        elif PHASE == 'val':
+        model_handler = CMAESTrainer(config=config,
+                                     emp_stats=emp_stats,
+                                     train_save_dir=curr_phase_save_dir)
+        model_handler.get_best_train_params(top_k_for_each_epoch=1)
+
+    elif phase.startswith('best_from_prev_phase_sim_on'):
+
+        PHASE = phase.split('_')[-1]
+
+        curr_phase_save_dir = get_curr_phase_save_dir(
+            ds_name=DS_NAME,
+            target=TARGET,
+            phase=phase,
+            trial_idx=trial_idx,
+            seed_idx=seed_idx,
+            use_agg_seeds=USE_AGG_SEEDS,
+            agg_seeds_num=AGG_SEEDS_NUM)
+        emp_stats = get_HCPYA_group_stats_for_phase(PHASE)
+
+        prev_phase_best_params_path = get_prev_phase_best_params_path(
+            ds_name=DS_NAME,
+            target=TARGET,
+            phase=PHASE,
+            trial_idx=trial_idx,
+            seed_idx=seed_idx,
+            use_agg_seeds=USE_AGG_SEEDS,
+            agg_seeds_num=AGG_SEEDS_NUM)
+        if PHASE == 'val':
             model_handler = CMAESValidator(config, emp_stats,
                                            prev_phase_best_params_path,
                                            curr_phase_save_dir)
@@ -124,11 +126,17 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
             model_handler = CMAESTester(config, emp_stats,
                                         prev_phase_best_params_path,
                                         curr_phase_save_dir)
-        model_handler.sim_best_param_multi_times(sim_res_dir,
-                                                 10,
-                                                 get_FCD_matrix=True,
-                                                 get_bold=True,
-                                                 seed=None)
+
+        sim_res_dir = get_sim_res_dir(DS_NAME, TARGET, PHASE, trial_idx,
+                                      seed_idx)
+        model_handler.sim_best_param_multi_times(
+            sim_res_dir,
+            10,
+            use_param_from_prev_phase=True,
+            param_idx=0,
+            get_FCD_matrix=True,
+            get_bold=True,
+            seed=None)
 
     return 0
 
@@ -643,13 +651,15 @@ if __name__ == "__main__":
     USE_MULTIPROC = False
 
     # phases = [
-    #     'train', 'best_from_train', 'val', 'best_from_val', 'test',
-    #     'best_from_test'
+    #     'train', 'best_from_train', 'val', 'test',
+    #     'best_from_prev_phase_sim_on_test'
     # ]
+    # phases = ['train']
     # phases = ['train', 'best_from_train']
-    phases = ['val', 'best_from_val', 'test', 'best_from_test']
-    # phases = ['test', 'best_from_test']
-    # phases = ['best_from_val']
+    phases = ['best_from_train', 'val', 'test']
+    # phases = ['best_from_train']
+    # phases = ['test', 'best_from_prev_phase_sim_on_test']
+    # phases = ['best_from_prev_phase_sim_on_test']
 
     for phase in phases:
         if USE_MULTIPROC:

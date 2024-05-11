@@ -7,7 +7,7 @@ import datetime
 
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
-from src.basic.constants import DESIKAN_NEUROMAPS_DIR  # noqa: F401
+from src.basic.constants import DESIKAN_NEUROMAPS_DIR, PREV_PHASE  # noqa: F401
 from src.utils.file_utils import combine_all_param_dicts, get_best_params_file_path, get_best_params_sim_res_path, get_train_file_path
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
@@ -82,11 +82,11 @@ def train_help_function(config,
                         seed=None,
                         other_parameterization=None):
     # * TODO: comment out codes if we want to use the original parameterization
-    other_parameterization = get_concat_matrix(
-        DESIKAN_NEUROMAPS_DIR,
-        PCs=3,
-        use_mean_map=True,
-        use_standardizing=True)  # shape: (N, num_of_PCs + 2)
+    # other_parameterization = get_concat_matrix(
+    #     DESIKAN_NEUROMAPS_DIR,
+    #     PCs=3,
+    #     use_mean_map=True,
+    #     use_standardizing=True)  # shape: (N, num_of_PCs + 2)
     # * TODO: comment out codes if we want to use the original parameterization
     mfm_trainer = CMAESTrainer(config=config,
                                emp_stats=emp_stats,
@@ -203,16 +203,7 @@ class ModelHandler:
 
     @property
     def prev_phase(self):
-        return self.get_prev_phase(self.phase)
-
-    @staticmethod
-    def get_prev_phase(phase: str):
-        if phase == 'train':
-            return 'train'
-        elif phase == 'val':
-            return 'train'
-        elif phase == 'test':
-            return 'val'
+        return PREV_PHASE[self.phase]
 
     def sim_param_with_dup(self, param_vectors, reshape_res=True):
         """
@@ -425,6 +416,8 @@ class ModelHandler:
     def sim_best_param_multi_times(self,
                                    sim_res_dir: str,
                                    sim_times: int = 10,
+                                   use_param_from_prev_phase: bool = True,
+                                   param_idx: int = 0,
                                    get_FCD_matrix: bool = True,
                                    get_bold: bool = True,
                                    seed=None):
@@ -435,6 +428,7 @@ class ModelHandler:
         Args:
             sim_res_dir (str): the dir to save the simulation results
             sim_times (int): the number of times to simulate
+            use_param_from_prev_phase (bool): whether to use the best param vector from the previous phase
             get_FCD_matrix (bool): whether to save the entire FCD matrix instead of the histogram of the FCD
             get_bold (bool): whether to get the mean bold signal
         """
@@ -442,11 +436,12 @@ class ModelHandler:
         if seed is None:
             seed = np.random.randint(0, 1000000000000)
         torch.manual_seed(seed)
-        best_params_path = get_best_params_file_path(self.phase,
-                                                     self.curr_phase_save_dir)
+        best_params_path = self.prev_phase_best_params_path if use_param_from_prev_phase else get_best_params_file_path(
+            self.phase, self.curr_phase_save_dir)
         saved_params = torch.load(best_params_path,
                                   map_location=self.device)['parameter']
-        param_vector = saved_params[:, 0:1]  # use the best param_vector
+        param_vector = saved_params[:, param_idx:param_idx +
+                                    1]  # use the chosen param_vector
         param_vectors = param_vector.repeat(
             1, sim_times)  # [3*N+1, sim_times * param_dup]
         print(
@@ -460,8 +455,7 @@ class ModelHandler:
         save_dict['seed'] = seed
 
         os.makedirs(sim_res_dir, exist_ok=True)
-        save_path = get_best_params_sim_res_path(self.phase, self.phase,
-                                                 sim_res_dir)
+        save_path = get_best_params_sim_res_path(self.phase, sim_res_dir)
 
         torch.save(save_dict, save_path)
         print(f'Successfully saved the simulation results to {save_path}')
@@ -501,6 +495,7 @@ class ModelHandler:
     def sim_n_get_losses(self,
                          param_vectors,
                          use_rFIC=False,
+                         sort_param_vectors=True,
                          get_FCD_matrix: bool = False,
                          get_bold: bool = False):
         """
@@ -541,7 +536,8 @@ class ModelHandler:
 
         save_dict = losses
         save_dict['valid_param_indices'] = valid_param_indices
-        save_dict['parameter'] = param_vectors[:, valid_param_indices]
+        save_dict['parameter'] = param_vectors[:, valid_param_indices] \
+            if sort_param_vectors else param_vectors
 
         if self.save_r_E:
             save_dict[
@@ -867,7 +863,9 @@ class CMAESTrainer(ModelHandler):
         :param use_rFIC: False stands for pFIC, True stands for rFIC
         :return: loss [select_param_sets(10),]; index [select_param_sets,]
         """
-        save_dict = self.sim_n_get_losses(param_vectors, use_rFIC)
+        save_dict = self.sim_n_get_losses(param_vectors,
+                                          use_rFIC,
+                                          sort_param_vectors=False)
 
         valid_param_indices = save_dict['valid_param_indices']
         num_valid = len(valid_param_indices)
@@ -1458,6 +1456,7 @@ class CMAESTrainer(ModelHandler):
         best_from_train_file_path = get_best_params_file_path(
             self.phase, self.curr_phase_save_dir)
         best_from_train = combine_all_param_dicts(
+            is_params_sorted=False,
             paths_to_dicts=train_save_files,
             top_k_per_dict=top_k_for_each_epoch,
             combined_dict_save_path=best_from_train_file_path)

@@ -42,6 +42,6 @@ SUBJECT_ID_RANGE = {
 # Deep Learning Dataset related
 NUM_GROUP_IN_SPLIT = {'train': 57, 'validation': 14, 'test': 17}
 SPLIT_NAMES = ['train', 'validation', 'test']
-
+PREV_PHASE = {'train': 'train', 'val': 'train', 'test': 'val'}
 # torch related
 DEFAULT_DTYPE = torch.float64

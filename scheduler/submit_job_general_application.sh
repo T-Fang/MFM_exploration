@@ -15,20 +15,22 @@ main_py="${scripts_dir}/main_${dataset_name}.py"
 
 target_list=('all_participants')
 # ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
-mode='validation'
+mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-need_gpu=1
+need_gpu=0
 
 echo $dataset_name $target_list $mode
 
 # ! Need to modify on every run
-trial_list=(31 32 34)
+trial_list=(31)
 # trial_list=($(seq 31 1 37))
-seed_list=(5)
-# seed_list=($(seq 1 1 5))
+# seed_list=(5)
+# seed_list=($(seq 6 1 30))
+seed_list=($(seq 1 1 15))
+seed_list=(1)
 
 for target in "${target_list[@]}"; do
-    # For group
+
     if [ ${target} = 'all_participants' ]; then # No group_nbr need
 
         logpath="${proj_dir}/logs/scheduler/${dataset_name}/${target}/${mode}"
@@ -54,7 +56,7 @@ for target in "${target_list[@]}"; do
                         $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 18:00:00 -ncpus 1 -ngpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     elif [ ${need_gpu} = 0 ]; then
                         cmd="source activate ${conda_env}; cd ${proj_dir}; python -u ${main_py} $trial_nbr $seed_nbr"
-                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 40:00:00 -ncpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
+                        $CBIG_CODE_DIR/setup/CBIG_pbsubmit -cmd "$cmd" -walltime 45:00:00 -ncpus 1 -mem 4G -name "se${seed_nbr}t${trial_nbr}_train" -joberr "$logdir/$logerror" -jobout "$logdir/$log_out"
                     fi
                 done
             done

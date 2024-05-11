@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 
 sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
-from src.basic.constants import SUBJECT_ID_RANGE
+from src.basic.constants import PREV_PHASE  # noqa F401
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import vis_best_param_vector, boxplot_train_r_E, compare_fc, compare_fcd, plot_test_losses, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap, plot_sim_fc_fcd  # noqa
-from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_best_params_file_path, get_emp_fig_dir, get_run_dir, get_sim_res_path, get_vis_param_dir  # noqa
+from src.utils.analysis_utils import compare_fc_fcd, plot_emp_bold_TC, plot_sim_bold_TC, plot_corr_matrix_for_best_params, vis_best_param_vector, boxplot_train_r_E, plot_test_losses, plot_test_losses_old, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap  # noqa
+from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_emp_fig_dir  # noqa
 from src.models.mfm_2014 import MfmModel2014
 
 sub_109 = [
@@ -41,7 +41,9 @@ def get_HCPYA_group_emp_fcd(range_start: int, range_end: int):
     return fcd
 
 
-def plot_HCPYA_group_emp_fc_fcd(range_start: int, range_end: int):
+def plot_HCPYA_group_emp_fc_fcd(range_start: int,
+                                range_end: int,
+                                plot_bold_TC: bool = True):
     # get emp fc and emp fcd tensors
     group_emp_fc = get_HCPYA_group_emp_fc(range_start, range_end).cpu().numpy()
     group_emp_fcd = get_HCPYA_group_emp_fcd(range_start,
@@ -68,6 +70,9 @@ def plot_HCPYA_group_emp_fc_fcd(range_start: int, range_end: int):
         fc_save_path.replace('.csv', '.png'),
         fcd_save_path.replace('.csv', '.png')
     ])
+
+    if plot_bold_TC:
+        plot_emp_bold_TC(range_start, range_end)
 
 
 def plot_pred_loss():
@@ -455,46 +460,52 @@ def analyze_run(target, trial_idx, seed_idx):
 
 
 def analyze_sim_res(target, trial_idx, seed_idx, phase):
-    plot_sim_fc_fcd(DS_NAME, target, phase, trial_idx, seed_idx, 0)
-    sim_fc_path = get_sim_res_path(DS_NAME, target, phase, trial_idx, seed_idx,
-                                   'sim_fc.csv')
-    sim_fcd_path = get_sim_res_path(DS_NAME, target, phase, trial_idx,
-                                    seed_idx, 'sim_fcd.csv')
-    emp_fc_fig_dir = get_emp_fig_dir(DS_NAME, target, 'FC')
-    emp_fcd_fig_dir = get_emp_fig_dir(DS_NAME, target, 'FCD')
-    range_start, range_end = SUBJECT_ID_RANGE[DS_NAME][phase]
-    emp_fc_path = os.path.join(emp_fc_fig_dir,
-                               f'group_emp_fc_{range_start}_{range_end}.csv')
-    emp_fcd_path = os.path.join(
-        emp_fcd_fig_dir, f'group_emp_fcd_{range_start}_{range_end}.csv')
-
-    compare_fc(sim_fc_path, emp_fc_path)
-    compare_fcd(sim_fcd_path, emp_fcd_path)
-
-    # TODO: Compare TC
+    USE_PARAM_AT_IDX = 2
+    compare_fc_fcd(DS_NAME,
+                   target,
+                   phase,
+                   trial_idx,
+                   seed_idx,
+                   param_idx=USE_PARAM_AT_IDX)
+    plot_sim_bold_TC(DS_NAME,
+                     target,
+                     phase,
+                     trial_idx,
+                     seed_idx,
+                     param_idx=USE_PARAM_AT_IDX)
 
 
 def analyze_phase(target, trial_idx, seed_idx, phase):
-    analyze_sim_res(target, trial_idx, seed_idx, phase)
+    plot_corr_matrix_for_best_params(DS_NAME, target, phase, trial_idx,
+                                     seed_idx)
+    # analyze_sim_res(target, trial_idx, seed_idx, phase)
 
-    # visualize the best param vector
-    best_from_phase_dir = get_run_dir(DS_NAME, target, phase, trial_idx,
-                                      seed_idx)
-    best_from_phase_path = get_best_params_file_path(phase,
-                                                     best_from_phase_dir)
-    vis_param_dir = get_vis_param_dir(DS_NAME, target, phase, trial_idx,
-                                      seed_idx)
-    vis_best_param_vector(best_from_phase_path, vis_param_dir)
+    # visualize the best param vector from previous phase
+    # vis_best_param_vector(DS_NAME,
+    #                       target,
+    #                       PREV_PHASE[phase],
+    #                       trial_idx,
+    #                       seed_idx,
+    #                       corr_with_myelin_gradient=True)
 
 
 def analyze_target(target):
+    # plot_test_losses_old(DS_NAME,
+    #                      target,
+    #                      trial_indices=[31, 32, 33, 34, 36, 37],
+    #                      trial_names=[
+    #                          'baseline', 'free rE', 'MAE l1', 'fixed sigma',
+    #                          'MAE l1\n+free rE', 'MAE l1\n+free rE\n+neuromaps'
+    #                      ],
+    #                      seed_idx='_best_among_all')
     plot_test_losses(DS_NAME,
                      target,
                      trial_indices=[31, 32, 33, 34, 36, 37],
                      trial_names=[
                          'baseline', 'free rE', 'MAE l1', 'fixed sigma',
-                         'MAE l1+free rE', 'MAE l1+free rE\n+neuromaps'
-                     ])
+                         'MAE l1\n+free rE', 'MAE l1\n+free rE\n+neuromaps'
+                     ],
+                     agg_seeds_num=2)
 
 
 if __name__ == "__main__":
@@ -509,12 +520,12 @@ if __name__ == "__main__":
     #                                   epoch_idx)
 
     # * phase-level analysis
-    for target in ALL_TARGETS:
-        for trial_idx in range(31, 38):
-            # for seed_idx in range(1, 6):
-            for seed_idx in ['_best_among_all']:
-                for phase in ['val']:
-                    analyze_phase(target, trial_idx, seed_idx, phase)
+    # for target in ALL_TARGETS:
+    #     for trial_idx in range(35, 36):
+    #         # for seed_idx in range(1, 6):
+    #         for seed_idx in ['_best_among_all']:
+    #             for phase in ['test']:
+    #                 analyze_phase(target, trial_idx, seed_idx, phase)
 
     # # * Run-level analysis
     # for target in ALL_TARGETS:
@@ -528,8 +539,8 @@ if __name__ == "__main__":
     #         analyze_trial(target, trial_idx)
 
     # * Target-level analysis
-    # for target in ALL_TARGETS:
-    #     analyze_target(target)
+    for target in ALL_TARGETS:
+        analyze_target(target)
 
     # * Others
     # plot_HCPYA_group_emp_fc_fcd(0, 343)
