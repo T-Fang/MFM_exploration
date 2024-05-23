@@ -1381,28 +1381,32 @@ class CMAESTrainer(ModelHandler):
             sampled_parameters[:, valid_count] = self.get_parameters(
                 sampled_params[:, valid_count]).squeeze()
 
-            if self.other_parameterization is not None:
-                if (sampled_parameters[:, valid_count] < search_range[:, 0]
-                    ).any() or (sampled_parameters[:, valid_count]
-                                > search_range[:, 1]).any():
-                    valid_count -= 1
-            else:
+            outside_range = (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
+                or (sampled_parameters[:, valid_count] > search_range[:, 1]).any()
+
+            if outside_range:
+                valid_count -= 1
+            elif self.other_parameterization is None:
                 wEI = sampled_parameters[self.N:2 * self.N,
                                          valid_count].unsqueeze(1)
                 wEI_myelin_corr = torch.squeeze(CBIG_corr(wEI, self.myelin))
                 wEI_rsfc_corr = torch.squeeze(
                     CBIG_corr(wEI, self.rsfc_gradient))
+
                 # print('wEE: ', sampled_parameters[0:self.N, valid_count])
                 # print('wEI: ', wEI)
                 # print('G: ', sampled_parameters[2 * self.N, valid_count])
                 # print('sigma: ', sampled_parameters[2 * self.N + 1:,
                 #                                     valid_count])
 
-                if (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
-                        or (sampled_parameters[:, valid_count] > search_range[:, 1]).any() or (wEI_myelin_corr > 0) or (wEI_rsfc_corr < 0):
-                    # print("Out of search range!")
-
-                    valid_count -= 1
+                violate_wEI_constraint = (  # noqa
+                    wEI_myelin_corr > 0) or (wEI_rsfc_corr < 0)
+                too_small_wEI_std = torch.std(wEI) < 0.35  # noqa F841
+                # * TODO: Try different param vector sampling constraints
+                # if violate_wEI_constraint or too_small_wEI_std:
+                # if violate_wEI_constraint:
+                #     valid_count -= 1
+                # * TODO: Try different param vector sampling constraints
 
             valid_count += 1
             total_count += 1

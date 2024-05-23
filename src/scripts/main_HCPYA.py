@@ -14,13 +14,13 @@ from src.utils import tzeng_func
 from src.utils.init_utils import set_torch_default
 from src.basic.constants import CONFIG_DIR, LOG_DIR
 from src.utils.file_utils import get_HCPYA_group_stats, get_HCPYA_group_stats_for_phase, get_best_params_file_path, get_sim_res_dir, get_run_dir, get_target_dir, combine_all_param_dicts  # noqa
-from src.utils.val_utils import get_prev_phase_best_params_path, get_curr_phase_save_dir
+from src.utils.val_utils import get_agg_seeds_range, get_prev_phase_best_params_path, get_curr_phase_save_dir
 from multiprocessing import Pool, set_start_method  # noqa: F401
 
 
 def apply_on_all_participants(phase, trial_idx, seed_idx):
-    USE_AGG_SEEDS = True  # whether we want to aggregate seeds during validation and test
-    AGG_SEEDS_NUM = 2  # the number of seeds to aggregate
+    USE_AGG_SEEDS = False  # whether we want to aggregate seeds during validation and test
+    AGG_SEEDS_NUM = 5  # the number of seeds to aggregate
 
     DS_NAME = 'HCPYA'
     set_torch_default()
@@ -87,14 +87,19 @@ def apply_on_all_participants(phase, trial_idx, seed_idx):
     elif phase == 'best_from_train':
         PHASE = 'train'
 
-        curr_phase_save_dir = get_run_dir(DS_NAME, TARGET, PHASE, trial_idx,
-                                          seed_idx)
         emp_stats = get_HCPYA_group_stats_for_phase(PHASE)
 
-        model_handler = CMAESTrainer(config=config,
-                                     emp_stats=emp_stats,
-                                     train_save_dir=curr_phase_save_dir)
-        model_handler.get_best_train_params(top_k_for_each_epoch=1)
+        seed_range, _ = get_agg_seeds_range(
+            AGG_SEEDS_NUM, seed_idx) if USE_AGG_SEEDS else [seed_idx]
+
+        for seed_idx in seed_range:
+            curr_phase_save_dir = get_run_dir(DS_NAME, TARGET, PHASE,
+                                              trial_idx, seed_idx)
+
+            model_handler = CMAESTrainer(config=config,
+                                         emp_stats=emp_stats,
+                                         train_save_dir=curr_phase_save_dir)
+            model_handler.get_best_train_params(top_k_for_each_epoch=1)
 
     elif phase.startswith('best_from_prev_phase_sim_on'):
 
@@ -655,8 +660,9 @@ if __name__ == "__main__":
     #     'best_from_prev_phase_sim_on_test'
     # ]
     # phases = ['train']
-    # phases = ['train', 'best_from_train']
-    phases = ['best_from_train', 'val', 'test']
+    phases = ['train', 'best_from_train']
+    # phases = ['best_from_train', 'val', 'test']
+    # phases = ['val', 'test']
     # phases = ['best_from_train']
     # phases = ['test', 'best_from_prev_phase_sim_on_test']
     # phases = ['best_from_prev_phase_sim_on_test']

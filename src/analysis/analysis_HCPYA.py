@@ -12,7 +12,7 @@ sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.basic.constants import PREV_PHASE  # noqa F401
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import compare_fc_fcd, plot_emp_bold_TC, plot_sim_bold_TC, plot_corr_matrix_for_best_params, vis_best_param_vector, boxplot_train_r_E, plot_test_losses, plot_test_losses_old, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap  # noqa
+from src.utils.analysis_utils import corr_params_with_myelin_gradient, compare_fc_fcd, plot_emp_bold_TC, plot_sim_bold_TC, vis_best_param_vector, boxplot_train_r_E, plot_test_losses, plot_test_losses_old, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap  # noqa
 from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_emp_fig_dir  # noqa
 from src.models.mfm_2014 import MfmModel2014
 
@@ -461,12 +461,12 @@ def analyze_run(target, trial_idx, seed_idx):
 
 def analyze_sim_res(target, trial_idx, seed_idx, phase):
     USE_PARAM_AT_IDX = 2
-    compare_fc_fcd(DS_NAME,
-                   target,
-                   phase,
-                   trial_idx,
-                   seed_idx,
-                   param_idx=USE_PARAM_AT_IDX)
+    # compare_fc_fcd(DS_NAME,
+    #                target,
+    #                phase,
+    #                trial_idx,
+    #                seed_idx,
+    #                param_idx=USE_PARAM_AT_IDX)
     plot_sim_bold_TC(DS_NAME,
                      target,
                      phase,
@@ -476,17 +476,17 @@ def analyze_sim_res(target, trial_idx, seed_idx, phase):
 
 
 def analyze_phase(target, trial_idx, seed_idx, phase):
-    plot_corr_matrix_for_best_params(DS_NAME, target, phase, trial_idx,
-                                     seed_idx)
-    # analyze_sim_res(target, trial_idx, seed_idx, phase)
-
-    # visualize the best param vector from previous phase
-    # vis_best_param_vector(DS_NAME,
-    #                       target,
-    #                       PREV_PHASE[phase],
-    #                       trial_idx,
-    #                       seed_idx,
-    #                       corr_with_myelin_gradient=True)
+    if phase == 'val':
+        corr_params_with_myelin_gradient(DS_NAME, target, phase, trial_idx,
+                                         seed_idx)
+        # vis_best_param_vector(DS_NAME,
+        #                       target,
+        #                       phase,
+        #                       trial_idx,
+        #                       seed_idx,
+        #                       corr_with_myelin_gradient=True)
+    elif phase == 'test':
+        analyze_sim_res(target, trial_idx, seed_idx, phase)
 
 
 def analyze_target(target):
@@ -505,7 +505,7 @@ def analyze_target(target):
                          'baseline', 'free rE', 'MAE l1', 'fixed sigma',
                          'MAE l1\n+free rE', 'MAE l1\n+free rE\n+neuromaps'
                      ],
-                     agg_seeds_num=2)
+                     agg_seeds_num=5)
 
 
 if __name__ == "__main__":
@@ -521,10 +521,11 @@ if __name__ == "__main__":
 
     # * phase-level analysis
     # for target in ALL_TARGETS:
-    #     for trial_idx in range(35, 36):
+    #     for trial_idx in range(31, 38):
     #         # for seed_idx in range(1, 6):
     #         for seed_idx in ['_best_among_all']:
-    #             for phase in ['test']:
+    #             # for phase in ['val', 'test']:
+    #             for phase in ['val']:
     #                 analyze_phase(target, trial_idx, seed_idx, phase)
 
     # # * Run-level analysis

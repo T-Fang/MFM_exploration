@@ -280,24 +280,44 @@ def draw_heatmap(heatmap_data_paths, titles, save_file_paths):
     print("Heatmaps saved to:", save_file_paths)
 
 
-def plot_bold_TC(bold_TC: torch.Tensor | np.ndarray, fig_file_path: str):
+def plot_bold_TC(bold_TC: torch.Tensor | np.ndarray,
+                 fig_file_path: str,
+                 standardize_bold: bool = True,
+                 remove_first_frames: int = 50):
     """
-    Plot the time course of the given BOLD signal, which has the shape (num_ROI, num_time_points).
+    Plot the time course of the given BOLD signal of shape (68, 1200), which has the shape (num_ROI, num_time_points).
     """
-    plt.rcParams.update({'font.size': 30})
-    plt.figure(figsize=(60, 15))
+    if standardize_bold:
+        bold_TC = (bold_TC - bold_TC.mean(
+            axis=1, keepdims=True)) / bold_TC.std(axis=1, keepdims=True)
+
+    original_font_size = plt.rcParams['font.size']
+    plt.rcParams.update({'font.size': 20})
+
+    plt.figure(figsize=(15, 5))
     for i, bold_TC_ROI in enumerate(bold_TC):
         # color = plt.cm.viridis(i / 68)  # Use a colormap for colors
         # plt.plot(bold_TC[i], label=f"Time Series {i+1}", color=color)
-        plt.plot(bold_TC_ROI, label=f"Time Series {i+1}", linewidth=0.3)
+        # plt.plot(bold_TC_ROI, label=f"Time Series {i+1}", linewidth=0.6)
+        plt.plot(bold_TC_ROI,
+                 label=f"Time Series {i+1}",
+                 linewidth=0.2,
+                 color='black')
     plt.xlabel('Time points')
     plt.ylabel('BOLD signal')
     plt.title('BOLD time course')
-    plt.xlim(0, bold_TC.shape[1])  # Limit the x-axis range from 0 to 1200
+    plt.ylim(-5, 5)  # Limit the x-axis range from 0 to 1200
+    plt.xlim(remove_first_frames,
+             bold_TC.shape[1])  # Limit the x-axis range from 0 to 1200
     plt.tight_layout()
     plt.savefig(fig_file_path)
     plt.close()
+
+    # Restore the original font size
+    plt.rcParams.update({'font.size': original_font_size})
+
     print("BOLD time course saved to:", fig_file_path)
+    return fig_file_path
 
 
 def plot_sim_bold_TC(ds_name: str,
@@ -306,21 +326,29 @@ def plot_sim_bold_TC(ds_name: str,
                      trial_idx: int,
                      seed_idx: int | str,
                      param_idx: int = 0,
-                     fig_file_path: str = None):
+                     standardize_bold: bool = True,
+                     sim_fig_path: str = None):
     """
     Plot the time course of the simulated BOLD signal, which has the shape (num_ROI, num_time_points).
     """
     sim_res = load_sim_res(ds_name, target, phase, trial_idx, seed_idx)
     bold_TC = sim_res['bold_TC_sim'][:, param_idx]
 
-    if fig_file_path is None:
-        fig_file_path = get_sim_res_path(ds_name, target, phase, trial_idx,
-                                         seed_idx, 'bold_TC_sim.png')
-    plot_bold_TC(bold_TC, fig_file_path)
+    if sim_fig_path is None:
+        sim_fig_path = get_sim_res_path(ds_name, target, phase, trial_idx,
+                                        seed_idx, 'bold_TC_sim.png')
+
+    plot_bold_TC(bold_TC, sim_fig_path, standardize_bold)
+
+    subject_id_range = SUBJECT_ID_RANGE[ds_name][phase]
+    emp_fig_path = plot_emp_bold_TC(subject_id_range[0], subject_id_range[1],
+                                    standardize_bold)
+    concat_n_images([sim_fig_path, emp_fig_path], 2, 1, sim_fig_path)
 
 
 def plot_emp_bold_TC(range_start: int,
                      range_end: int,
+                     standardize_bold: bool = True,
                      fig_file_path: str = None):
     """
     Plot the time course of the simulated BOLD signal, which has the shape (num_ROI, num_time_points).
@@ -340,7 +368,69 @@ def plot_emp_bold_TC(range_start: int,
     if fig_file_path is None:
         fig_file_path = group_TC_save_path.replace('.csv', '.png')
 
-    plot_bold_TC(bold_TC, fig_file_path)
+    return plot_bold_TC(bold_TC, fig_file_path, standardize_bold)
+
+
+def corr_params_with_myelin_gradient(ds_name: str,
+                                     target: str,
+                                     phase: int,
+                                     trial_idx: int,
+                                     seed_idx: int | str,
+                                     top_k_params: int = 10):
+    """
+    Correlate each of the best 10 params with the myelin and rsfc gradient, respectively.
+    We will get a resulting DataFrame with index 'myelin' and 'rsfc_gradient',
+    and columns the index of correlated param in the top 10 best params.
+
+    Finally, plot the DataFrame as a heatmap, with index and columns
+    """
+    best_params_dict = load_best_params(ds_name, target, phase, trial_idx,
+                                        seed_idx)
+    best_params = best_params_dict['parameter'][:, :top_k_params]
+
+    split_params = {
+        'wEE': best_params[:NUM_ROI],
+        'wEI': best_params[NUM_ROI:2 * NUM_ROI],
+        'sigma': best_params[2 * NUM_ROI + 1:]
+    }
+
+    myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
+    rsfc_gradient = get_HCPYA_group_rsfc_gradient(0, 343).flatten().numpy()
+
+    for param_name, param in split_params.items():
+        corr_with_myelin = [
+            stats.pearsonr(myelin, param[:, i])[0] for i in range(top_k_params)
+        ]
+        corr_with_rsfc_gradient = [
+            stats.pearsonr(rsfc_gradient, param[:, i])[0]
+            for i in range(top_k_params)
+        ]
+
+        # print('myelin:', myelin)
+        # print('param:', param)
+        # print('rsfc_gradient:', rsfc_gradient)
+        # print('corr_with_myelin:', corr_with_myelin)
+        # print('corr_with_rsfc_gradient:', corr_with_rsfc_gradient)
+
+        corr_df = pd.DataFrame({
+            'myelin': corr_with_myelin,
+            'rsfc_gradient': corr_with_rsfc_gradient
+        })
+
+        fig_file_path = get_fig_path_in_logs(
+            ds_name, target, 'corr_params_with_myelin_gradient', trial_idx,
+            seed_idx, f'corr_params_with_myelin_gradient_{param_name}.png')
+        plt.figure()
+        sns.heatmap(
+            corr_df.T, annot=True
+        )  # ! To have annotations, either downgrade matplotlib to 3.7 or upgrade seaborn to 0.13
+        plt.xlabel("best param vector index")
+        plt.title(
+            f'Correlation with myelin and rsfc gradient for {param_name}')
+        plt.savefig(fig_file_path)
+        plt.close()
+        print("Correlation with myelin and rsfc gradient saved to:",
+              fig_file_path)
 
 
 def plot_corr_matrix_for_best_params(ds_name: str, target: str, phase: int,
@@ -902,7 +992,8 @@ def plot_setup_losses(setup_losses_df: pd.DataFrame, fig_save_dir: str):
                               order=trial_names)
         annotator.configure(
             test='t-test_ind',
-            text_format='full',
+            # text_format='full',
+            text_format='star',
             loc='inside',
             comparisons_correction=None,
             # text_offset=8,
@@ -926,6 +1017,9 @@ def get_indices(lst, targets):
     print(result)  # [1, 4]
     """
     indices = []
+    if not isinstance(lst, list):
+        lst = lst.tolist()
+
     for target in targets:
         if target in lst:
             indices.append(lst.index(target))

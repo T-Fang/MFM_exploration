@@ -217,12 +217,14 @@ def get_values_at_indices(saved_dict: dict, indices=None):
     for key, value in saved_dict.items():
         if not torch.is_tensor(value):
             value = torch.as_tensor(value)
-
+        if value.ndim == 0:
+            new_dict[key] = value
+            continue
         assert value.ndim == 1 or value.ndim == 2, f"The value for {key} is not a 1D or 2D tensor"
         value = value[indices] if value.ndim == 1 else value[:, indices]
         new_dict[key] = value
 
-    return saved_dict
+    return new_dict
 
 
 def sort_dict_by_total_loss(saved_dict, top_k=None):
@@ -247,6 +249,8 @@ def get_first_k_values(values, k=None):
     # convert to tensor if values is not a tensor
     if not torch.is_tensor(values):
         values = torch.as_tensor(values)
+    if values.ndim == 0:
+        return values.unsqueeze(0).unsqueeze(0)
 
     if values.ndim == 1:
         if k is not None:
@@ -285,6 +289,10 @@ def combine_all_param_dicts(paths_to_dicts: list[str],
 
     for key, value in combined_dict.items():
         combined_dict[key] = torch.cat(value, dim=1).squeeze()
+
+    # get value's shape for every key
+    # for k, v in combined_dict.items():
+    #     print(f"{k}: {v.shape}")
 
     combined_dict = sort_dict_by_total_loss(combined_dict,
                                             top_k_among_all_dicts)

@@ -17,7 +17,7 @@ target_list=('all_participants')
 # ('all_participants' 'age_group' 'overall_acc_group_high' 'overall_acc_group_low' 'group_dl_dataset' 'individual')
 mode='train'
 # ('train' 'validation' 'val' 'test' 'simulate_fc_fcd' 'EI' 'val_train_param' 'simulate_fc')
-need_gpu=0
+need_gpu=1
 
 echo $dataset_name $target_list $mode
 
@@ -25,9 +25,9 @@ echo $dataset_name $target_list $mode
 trial_list=(31)
 # trial_list=($(seq 31 1 37))
 # seed_list=(5)
+seed_list=($(seq 31 1 35))
 # seed_list=($(seq 6 1 30))
-seed_list=($(seq 1 1 15))
-seed_list=(1)
+# seed_list=($(seq 1 1 6))
 
 for target in "${target_list[@]}"; do
 
