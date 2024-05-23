@@ -286,7 +286,7 @@ class MfmModel2014:
 
         if need_EI:
             return bold[:, :, burn_in_bold +
-                        1:], valid_M_mask, S_E_ave, S_I_ave, r_E_ave
+                        1:], valid_M_mask, r_E_ave, S_E_ave, S_I_ave
         else:
             return bold[:, :, burn_in_bold + 1:], valid_M_mask, r_E_ave
 

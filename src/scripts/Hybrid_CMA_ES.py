@@ -180,6 +180,9 @@ class ModelHandler:
         # TODO: Save r_E
         self.save_r_E = True
         # TODO: Save r_E
+        # TODO: Save E/I Ratio
+        self.save_EI = True
+        # TODO: Save E/I Ratio
 
         # Empirical data
         self.sc_euler = emp_stats['sc_euler']  # [N, N] for Euler integration
@@ -205,12 +208,17 @@ class ModelHandler:
     def prev_phase(self):
         return PREV_PHASE[self.phase]
 
-    def sim_param_with_dup(self, param_vectors, reshape_res=True):
+    def sim_param_with_dup(self,
+                           param_vectors,
+                           reshape_res=True,
+                           need_EI=True):
         """
         Simulate the MFM model with duplicated parameters
 
         Args:
             param_vectors (tensor): [3N+1, param_sets]
+            reshape_res (bool): whether to reshape the simulation results
+            need_EI (bool): whether to return S_E and S_I which will can be used to calculate E/I ratio
 
         Returns:
             bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
@@ -223,18 +231,20 @@ class ModelHandler:
                                  parameter_repeat,
                                  self.sc_euler,
                                  dt=self.dt)
-        bold_signal, valid_M_mask, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
+        bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave = mfm_model.CBIG_2014_mfm_simulation(
             simulate_time=self.simulate_time,
             burn_in_time=self.burn_in_time,
-            TR=self.TR)
+            TR=self.TR,
+            need_EI=need_EI)
         # bold_signal, valid_M_mask = CBIG_mfm_single_simulation_no_input_noise(parameter_repeat, sc_mat, self.t_epochlong)
 
         if reshape_res:
-            bold_signal, valid_M_mask, r_E_ave = self.reshape_sim_res(
-                bold_signal, valid_M_mask, r_E_ave)
-        return bold_signal, valid_M_mask, r_E_ave
+            bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave = self.reshape_sim_res(
+                bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave)
+        return bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave
 
-    def reshape_sim_res(self, bold_signal, valid_M_mask, r_E_ave):
+    def reshape_sim_res(self, bold_signal, valid_M_mask, r_E_ave, S_E_ave,
+                        S_I_ave):
         """
         Reshape the simulation results
 
@@ -242,11 +252,15 @@ class ModelHandler:
             bold_signal (tensor): (N, param_sets * param_dup, #time_points_in_BOLD)
             valid_M_mask (tensor): (param_sets * aram_dup, )
             r_E_ave (tensor): (N, param_sets * param_dup)
+            S_E_ave (tensor): (N, param_sets * param_dup)
+            S_I_ave (tensor): (N, param_sets * param_dup)
 
         Returns:
             bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
             valid_M_mask (tensor): (param_sets, param_dup)
             r_E_ave (tensor): (N, param_sets, param_dup)
+            S_E_ave (tensor): (N, param_sets, param_dup)
+            S_I_ave (tensor): (N, param_sets, param_dup)
         """
         param_sets = bold_signal.shape[1] // self.param_dup
         bold_signal = bold_signal.view(
@@ -256,7 +270,11 @@ class ModelHandler:
             self.param_dup, param_sets).T  # [param_sets, param_dup]
         r_E_ave = r_E_ave.view(self.N, self.param_dup, param_sets).transpose(
             1, 2)  # [N, param_sets, param_dup]
-        return bold_signal, valid_M_mask, r_E_ave
+        S_E_ave = S_E_ave.view(self.N, self.param_dup, param_sets).transpose(
+            1, 2)  # [N, param_sets, param_dup]
+        S_I_ave = S_I_ave.view(self.N, self.param_dup, param_sets).transpose(
+            1, 2)  # [N, param_sets, param_dup]
+        return bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave
 
     def get_valid_params(self, valid_M_mask):
         """
@@ -282,6 +300,8 @@ class ModelHandler:
                                     bold_signal,
                                     valid_M_mask,
                                     r_E_ave,
+                                    S_E_ave,
+                                    S_I_ave,
                                     get_FCD_matrix=False,
                                     get_mean_bold=False):
         """
@@ -292,11 +312,21 @@ class ModelHandler:
             bold_signal (tensor): (N, param_sets, param_dup, #time_points_in_BOLD)
             valid_M_mask (tensor): (param_sets, param_dup)
             r_E_ave (tensor): (N, param_sets, param_dup)
+            S_E_ave (tensor): (N, param_sets, param_dup)
+            S_I_ave (tensor): (N, param_sets, param_dup)
+            get_FCD_matrix (bool): whether to save the entire FCD matrix
+            get_mean_bold (bool): whether to get the mean bold signal
         Returns:
             fc_sim (tensor): (#valid_params, N, N)
-            fcd_sim (tensor): (fcd_hist_bins, #valid_params) or (#valid_params, window_num, window_num) if get_FCD_matrix is True
-            r_E_for_valid_params (tensor): (N, #valid_params)
-            mean_bold (tensor): (N, #valid_params, #time_points_in_BOLD) if get_mean_bold is True
+            fcd_hist (tensor): (fcd_hist_bins, #valid_params)
+            save_dict (dict): containing information to be saved, including:
+                r_E_for_valid_params (tensor): (N, #valid_params) if self.save_r_E is True
+                S_E_for_valid_params (tensor): (N, #valid_params) if self.save_EI is True
+                S_I_for_valid_params (tensor): (N, #valid_params) if self.save_EI is True
+                EI_for_valid_params (tensor): (N, #valid_params) if self.save_EI is True
+                fc_sim (tensor): (#valid_params, N, N) if get_FCD_matrix is True
+                fcd_sim (tensor): (#valid_params, window_num, window_num) if get_FCD_matrix is True
+                mean_bold (tensor): (N, #valid_params, #time_points_in_BOLD) if get_mean_bold is True
         """
         num_valid = len(valid_param_indices)
         t_len = bold_signal.shape[3]
@@ -308,10 +338,14 @@ class ModelHandler:
             window_num = t_len - self.window_size + 1
             fcd_matrices = torch.zeros(num_valid, window_num, window_num)
 
-        if self.save_r_E:
-            r_E_for_valid_params = torch.zeros(self.N, num_valid)
-        else:
-            r_E_for_valid_params = None
+        r_E_for_valid_params = torch.zeros(
+            self.N, num_valid) if self.save_r_E else None
+        S_E_for_valid_params = torch.zeros(self.N,
+                                           num_valid) if self.save_EI else None
+        S_I_for_valid_params = torch.zeros(self.N,
+                                           num_valid) if self.save_EI else None
+        EI_for_valid_params = torch.zeros(self.N,
+                                          num_valid) if self.save_EI else None
 
         for i, idx in enumerate(valid_param_indices):
             # for each set of parameter
@@ -339,15 +373,30 @@ class ModelHandler:
                                              mask_this_param]  # [N, 1/2/3/param_dup]
                 r_E_for_valid_params[:, i] = torch.mean(r_E_ave_this_param,
                                                         dim=1)
-
-        extra = {}
+            if self.save_EI:
+                S_E_ave_this_param = S_E_ave[:, idx, mask_this_param]
+                S_I_ave_this_param = S_I_ave[:, idx, mask_this_param]
+                EI_ave_this_param = S_E_ave_this_param / S_I_ave_this_param  # [N, 1/2/3/param_dup]
+                S_E_for_valid_params[:, i] = torch.mean(S_E_ave_this_param,
+                                                        dim=1)
+                S_I_for_valid_params[:, i] = torch.mean(S_I_ave_this_param,
+                                                        dim=1)
+                EI_for_valid_params[:, i] = torch.mean(EI_ave_this_param,
+                                                       dim=1)
+        save_dict = {}
+        if self.save_r_E:
+            save_dict['r_E_for_valid_params'] = r_E_for_valid_params
+        if self.save_EI:
+            save_dict['S_E_for_valid_params'] = S_E_for_valid_params
+            save_dict['S_I_for_valid_params'] = S_I_for_valid_params
+            save_dict['EI_for_valid_params'] = EI_for_valid_params
         if get_FCD_matrix:
-            extra['fcd_sim'] = fcd_matrices
-            extra['fc_sim'] = fc_sim
+            save_dict['fc_sim'] = fc_sim
+            save_dict['fcd_sim'] = fcd_matrices
         if get_mean_bold:
-            extra['bold_TC_sim'] = mean_bold
+            save_dict['bold_TC_sim'] = mean_bold
 
-        return fc_sim, fcd_hist, r_E_for_valid_params, extra
+        return fc_sim, fcd_hist, save_dict
 
     def calc_losses(self,
                     fc_sim,
@@ -475,22 +524,30 @@ class ModelHandler:
         Returns:
             fc_sim (tensor): (#valid_params, N, N)
             fcd_sim (tensor): (fcd_hist_bins, #valid_params) or (#valid_params, window_num, window_num) if get_FCD_matrix is True
-            r_E_for_valid_params (tensor): (N, #valid_params)
             valid_param_indices (list[int]): the list of valid parameter indices
+            save_dict (dict): containing information to be saved, including:
+                r_E_for_valid_params (tensor): (N, #valid_params)
+                S_E_for_valid_params (tensor): (N, #valid_params)
+                S_I_for_valid_params (tensor): (N, #valid_params)
+                fc_sim (tensor): (#valid_params, N, N)
+                fcd_sim (tensor): (#valid_params, window_num, window_num) if get_FCD_matrix is True
+                bold_TC_sim (tensor): (N, #valid_params, #time_points_in_BOLD) if get_bold is True
         """
 
-        bold_signal, valid_M_mask, r_E_ave = self.sim_param_with_dup(
-            param_vectors, reshape_res=True)
+        bold_signal, valid_M_mask, r_E_ave, S_E_ave, S_I_ave = self.sim_param_with_dup(
+            param_vectors, reshape_res=True, need_EI=True)
         valid_param_indices = self.get_valid_params(valid_M_mask)
-        fc_sim, fcd_sim, r_E_for_valid_params, extra = self.get_fc_fcd_for_valid_params(
+        fc_sim, fcd_sim, save_dict = self.get_fc_fcd_for_valid_params(
             valid_param_indices,
             bold_signal,
             valid_M_mask,
             r_E_ave,
-            get_FCD_matrix,
+            S_E_ave,
+            S_I_ave,
+            get_FCD_matrix=get_FCD_matrix,
             get_mean_bold=get_bold)
 
-        return fc_sim, fcd_sim, r_E_for_valid_params, valid_param_indices, extra
+        return fc_sim, fcd_sim, valid_param_indices, save_dict
 
     def sim_n_get_losses(self,
                          param_vectors,
@@ -519,38 +576,57 @@ class ModelHandler:
                 'parameter': (3N+1, param_sets)
                 'valid_param_indices': (#valid_params, )
                 'r_E_for_valid_params': (N, #valid_params) if self.save_r_E is True
+                'S_E_for_valid_params': (N, #valid_params) if self.save_EI is True
+                'S_I_for_valid_params': (N, #valid_params) if self.save_EI is True
+                'EI_for_valid_params': (N, #valid_params) if self.save_EI is True
         """
-        fc_sim, fcd_hist_sim, r_E_for_valid_params, valid_param_indices, extra = self.sim_n_get_fc_fcd(
+        fc_sim, fcd_hist_sim, valid_param_indices, save_dict = self.sim_n_get_fc_fcd(
             param_vectors, get_FCD_matrix=get_FCD_matrix, get_bold=get_bold)
 
         reg_loss = self.get_reg_loss(param_vectors[:, valid_param_indices],
-                                     use_rFIC, r_E_for_valid_params)
+                                     use_rFIC,
+                                     save_dict['r_E_for_valid_params'])
 
         losses, index_sorted_in_valid = self.calc_losses(fc_sim,
                                                          fcd_hist_sim,
                                                          reg_loss,
                                                          apply_sort=True)
 
+        save_dict = self.sort_save_dict(save_dict, index_sorted_in_valid)
+
+        save_dict.update(losses)
+
         valid_param_indices = torch.as_tensor(valid_param_indices)
         valid_param_indices = valid_param_indices[index_sorted_in_valid]
-
-        save_dict = losses
         save_dict['valid_param_indices'] = valid_param_indices
+
         save_dict['parameter'] = param_vectors[:, valid_param_indices] \
             if sort_param_vectors else param_vectors
 
-        if self.save_r_E:
-            save_dict[
-                'r_E_for_valid_params'] = r_E_for_valid_params[:,
-                                                               index_sorted_in_valid]
-        if 'fcd_sim' in extra:
-            save_dict['fcd_sim'] = extra['fcd_sim'][index_sorted_in_valid]
-        if 'fc_sim' in extra:
-            save_dict['fc_sim'] = extra['fc_sim'][index_sorted_in_valid]
-        if 'bold_TC_sim' in extra:
-            save_dict['bold_TC_sim'] = extra[
-                'bold_TC_sim'][:, index_sorted_in_valid]
+        return save_dict
 
+    def sort_save_dict(self, save_dict, index_sorted_in_valid):
+        """
+        Sort the save_dict according to the index_sorted_in_valid
+        ! Be careful about the shape of the tensors in the save_dict
+        """
+        if self.save_r_E:
+            save_dict['r_E_for_valid_params'] = save_dict[
+                'r_E_for_valid_params'][:, index_sorted_in_valid]
+        if self.save_EI:
+            save_dict['S_E_for_valid_params'] = save_dict[
+                'S_E_for_valid_params'][:, index_sorted_in_valid]
+            save_dict['S_I_for_valid_params'] = save_dict[
+                'S_I_for_valid_params'][:, index_sorted_in_valid]
+            save_dict['EI_for_valid_params'] = save_dict[
+                'EI_for_valid_params'][:, index_sorted_in_valid]
+        if 'fc_sim' in save_dict:
+            save_dict['fc_sim'] = save_dict['fc_sim'][index_sorted_in_valid]
+        if 'fcd_sim' in save_dict:
+            save_dict['fcd_sim'] = save_dict['fcd_sim'][index_sorted_in_valid]
+        if 'bold_TC_sim' in save_dict:
+            save_dict['bold_TC_sim'] = save_dict[
+                'bold_TC_sim'][:, index_sorted_in_valid]
         return save_dict
 
 
@@ -2016,7 +2092,7 @@ def get_EI_ratio(config, save_path, parameter, param_dup, sc_euler, seed=None):
     parameter_repeat = parameter.repeat(
         1, param_dup)  # [3*N+1, param_sets * param_dup]
     mfm_model = MfmModel2014(config, parameter_repeat, sc_euler, dt=euler_dt)
-    bold_signal, valid_M_mask, s_e_ave, s_i_ave, r_E_ave = mfm_model.CBIG_2014_mfm_simulation(
+    bold_signal, valid_M_mask, r_E_ave, s_e_ave, s_i_ave = mfm_model.CBIG_2014_mfm_simulation(
         simulate_time=simulate_time,
         burn_in_time=burn_in_time,
         TR=TR,
