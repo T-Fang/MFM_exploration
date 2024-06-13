@@ -9,12 +9,12 @@ from matplotlib import pyplot as plt
 from scipy import stats, io as sio
 from itertools import combinations
 
-from src.basic.constants import HCPYA_1029_DATA_DIR, MATLAB_SCRIPT_DIR, NUM_ROI, SUBJECT_ID_RANGE
+from src.basic.constants import DESIKAN_NEUROMAPS_DIR, HCPYA_1029_DATA_DIR, MATLAB_SCRIPT_DIR, NUM_ROI, SUBJECT_ID_RANGE
 from src.utils.file_utils import convert_to_mat, get_HCPYA_group_emp_TC, get_HCPYA_group_myelin, get_HCPYA_group_rsfc_gradient, \
-    get_best_params_sim_res_path, get_emp_fig_dir, get_fig_dir_in_logs, get_fig_path_in_logs, \
+    get_best_params_sim_res_path, get_best_train_params, get_emp_fig_dir, get_fig_dir_in_logs, get_fig_path_in_logs, \
     get_losses_fig_dir, get_run_dir, get_sim_res_dir, get_target_dir, get_vis_param_dir, load_all_val_dicts, \
-    load_best_params, load_train_dict, get_sim_res_path, get_values_at_indices
-from src.utils.val_utils import get_agg_seeds_range
+    load_best_params, load_train_dict, get_sim_res_path, get_values_at_indices, merge_all_train_dicts, \
+    get_agg_seeds_range
 from statannotations.Annotator import Annotator
 
 ############################################################
@@ -371,15 +371,149 @@ def plot_emp_bold_TC(range_start: int,
     return plot_bold_TC(bold_TC, fig_file_path, standardize_bold)
 
 
-def corr_params_with_myelin_gradient(ds_name: str,
-                                     target: str,
-                                     phase: int,
-                                     trial_idx: int,
-                                     seed_idx: int | str,
-                                     top_k_params: int = 10):
+def first_row_corrcoef(matrix):
+    # Standardize the matrix along columns
+    standardized_matrix = (matrix - matrix.mean(
+        dim=0, keepdim=True)) / matrix.std(dim=0, keepdim=True)
+
+    # Compute the correlation of the first column with all columns
+    first_column = standardized_matrix[:, 0]
+    corr_first_column = torch.matmul(standardized_matrix.t(),
+                                     first_column) / (matrix.size(0) - 1)
+
+    return corr_first_column
+
+
+def stats_corr_vs_sorted_loss(ds_name: str,
+                              target: str,
+                              trial_idx: int,
+                              seed_indices,
+                              regional_stats: str | list[str],
+                              global_stats: str | list[str],
+                              use_scatter: bool = True,
+                              fig_file_path: str = None):
     """
-    Correlate each of the best 10 params with the myelin and rsfc gradient, respectively.
-    We will get a resulting DataFrame with index 'myelin' and 'rsfc_gradient',
+    For each type of stats (either regional or global):
+        Draw a line chart, where the x-axis is the loss of a param, and the y-axis is:
+            - the param's stats value, if the stats is global, or
+            - the correlation between the param's stats with the best best param's stats, if the stats is regional
+    The line charts should be stack vertically
+    """
+    all_train_dicts = merge_all_train_dicts(ds_name, target, trial_idx,
+                                            seed_indices)
+    y_values = []
+
+    total_losses = all_train_dicts['total_loss']
+
+    for stat_name in regional_stats:
+        if stat_name == 'wEE':
+            stat = all_train_dicts['parameter'][:NUM_ROI]
+        elif stat_name == 'wEI':
+            stat = all_train_dicts['parameter'][NUM_ROI:2 * NUM_ROI]
+        elif stat_name == 'sigma':
+            stat = all_train_dicts['parameter'][2 * NUM_ROI + 1:]
+        else:
+            stat = all_train_dicts[stat_name]
+
+        # corr_with_best_stat = np.corrcoef(stat, rowvar=False)[0]
+        corr_with_best_stat = first_row_corrcoef(stat)
+        y_values.append(corr_with_best_stat)
+
+    for stat_name in global_stats:
+        if stat_name == 'G':
+            stat = all_train_dicts['parameter'][2 * NUM_ROI]
+        elif stat_name == 'sigma':
+            stat = all_train_dicts['parameter'][2 * NUM_ROI + 1]
+        else:
+            stat = all_train_dicts[stat_name]
+
+        y_values.append(stat)
+
+    original_font_size = plt.rcParams['font.size']
+    plt.rcParams.update({'font.size': 15})
+    figure, axs = plt.subplots(len(regional_stats) + len(global_stats),
+                               1,
+                               figsize=(20, 10))
+
+    for ax, y_value, stat_name in zip(axs, y_values,
+                                      regional_stats + global_stats):
+        if use_scatter:
+            ax.scatter(total_losses, y_value)
+        else:
+            ax.plot(total_losses, y_value)
+        is_regional = stat_name in regional_stats
+        title = f"{stat_name} corr with the best param's vs. total loss" \
+            if is_regional else f'global {stat_name} vs. total loss'
+        ax.set_title(title)
+        ax.set_xlabel('total loss')
+        ax.set_ylabel(
+            f'{stat_name} corr' if is_regional else f'global {stat_name}')
+
+    if fig_file_path is None:
+        postfix = '_scatter' if use_scatter else ''
+        fig_file_path = get_fig_path_in_logs(ds_name, target,
+                                             'stats_corr_vs_sorted_loss',
+                                             trial_idx, None,
+                                             f'stats_corr_vs_sorted_loss{postfix}.png')
+
+    plt.tight_layout()
+    plt.savefig(fig_file_path)
+    plt.rcParams.update({'font.size': original_font_size})
+    plt.close()
+    print("Stats correlation vs. sorted loss saved to:", fig_file_path)
+
+
+def get_myelin_gradient():
+
+    myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
+    rsfc_gradient = get_HCPYA_group_rsfc_gradient(0, 343).flatten().numpy()
+
+    myelin_fig_path = os.path.join(
+        get_emp_fig_dir('HCPYA', 'all_participants', 'myelin'),
+        "myelin_train.png")
+    rsfc_gradient_fig_path = os.path.join(
+        get_emp_fig_dir('HCPYA', 'all_participants', 'rsfc_gradient'),
+        "rsfc_gradient_train.png")
+
+    return {
+        'myelin': (myelin, myelin_fig_path),
+        'rsfc_gradient': (rsfc_gradient, rsfc_gradient_fig_path)
+    }
+
+
+def get_neuromaps_PCs(num_of_PCs: int = 3, with_mean_map: bool = True):
+    all_PCs = {}
+    if with_mean_map:
+        mean_map_path = os.path.join(DESIKAN_NEUROMAPS_DIR, 'mean_map.csv')
+        all_PCs['mean_map'] = (pd.read_csv(mean_map_path,
+                                           header=None).values.flatten(),
+                               mean_map_path.replace('.csv', '_surf_map.png'))
+
+    for i in range(num_of_PCs):
+        pc_path = os.path.join(DESIKAN_NEUROMAPS_DIR, f'pc{i+1}.csv')
+        all_PCs[f'pc{i+1}'] = (pd.read_csv(pc_path,
+                                           header=None).values.flatten(),
+                               pc_path.replace('.csv', '_surf_map.png'))
+
+    return all_PCs
+
+
+def get_parameterizors(num_of_PCs: int = 3, with_mean_map: bool = True):
+    myelin_gradient = get_myelin_gradient()
+    all_PCs = get_neuromaps_PCs(num_of_PCs, with_mean_map)
+
+    return {**myelin_gradient, **all_PCs}
+
+
+def corr_params_with_parameterizors(ds_name: str,
+                                    target: str,
+                                    phase: int,
+                                    trial_idx: int,
+                                    seed_idx: int | str,
+                                    top_k_params: int = 10):
+    """
+    Correlate each of the best 10 params with the parameterizors, respectively.
+    We will get a resulting DataFrame with name of the parameteriors as index,
     and columns the index of correlated param in the top 10 best params.
 
     Finally, plot the DataFrame as a heatmap, with index and columns
@@ -388,65 +522,61 @@ def corr_params_with_myelin_gradient(ds_name: str,
                                         seed_idx)
     best_params = best_params_dict['parameter'][:, :top_k_params]
 
-    split_params = {
+    params_stats = {
+        'EI_ratio': best_params_dict['EI_for_valid_params'],
         'wEE': best_params[:NUM_ROI],
         'wEI': best_params[NUM_ROI:2 * NUM_ROI],
         'sigma': best_params[2 * NUM_ROI + 1:]
     }
 
-    myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
-    rsfc_gradient = get_HCPYA_group_rsfc_gradient(0, 343).flatten().numpy()
+    parameterizors = get_parameterizors(num_of_PCs=3, with_mean_map=True)
+    for stat_name, params_stat in params_stats.items():
+        corr_df_dict = {}
+        for parameterizor_name, (
+                parameterizor,
+                parameterizor_fig_path) in parameterizors.items():
 
-    for param_name, param in split_params.items():
-        corr_with_myelin = [
-            stats.pearsonr(myelin, param[:, i])[0] for i in range(top_k_params)
-        ]
-        corr_with_rsfc_gradient = [
-            stats.pearsonr(rsfc_gradient, param[:, i])[0]
-            for i in range(top_k_params)
-        ]
-
-        # print('myelin:', myelin)
-        # print('param:', param)
-        # print('rsfc_gradient:', rsfc_gradient)
-        # print('corr_with_myelin:', corr_with_myelin)
-        # print('corr_with_rsfc_gradient:', corr_with_rsfc_gradient)
-
-        corr_df = pd.DataFrame({
-            'myelin': corr_with_myelin,
-            'rsfc_gradient': corr_with_rsfc_gradient
-        })
+            corr_with_parameterizor = [
+                stats.pearsonr(parameterizor, params_stat[:, i])[0]
+                for i in range(top_k_params)
+            ]
+            corr_df_dict[parameterizor_name] = corr_with_parameterizor
 
         fig_file_path = get_fig_path_in_logs(
-            ds_name, target, 'corr_params_with_myelin_gradient', trial_idx,
-            seed_idx, f'corr_params_with_myelin_gradient_{param_name}.png')
+            ds_name, target, 'corr_params_with_parameterizors', trial_idx,
+            seed_idx, f'corr_params_with_parameterizors_{stat_name}.png')
         plt.figure()
         sns.heatmap(
-            corr_df.T, annot=True
+            pd.DataFrame(corr_df_dict).T, annot=True
         )  # ! To have annotations, either downgrade matplotlib to 3.7 or upgrade seaborn to 0.13
         plt.xlabel("best param vector index")
-        plt.title(
-            f'Correlation with myelin and rsfc gradient for {param_name}')
+        plt.title(f'Correlation with parameterizors for {stat_name}')
+        plt.tight_layout()
         plt.savefig(fig_file_path)
         plt.close()
-        print("Correlation with myelin and rsfc gradient saved to:",
-              fig_file_path)
+        print("Correlation with parameterizors saved to:", fig_file_path)
 
 
-def plot_corr_matrix_for_best_params(ds_name: str, target: str, phase: int,
-                                     trial_idx: int, seed_idx: int | str):
+def plot_corr_matrix_for_best_params(ds_name: str,
+                                     target: str,
+                                     phase: int,
+                                     trial_idx: int,
+                                     seed_idx: int | str,
+                                     top_k_params: int = 10):
     """
     Plot the correlation matrix for the best parameters.
     """
     best_params_dict = load_best_params(ds_name, target, phase, trial_idx,
                                         seed_idx)
-    best_params = best_params_dict['parameter']
+    best_params = best_params_dict['parameter'][:, :top_k_params]
+    EI_ratios = best_params_dict['EI_for_valid_params'][:, :top_k_params]
     wEEs = best_params[:NUM_ROI]
     wEIs = best_params[NUM_ROI:2 * NUM_ROI]
     sigmas = best_params[2 * NUM_ROI + 1:]
 
-    for param, param_name in zip([wEEs, wEIs, sigmas, best_params],
-                                 ['wEE', 'wEI', 'sigma', 'all_params']):
+    params = [EI_ratios, wEEs, wEIs, sigmas, best_params]
+    param_names = ['EI_ratio', 'wEE', 'wEI', 'sigma', 'all_params']
+    for param, param_name in zip(params, param_names):
         corr_matrix = np.corrcoef(param.T)
         plt.figure()
         heatmap = sns.heatmap(
@@ -462,6 +592,19 @@ def plot_corr_matrix_for_best_params(ds_name: str, target: str, phase: int,
         plt.savefig(fig_file_path)
         plt.close()
         print(f"Correlation matrix for {param_name} saved to:", fig_file_path)
+
+
+def corr_with_best_vs_loss(ds_name: str,
+                           target: str,
+                           trial_idx: int,
+                           seed_idx: int | str,
+                           num_epochs: int = 100):
+    train_save_dir = get_run_dir(ds_name, target, 'train', trial_idx, seed_idx)
+
+    get_best_train_params(train_save_dir,
+                          num_epochs=num_epochs,
+                          top_k_for_each_epoch=1)
+    pass
 
 
 def boxplot_network_stats(mat_file_path, stats_name, fig_file_path):
@@ -552,7 +695,7 @@ def vis_best_param_vector(ds_name: str,
                           phase: int,
                           trial_idx: int,
                           seed_idx: int | str,
-                          corr_with_myelin_gradient: bool = True):
+                          corr_with_parameterizors: bool = True):
     vis_param_dir = get_vis_param_dir(ds_name, target, phase, trial_idx,
                                       seed_idx)
 
@@ -561,78 +704,85 @@ def vis_best_param_vector(ds_name: str,
     wEE = param_vector[:NUM_ROI]
     wEI = param_vector[NUM_ROI:2 * NUM_ROI]
     sigma = param_vector[2 * NUM_ROI + 1:]
-    param_dict = {'wEE': wEE, 'wEI': wEI, 'sigma': sigma}
+    EI_ratio = save_dict['EI_for_valid_params'][:, 0]
+    param_stats_dict = {
+        'EI_ratio': EI_ratio,
+        'wEE': wEE,
+        'wEI': wEI,
+        'sigma': sigma
+    }
 
     os.makedirs(vis_param_dir, exist_ok=True)
 
-    train_myelin = get_HCPYA_group_myelin(0, 343).flatten().numpy()
-    train_rsfc_gradient = get_HCPYA_group_rsfc_gradient(0,
-                                                        343).flatten().numpy()
+    parameterizors = get_parameterizors(num_of_PCs=3, with_mean_map=True)
 
-    train_myelin_fig_dir = get_emp_fig_dir('HCPYA', 'all_participants',
-                                           'myelin')
-    train_myelin_fig_path = os.path.join(train_myelin_fig_dir,
-                                         "myelin_train.png")
-    train_rsfc_gradient_fig_dir = get_emp_fig_dir('HCPYA', 'all_participants',
-                                                  'rsfc_gradient')
-    train_rsfc_gradient_fig_path = os.path.join(train_rsfc_gradient_fig_dir,
-                                                "rsfc_gradient_train.png")
+    stats_list = []
+    stats_names = []
+    fig_file_paths = []
+    fig_titles = []
 
-    stats_list = [train_myelin, train_rsfc_gradient]
-    stats_names = ['myelin_train', 'rsfc_gradient_train']
-    fig_file_paths = [train_myelin_fig_path, train_rsfc_gradient_fig_path]
-    fig_titles = ['myelin in train', 'rsfc gradient in train']
-    param_fig_paths = []
-    myelin_param_scatter_paths = []
-    rsfc_gradient_param_scatter_paths = []
+    parameterizor_fig_paths = []
+    for parameterizor_name, (parameterizor,
+                             parameterizor_fig_path) in parameterizors.items():
+        stats_list.append(parameterizor)
+        stats_names.append(parameterizor_name)
+        fig_file_paths.append(parameterizor_fig_path)
+        parameterizor_fig_paths.append(parameterizor_fig_path)
+        fig_titles.append(parameterizor_name.replace('_', ' '))
 
-    param_names = ['wEE', 'wEI', 'sigma']
+    param_stats_names = ['EI_ratio', 'wEE', 'wEI', 'sigma']
     if torch.all(sigma == sigma[0]):
         # ignore sigma if all sigma are the same
-        param_names = ['wEE', 'wEI']
+        param_stats_names = ['EI_ratio', 'wEE', 'wEI']
+    scatter_paths = {}
+    param_stats_fig_paths = []
 
-    for param_name in param_names:
-        param = param_dict[param_name]
-        stats_list.append(param)
-        stats_names.append(f'{param_name}')
+    for param_stat_name in param_stats_names:
+        scatter_paths[param_stat_name] = []
+        param_stat = param_stats_dict[param_stat_name]
+        stats_list.append(param_stat)
+        stats_names.append(param_stat_name)
         param_fig_path = os.path.join(vis_param_dir,
-                                      f"{param_name}_surf_map.png")
+                                      f"{param_stat_name}_surf_map.png")
         fig_file_paths.append(param_fig_path)
-        param_fig_paths.append(param_fig_path)
-        fig_titles.append(f'{param_name}')
+        param_stats_fig_paths.append(param_fig_path)
+        fig_titles.append(param_stat_name.replace('_', ' '))
 
-        if corr_with_myelin_gradient:
-            # scatter plot myelin and rsfc gradient with the param
-            myelin_param_scatter_paths.append(
-                os.path.join(vis_param_dir,
-                             f"myelin_{param_name}_scatter.png"))
-            plot_scatter(param, train_myelin, param_name, 'myelin in train',
-                         f'myelin in train vs. {param_name}',
-                         myelin_param_scatter_paths[-1], False, True, True)
-            rsfc_gradient_param_scatter_paths.append(
-                os.path.join(vis_param_dir,
-                             f"rsfc_gradient_{param_name}_scatter.png"))
-            plot_scatter(param, train_rsfc_gradient, param_name,
-                         'rsfc gradient in train',
-                         f'rsfc gradient in train vs. {param_name}',
-                         rsfc_gradient_param_scatter_paths[-1], False, True,
-                         True)
+        if corr_with_parameterizors:
+            # scatter plot parameterizors with the param
+            for parameterizor_name, (
+                    parameterizor,
+                    parameterizor_fig_path) in parameterizors.items():
+                scatter_paths[param_stat_name].append(
+                    os.path.join(
+                        vis_param_dir,
+                        f"{param_stat_name}_{parameterizor_name}_scatter.png"))
+                plot_scatter(parameterizor, param_stat, parameterizor_name,
+                             param_stat_name,
+                             f'{param_stat_name} vs. {parameterizor_name}',
+                             scatter_paths[param_stat_name][-1], False, True,
+                             True)
 
     visualize_stats(stats_list, stats_names, fig_file_paths, fig_titles)
 
-    if corr_with_myelin_gradient:
-        image_path_list = [None] + param_fig_paths + [train_myelin_fig_path] + myelin_param_scatter_paths + \
-                          [train_rsfc_gradient_fig_path] + rsfc_gradient_param_scatter_paths
+    if corr_with_parameterizors:
+        image_path_list = [None] + parameterizor_fig_paths
+        for param_stat_fig_path, param_stat_scatter_paths in zip(
+                param_stats_fig_paths, scatter_paths.values()):
+            image_path_list += [param_stat_fig_path] + param_stat_scatter_paths
+
         merged_img_path = os.path.join(
             vis_param_dir,
-            "vis_best_param_vector_corr_with_myelin_gradient.png")
-        concat_n_images(image_path_list, 3,
-                        len(param_names) + 1, merged_img_path)
+            "vis_best_param_vector_corr_with_parameterizors.png")
+        concat_n_images(image_path_list,
+                        len(param_stats_names) + 1,
+                        len(parameterizors) + 1, merged_img_path)
     else:
-        image_path_list = param_fig_paths
+        image_path_list = param_stats_fig_paths
         merged_img_path = os.path.join(vis_param_dir,
                                        "vis_best_param_vector.png")
-        concat_n_images(image_path_list, 1, len(param_names), merged_img_path)
+        concat_n_images(image_path_list, 1, len(param_stats_names),
+                        merged_img_path)
 
 
 ############################################################
@@ -1328,6 +1478,7 @@ def visualize_train_r_E_for_multi_epochs(ds_name, target, trial_idx, seed_idx,
                              seed_idx, f'r_E{group_affix}_surf_map.png'))
 
 
+# @DeprecationWarning
 def merge_train_dict_across_seed(ds_name,
                                  target,
                                  trial_idx,

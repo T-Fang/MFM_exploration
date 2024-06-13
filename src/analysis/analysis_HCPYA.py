@@ -12,7 +12,7 @@ sys.path.insert(1, '/home/ftian/storage/projects/MFM_exploration')
 from src.basic.constants import PREV_PHASE  # noqa F401
 from src.analysis import analysis_functions
 from src.utils import tzeng_func
-from src.utils.analysis_utils import corr_params_with_myelin_gradient, compare_fc_fcd, plot_emp_bold_TC, plot_sim_bold_TC, vis_best_param_vector, boxplot_train_r_E, plot_test_losses, plot_test_losses_old, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap  # noqa
+from src.utils.analysis_utils import plot_corr_matrix_for_best_params, stats_corr_vs_sorted_loss, corr_params_with_parameterizors, compare_fc_fcd, plot_emp_bold_TC, plot_sim_bold_TC, vis_best_param_vector, boxplot_train_r_E, plot_test_losses, plot_test_losses_old, plot_train_loss, scatter_loss_vs_r_E, visualize_train_r_E_for_multi_epochs, draw_heatmap  # noqa
 from src.utils.file_utils import get_HCPYA_group_emp_TC, get_HCPYA_group_emp_fc, get_emp_fig_dir  # noqa
 from src.models.mfm_2014 import MfmModel2014
 
@@ -477,16 +477,27 @@ def analyze_sim_res(target, trial_idx, seed_idx, phase):
 
 def analyze_phase(target, trial_idx, seed_idx, phase):
     if phase == 'val':
-        corr_params_with_myelin_gradient(DS_NAME, target, phase, trial_idx,
-                                         seed_idx)
+        # corr_params_with_parameterizors(DS_NAME, target, phase, trial_idx,
+        #                                 seed_idx)
         # vis_best_param_vector(DS_NAME,
         #                       target,
         #                       phase,
         #                       trial_idx,
         #                       seed_idx,
-        #                       corr_with_myelin_gradient=True)
+        #                       corr_with_parameterizors=True)
+        plot_corr_matrix_for_best_params(DS_NAME, target, phase, trial_idx,
+                                         seed_idx)
     elif phase == 'test':
         analyze_sim_res(target, trial_idx, seed_idx, phase)
+
+
+def analyze_trial(target, trial_idx):
+    stats_corr_vs_sorted_loss(DS_NAME,
+                              target,
+                              trial_idx,
+                              seed_indices=range(1, 31),
+                              regional_stats=['wEE', 'wEI', 'sigma'],
+                              global_stats=['G'])
 
 
 def analyze_target(target):
@@ -498,14 +509,16 @@ def analyze_target(target):
     #                          'MAE l1\n+free rE', 'MAE l1\n+free rE\n+neuromaps'
     #                      ],
     #                      seed_idx='_best_among_all')
+
+    # ! TODO: Change 37 to 42
     plot_test_losses(DS_NAME,
                      target,
-                     trial_indices=[31, 32, 33, 34, 36, 37],
+                     trial_indices=[31, 32, 33, 39, 37],
                      trial_names=[
-                         'baseline', 'free rE', 'MAE l1', 'fixed sigma',
-                         'MAE l1\n+free rE', 'MAE l1\n+free rE\n+neuromaps'
+                         'baseline', 'free rE', 'MAE l1', 'same sigma',
+                         'free rE\n+neuromaps'
                      ],
-                     agg_seeds_num=5)
+                     agg_seeds_num=3)
 
 
 if __name__ == "__main__":
@@ -521,9 +534,11 @@ if __name__ == "__main__":
 
     # * phase-level analysis
     # for target in ALL_TARGETS:
-    #     for trial_idx in range(31, 38):
+    #     # for trial_idx in range(31, 38):
+    #     # for trial_idx in [31]:
+    #     for trial_idx in [31, 32, 33, 36, 37, 39, 40]:
     #         # for seed_idx in range(1, 6):
-    #         for seed_idx in ['_best_among_all']:
+    #         for seed_idx in ['_seed1_to_seed3']:
     #             # for phase in ['val', 'test']:
     #             for phase in ['val']:
     #                 analyze_phase(target, trial_idx, seed_idx, phase)
@@ -535,13 +550,15 @@ if __name__ == "__main__":
     #             analyze_run(target, trial_idx, seed_idx)
 
     # * Trial-level analysis
-    # for target in ALL_TARGETS:
-    #     for trial_idx in [10]:
-    #         analyze_trial(target, trial_idx)
+    for target in ALL_TARGETS:
+        # for trial_idx in [31]:
+        # for trial_idx in [39, 40]:
+        for trial_idx in [31, 32, 33, 36, 37]:
+            analyze_trial(target, trial_idx)
 
     # * Target-level analysis
-    for target in ALL_TARGETS:
-        analyze_target(target)
+    # for target in ALL_TARGETS:
+    #     analyze_target(target)
 
     # * Others
     # plot_HCPYA_group_emp_fc_fcd(0, 343)

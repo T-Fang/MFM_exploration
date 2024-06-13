@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 import scipy.io as sio
 
-from src.basic.constants import DEFAULT_DTYPE, LOG_DIR, MATLAB_SCRIPT_DIR, TMP_DIR, HCPYA_1029_DATA_DIR, FIGURES_DIR
+from src.basic.constants import PREV_PHASE, DEFAULT_DTYPE, LOG_DIR, MATLAB_SCRIPT_DIR, TMP_DIR, HCPYA_1029_DATA_DIR, FIGURES_DIR
 from src.utils.SC_utils import group_SC_matrices
 from src.utils.FC_utils import fisher_average
 
@@ -53,6 +53,13 @@ def get_target_dir(ds_name, target):
     return target_path
 
 
+def get_trial_dir(ds_name, target, trial_idx):
+    trial_path = os.path.join(get_target_dir(ds_name, target),
+                              f'trial{trial_idx}')
+    os.makedirs(trial_path, exist_ok=True)
+    return trial_path
+
+
 def get_run_dir(ds_name, target, phase, trial_idx, seed_idx):
     run_path = os.path.join(get_target_dir(ds_name, target), phase,
                             f'trial{trial_idx}', f'seed{seed_idx}')
@@ -72,7 +79,13 @@ def get_group_dir(ds_name, target, phase, trial_idx, seed_idx, group_idx=None):
 
 def get_fig_dir_in_logs(ds_name, target, fig_type, trial_idx, seed_idx):
     fig_dir = os.path.join(get_target_dir(ds_name, target), 'figures',
-                           fig_type, f'trial{trial_idx}', f'seed{seed_idx}')
+                           fig_type)
+    if trial_idx is not None:
+        fig_dir = os.path.join(fig_dir, f'trial{trial_idx}')
+
+    if seed_idx is not None:
+        fig_dir = os.path.join(fig_dir, f'seed{seed_idx}')
+
     os.makedirs(fig_dir, exist_ok=True)
     return fig_dir
 
@@ -109,9 +122,104 @@ def get_fig_path_in_logs(ds_name, target, fig_type, trial_idx, seed_idx,
     return os.path.join(fig_dir, fig_name)
 
 
+def get_agg_seeds_range(agg_seeds_num, agg_seed_idx):
+    """
+    Get the range of seeds to aggregate
+
+    Parameters
+    ----------
+    agg_seeds_num : int
+        The number of seeds to aggregate
+    seed_idx : int
+        The index of the aggregated seed
+
+    """
+    seed_start = (agg_seed_idx - 1) * agg_seeds_num + 1
+    seed_end = agg_seed_idx * agg_seeds_num
+    agg_seed_label = f'_seed{seed_start}_to_seed{seed_end}'
+    return range(seed_start, seed_end + 1), agg_seed_label
+
+
+def get_prev_phase_best_params_path(ds_name,
+                                    target,
+                                    phase,
+                                    trial_idx,
+                                    seed_idx,
+                                    agg_seeds_num: int = None):
+
+    if agg_seeds_num is not None and phase != 'train':
+        seeds_range, seed_idx = get_agg_seeds_range(agg_seeds_num, seed_idx)
+    prev_phase = PREV_PHASE[phase]
+    prev_phase_save_dir = get_run_dir(ds_name, target, prev_phase, trial_idx,
+                                      seed_idx)
+    prev_phase_best_params_path = get_best_params_file_path(
+        prev_phase, prev_phase_save_dir)
+
+    # if we haven't saved best params from previous phase, get it from all seeds
+    if agg_seeds_num is not None and phase != 'train' and not os.path.exists(
+            prev_phase_best_params_path):
+        prev_phase_all_seeds_save_dir = [
+            get_run_dir(ds_name, target, prev_phase, trial_idx, seed_i)
+            for seed_i in seeds_range
+        ]
+        prev_phase_all_seeds_best_params_path = [
+            get_best_params_file_path(prev_phase, prev_phase_save_dir)
+            for prev_phase_save_dir in prev_phase_all_seeds_save_dir
+        ]
+        combine_all_param_dicts(
+            paths_to_dicts=prev_phase_all_seeds_best_params_path,
+            combined_dict_save_path=prev_phase_best_params_path)
+
+    return prev_phase_best_params_path
+
+
+def get_curr_phase_save_dir(ds_name,
+                            target,
+                            phase,
+                            trial_idx,
+                            seed_idx,
+                            agg_seeds_num: int = None):
+    if agg_seeds_num is not None and phase != 'train':
+        seeds_range, seed_idx = get_agg_seeds_range(agg_seeds_num, seed_idx)
+    return get_run_dir(ds_name, target, phase, trial_idx, seed_idx)
+
+
 ############################################################
 # Load intermediate files
 ############################################################
+def get_best_train_params(train_save_dir,
+                          num_epochs: int = 100,
+                          top_k_for_each_epoch: int = 1):
+    """
+    Firstly, load the dict for each epoch under 'train_save_dir'.
+    Afterwards, get the top_k_for_each_epoch param vector along with their costs for each train epoch.
+    Then combine them into a dict with the same structure.
+    Finally, save the dict as 'best_from_train.pth' under 'train_save_dir'
+    """
+
+    train_save_files = [
+        get_train_file_path(train_save_dir, ep) for ep in range(num_epochs)
+    ]
+
+    # save the top few param vectors with the lowest validation loss
+    best_from_train_file_path = get_best_params_file_path(
+        'train', train_save_dir)
+    if top_k_for_each_epoch != 1:
+        best_from_train_file_path = best_from_train_file_path.replace(
+            '.pth', f'_top{top_k_for_each_epoch}_per_epoch.pth')
+    best_from_train = combine_all_param_dicts(
+        is_params_sorted=False,
+        paths_to_dicts=train_save_files,
+        top_k_per_dict=top_k_for_each_epoch,
+        combined_dict_save_path=best_from_train_file_path)
+
+    print(
+        f"Successfully saved the top {top_k_for_each_epoch} parameters from each train epoch to: {best_from_train_file_path}"
+    )
+
+    return best_from_train
+
+
 def load_best_params(
     ds_name: str,
     target: str,
@@ -228,8 +336,7 @@ def get_values_at_indices(saved_dict: dict, indices=None):
 
 
 def sort_dict_by_total_loss(saved_dict, top_k=None):
-    total_loss = saved_dict['total_loss']
-    sorted_indices = torch.argsort(total_loss, descending=False)
+    sorted_indices = torch.argsort(saved_dict['total_loss'], descending=False)
     new_save_dict = get_values_at_indices(saved_dict, sorted_indices)
     if top_k is not None:
         new_save_dict = get_values_at_indices(new_save_dict, range(top_k))
@@ -263,6 +370,25 @@ def get_first_k_values(values, k=None):
         raise Exception("The input `values` is not a 1D or 2D tensor")
 
     return values
+
+
+def merge_all_train_dicts(ds_name,
+                          target,
+                          trial_idx,
+                          seed_range,
+                          epoch_range=range(100)):
+    all_train_dict_paths = []
+    for seed_idx in seed_range:
+        train_save_dir = get_run_dir(ds_name, target, 'train', trial_idx,
+                                     seed_idx)
+        for epoch_idx in epoch_range:
+            all_train_dict_paths.append(
+                get_train_file_path(train_save_dir, epoch_idx))
+
+    merged_train_dict = combine_all_param_dicts(all_train_dict_paths,
+                                                is_params_sorted=False)
+
+    return merged_train_dict
 
 
 def combine_all_param_dicts(paths_to_dicts: list[str],

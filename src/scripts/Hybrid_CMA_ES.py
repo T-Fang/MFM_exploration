@@ -8,7 +8,7 @@ import datetime
 from src.models.model_predictor_classifier import ClassifyNanModel_2, PredictLossModel_1, ClassifyNanModel_Yan100, PredictLossModel_1_Yan100
 from src.models.mfm_2014 import MfmModel2014
 from src.basic.constants import DESIKAN_NEUROMAPS_DIR, PREV_PHASE  # noqa: F401
-from src.utils.file_utils import combine_all_param_dicts, get_best_params_file_path, get_best_params_sim_res_path, get_train_file_path
+from src.utils.file_utils import get_best_params_file_path, get_best_params_sim_res_path, get_train_file_path
 from src.utils.tzeng_func_torch import parameterize_myelin_rsfc
 from src.utils.CBIG_func_torch import CBIG_corr
 from src.utils.neuromaps_utils import get_concat_matrix  # noqa: F401
@@ -80,14 +80,20 @@ def train_help_function(config,
                         opportunities,
                         next_epoch,
                         seed=None,
-                        other_parameterization=None):
-    # * TODO: comment out codes if we want to use the original parameterization
-    # other_parameterization = get_concat_matrix(
-    #     DESIKAN_NEUROMAPS_DIR,
-    #     PCs=3,
-    #     use_mean_map=True,
-    #     use_standardizing=True)  # shape: (N, num_of_PCs + 2)
-    # * TODO: comment out codes if we want to use the original parameterization
+                        other_parameterization=None,
+                        use_same_sigma=False):
+    # ** TODO: comment out codes if we want to use the original parameterization
+    other_parameterization = get_concat_matrix(
+        DESIKAN_NEUROMAPS_DIR,
+        PCs=3,
+        use_mean_map=True,
+        use_standardizing=True)  # shape: (N, num_of_PCs + 2)
+    # ** TODO: comment out codes if we want to use the original parameterization
+
+    # ** TODO: Try optimizing the same sigma for every ROI
+    # use_same_sigma = True
+    # ** TODO: Try optimizing the same sigma for every ROI
+
     mfm_trainer = CMAESTrainer(config=config,
                                emp_stats=emp_stats,
                                train_save_dir=train_save_dir,
@@ -97,7 +103,8 @@ def train_help_function(config,
                                dl_rfic_range=dl_rfic_range,
                                euler_rfic_range=euler_rfic_range,
                                query_wei_range=query_wei_range,
-                               other_parameterization=other_parameterization)
+                               other_parameterization=other_parameterization,
+                               use_same_sigma=use_same_sigma)
     opportunities = opportunities
     next_epoch = next_epoch
     for i in range(opportunities):
@@ -642,7 +649,8 @@ class CMAESTrainer(ModelHandler):
                  dl_rfic_range=[],
                  euler_rfic_range=[],
                  query_wei_range: str = 'Uniform',
-                 other_parameterization=None):
+                 other_parameterization=None,
+                 use_same_sigma=False):
         """Initialize Hybrid CMA-ES trainer
 
         Args:
@@ -666,6 +674,7 @@ class CMAESTrainer(ModelHandler):
 
         self.myelin = emp_stats['myelin']  # [N, 1]
         self.rsfc_gradient = emp_stats['rsfc_gradient']  # [N, 1]
+        self.use_same_sigma = use_same_sigma
 
         # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
         self.other_parameterization = other_parameterization
@@ -679,11 +688,10 @@ class CMAESTrainer(ModelHandler):
             self.p = other_parameterization.shape[1]
         self.pinv_concat_mat = torch.linalg.pinv(self.concat_mat)
         # TODO: Use PCs and mean of neuromaps to parameterize wEE and wEI
-
         self.parameter_dim = 3 * self.N + 1  # 3N + 1. The dimension of parameters in MFM model.
 
-        # TODO: change to 2 * self.p + 1, if we want to totally remove parameterization for sigma
-        self.param_dim = 3 * self.p + 1  # The dimension of the parameters in our parameterization
+        # The dimension of the coefficient vector in our parameterization
+        self.param_dim = 2 * self.p + 2 if self.use_same_sigma else 3 * self.p + 1
 
         # Training and generating parameters
         self.num_epochs = int(num_epochs)
@@ -743,7 +751,7 @@ class CMAESTrainer(ModelHandler):
     def get_parameters(self, param_coef):
         """
         From the parameterization coefficients to get the 3N+1 parameters
-        :param param_coef: [3 * self.p + 1, param_sets]
+        :param param_coef: (2 * self.p + 2, param_sets) if self.use_same_sigma else (3 * self.p + 1, param_sets)
         :return: parameters for 2014 Deco Model [3N+1, param_sets]
         """
         w_EE = torch.matmul(self.concat_mat,
@@ -751,13 +759,19 @@ class CMAESTrainer(ModelHandler):
         w_EI = torch.matmul(self.concat_mat,
                             param_coef[self.p:2 *
                                        self.p])  # shape: (N, param_sets)
-        G = param_coef[2 * self.p].unsqueeze(0)  # shape: (param_sets, )
-        sigma = torch.matmul(self.concat_mat,
-                             param_coef[2 * self.p +
-                                        1:])  # shape: (N, param_sets)
+        G = param_coef[2 * self.p].unsqueeze(0)  # shape: (1, param_sets)
+        if self.use_same_sigma:
+            sigma = param_coef[2 * self.p + 1].unsqueeze(
+                0)  # shape: (1, param_sets)
+            # repeat sigma for self.N times since we are using the same sigma for every ROI
+            sigma = sigma.repeat(self.N, 1).squeeze()  # shape: (N, param_sets)
+        else:
+            sigma = torch.matmul(self.concat_mat,
+                                 param_coef[2 * self.p +
+                                            1:])  # shape: (N, param_sets)
 
         return torch.cat((w_EE, w_EI, G, sigma),
-                         dim=0)  # shape: (3N+1, param_sets)
+                         dim=0).squeeze()  # shape: (3N+1, param_sets)
 
     def get_wei_range(self):
         if self.query_wei_range == 'Uniform':
@@ -1187,13 +1201,13 @@ class CMAESTrainer(ModelHandler):
         init_parameters = torch.rand(self.parameter_dim) * (
             search_range[:, 1] -
             search_range[:, 0]) + search_range[:, 0]  # [3*N+1]
+        if self.use_same_sigma:
+            init_parameters[2 * N + 1:] = init_parameters[2 * N + 1]
         init_parameters = init_parameters.unsqueeze(1)  # [3*N+1, 1]
         start_point_wEE = torch.matmul(self.pinv_concat_mat,
                                        init_parameters[0:N]).squeeze()
         start_point_wEI = torch.matmul(self.pinv_concat_mat,
                                        init_parameters[N:2 * N]).squeeze()
-        start_point_sigma = torch.matmul(  # noqa
-            self.pinv_concat_mat, init_parameters[2 * N + 1:]).squeeze()
 
         # Init m_0 for CMA-ES, just by the experience of my seniors
         m_0 = torch.zeros(self.param_dim)
@@ -1202,7 +1216,12 @@ class CMAESTrainer(ModelHandler):
         m_0[self.p:2 * self.p] = start_point_wEI
         # m_0[self.p + 1] = start_point_wEI[1] / 2
         m_0[2 * self.p] = init_parameters[2 * N]  # G
-        m_0[2 * self.p + 1:] = start_point_sigma
+        if self.use_same_sigma:
+            m_0[2 * self.p + 1] = init_parameters[2 * N + 1]
+        else:
+            start_point_sigma = torch.matmul(  # noqa
+                self.pinv_concat_mat, init_parameters[2 * N + 1:]).squeeze()
+            m_0[2 * self.p + 1:] = start_point_sigma
 
         sigma_0 = 0.2
         p_sigma_0 = torch.zeros(self.param_dim, 1)
@@ -1214,7 +1233,8 @@ class CMAESTrainer(ModelHandler):
         Lambda_ini[0:self.p] = start_point_wEE[0]
         Lambda_ini[self.p:2 * self.p] = start_point_wEI[0]
         Lambda_ini[2 * self.p] = 0.4
-        Lambda_ini[2 * self.p + 1:] = 0.0005
+        Lambda_ini[2 * self.p +
+                   1:] = 0.0005  # Also works when self.use_same_sigma is True
         cov_0 = torch.matmul(V_ini,
                              torch.matmul(torch.diag(Lambda_ini**2), V_ini.T))
 
@@ -1449,13 +1469,14 @@ class CMAESTrainer(ModelHandler):
         while valid_count < self.param_sets:
             # print('current valid count: ', valid_count)
             sampled_params[:, valid_count] = multivariate_normal.sample(
-            )  # [3 * self.p + 1, param_sets]
+            )  # (2 * self.p + 2, param_sets) if self.use_same_sigma else (3 * self.p + 1, param_sets)
+
             # * TODO: Try without parameterizing sigma
             # sampled_params[2 * self.p + 1, valid_count] = 0.005
             # sampled_params[2 * self.p + 2:, valid_count] = 0
             # * TODO: Try without parameterizing sigma
             sampled_parameters[:, valid_count] = self.get_parameters(
-                sampled_params[:, valid_count]).squeeze()
+                sampled_params[:, valid_count])
 
             outside_range = (sampled_parameters[:, valid_count] < search_range[:, 0]).any() \
                 or (sampled_parameters[:, valid_count] > search_range[:, 1]).any()
@@ -1495,6 +1516,7 @@ class CMAESTrainer(ModelHandler):
         return sampled_params, sampled_parameters
 
     def _sample_valid_parameters_rFIC(self, mean, cov, search_range):
+        # TODO: May need to modify if we want to use the same sigma for every ROI
         multivariate_normal = td.MultivariateNormal(mean, cov)
         valid_count = 0
         total_count = 0
@@ -1518,34 +1540,6 @@ class CMAESTrainer(ModelHandler):
                 )
                 return None
         return sampled_parameters
-
-    def get_best_train_params(self, top_k_for_each_epoch: int = 1):
-        """
-        Firstly, load the dict for each epoch under 'self.curr_phase_save_dir'.
-        Afterwards, get the best param vector along with their costs for each train epoch.
-        Then combine them into a dict with the same structure.
-        Finally, save the dict as 'best_from_train.pth' under 'self.curr_phase_save_dir'
-        """
-
-        train_save_files = [
-            get_train_file_path(self.curr_phase_save_dir, ep)
-            for ep in range(self.num_epochs)
-        ]
-
-        # save the top few param vectors with the lowest validation loss
-        best_from_train_file_path = get_best_params_file_path(
-            self.phase, self.curr_phase_save_dir)
-        best_from_train = combine_all_param_dicts(
-            is_params_sorted=False,
-            paths_to_dicts=train_save_files,
-            top_k_per_dict=top_k_for_each_epoch,
-            combined_dict_save_path=best_from_train_file_path)
-
-        print(
-            f"Successfully saved the top {top_k_for_each_epoch} parameters from each train epoch to: {best_from_train_file_path}"
-        )
-
-        return best_from_train
 
 
 class CMAESValidator(ModelHandler):
